@@ -1,0 +1,21 @@
+{
+  "_comment": "Merge into ~/.cursor/permissions.json. Cursor Settings \u2192 Agents \u2192 Auto-Run \u2192 Allowlist.",
+  "mcpAllowlist": [
+    "user-atlassian:getJiraIssue",
+    "user-atlassian:getJiraIssueRemoteIssueLinks",
+    "user-atlassian:getAccessibleAtlassianResources",
+    "user-atlassian:searchJiraIssuesUsingJql",
+    "user-atlassian:getJiraIssueTypeMetaWithFields",
+    "user-atlassian:getJiraProjectIssueTypesMetadata",
+    "user-atlassian:createJiraIssue",
+    "user-atlassian:addCommentToJiraIssue"
+  ],
+  "terminalAllowlist": [
+    "gh",
+    "python scripts/prefetch_coverage_inputs.py",
+    "python scripts/fetch_coverage_github.py",
+    "python scripts/generate_qmetry_excel.py",
+    "python scripts/install_coverage_validator_permissions.py",
+    "mkdir"
+  ]
+}

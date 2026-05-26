@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Agent outputs (keep structure)
+reports/*
+!reports/.gitkeep
+!reports/.cache/
+reports/.cache/*
+!reports/.cache/.gitkeep
+testcases/*
+!testcases/.gitkeep
+
+# Local overrides
+.coverage-validator.defaults.json

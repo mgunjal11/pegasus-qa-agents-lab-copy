@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coverage validation — {{ISSUE_KEY}}</title>
+  <style>
+    :root {
+      --bg: #eef2f7;
+      --card: #ffffff;
+      --text: #1a1a2e;
+      --muted: #5c6370;
+      --border: #dde1e8;
+      --link: #2563eb;
+      --pass: #15803d;
+      --pass-bg: #dcfce7;
+      --pass-border: #86efac;
+      --warn: #b45309;
+      --warn-bg: #fef3c7;
+      --warn-border: #fcd34d;
+      --fail: #b91c1c;
+      --fail-bg: #fee2e2;
+      --fail-border: #fca5a5;
+      --na: #64748b;
+      --na-bg: #f1f5f9;
+      --na-border: #cbd5e1;
+      --dev: #1d4ed8;
+      --dev-bg: #dbeafe;
+      --qa: #7c3aed;
+      --qa-bg: #ede9fe;
+      --integration: #0e7490;
+      --integration-bg: #cffafe;
+      --header-accent: #1e40af;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 2rem 1rem;
+    }
+    .container { max-width: 1140px; margin: 0 auto; }
+    header {
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--header-accent);
+      border-radius: 10px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    header h1 { font-size: 1.35rem; margin-bottom: 0.5rem; color: #0f172a; }
+    header .meta { color: var(--muted); font-size: 0.9rem; }
+    header .meta a { color: var(--link); text-decoration: none; }
+    header .meta a:hover { text-decoration: underline; }
+    .verdict {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.45rem 1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .verdict-pass { background: var(--pass-bg); color: var(--pass); border: 1px solid var(--pass-border); }
+    .verdict-pass-gaps { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-border); }
+    .verdict-fail { background: var(--fail-bg); color: var(--fail); border: 1px solid var(--fail-border); }
+    section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    section h2 {
+      font-size: 1.05rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #e2e8f0;
+      color: #0f172a;
+    }
+    /* Section themes — management-presentable */
+    .report-section {
+      position: relative;
+      overflow: hidden;
+      border-radius: 12px;
+      padding: 0;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    }
+    .report-section .section-head {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid rgba(255,255,255,0.25);
+    }
+    .report-section .section-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 50%;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.22);
+      color: #fff;
+    }
+    .report-section .section-head h2 {
+      margin: 0;
+      padding: 0;
+      border: none;
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.01em;
+    }
+    .report-section .section-body {
+      padding: 1.25rem 1.5rem 1.5rem;
+      background: #fff;
+    }
+    .section-summary { border: 1px solid #93c5fd; }
+    .section-summary .section-head { background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%); }
+    .section-summary .section-body { background: linear-gradient(180deg, #f8fbff 0%, #fff 100%); }
+    .section-pr { border: 1px solid #a5b4fc; }
+    .section-pr .section-head { background: linear-gradient(135deg, #3730a3 0%, #4f46e5 100%); }
+    .section-pr .section-body { background: linear-gradient(180deg, #f5f3ff 0%, #fff 100%); }
+    .section-pr table th { background: #eef2ff; color: #3730a3; }
+    .section-pr tbody tr:nth-child(even) { background: #fafafe; }
+    .section-ownership { border: 1px solid #67e8f9; }
+    .section-ownership .section-head { background: linear-gradient(135deg, #0e7490 0%, #0891b2 100%); }
+    .section-ownership .section-body { background: linear-gradient(180deg, #f0fdfa 0%, #fff 100%); }
+    .section-ownership .section-lead {
+      color: #0f766e;
+      font-size: 0.875rem;
+      margin-bottom: 1.25rem;
+      padding: 0.65rem 0.9rem;
+      background: #ccfbf1;
+      border-left: 3px solid #14b8a6;
+      border-radius: 0 6px 6px 0;
+    }
+    .section-trace { border: 1px solid #c4b5fd; }
+    .section-trace .section-head { background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%); }
+    .section-trace .section-body { background: linear-gradient(180deg, #faf5ff 0%, #fff 100%); padding: 0; }
+    .section-trace .table-wrap { padding: 0 1rem 1rem; overflow-x: auto; }
+    .section-trace table th { background: #ede9fe; color: #5b21b6; }
+    .section-trace tbody tr:nth-child(even) { background: #faf5ff; }
+    .section-trace td:first-child { font-weight: 700; color: #6d28d9; }
+    .section-review { border: 1px solid #86efac; }
+    .section-review .section-head { background: linear-gradient(135deg, #166534 0%, #15803d 100%); }
+    .section-review .section-body { background: #fff; }
+    .review-panel {
+      border-radius: 10px;
+      padding: 1rem 1.15rem;
+      margin-bottom: 1rem;
+    }
+    .review-panel:last-child { margin-bottom: 0; }
+    .review-panel h3 {
+      font-size: 0.92rem;
+      margin: 0 0 0.65rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .review-panel ul { margin: 0; }
+    .review-positive {
+      background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+      border: 1px solid #86efac;
+    }
+    .review-positive h3 { color: #15803d; }
+    .review-gaps {
+      background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+      border: 1px solid #fcd34d;
+    }
+    .review-gaps h3 { color: #b45309; }
+    .section-assumptions { border: 1px solid #cbd5e1; }
+    .section-assumptions .section-head { background: linear-gradient(135deg, #334155 0%, #475569 100%); }
+    .section-assumptions .section-body {
+      background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+    }
+    .section-assumptions ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    .section-assumptions li {
+      padding: 0.55rem 0.75rem 0.55rem 2rem;
+      margin-bottom: 0.45rem;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      position: relative;
+    }
+    .section-assumptions li::before {
+      content: "?";
+      position: absolute;
+      left: 0.65rem;
+      top: 0.55rem;
+      width: 1.1rem;
+      height: 1.1rem;
+      background: #e2e8f0;
+      color: #475569;
+      border-radius: 50%;
+      font-size: 0.65rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .section-actions { border: 1px solid #fdba74; }
+    .section-actions .section-head { background: linear-gradient(135deg, #c2410c 0%, #ea580c 100%); }
+    .section-actions .section-body {
+      background: linear-gradient(180deg, #fff7ed 0%, #fff 100%);
+    }
+    .section-actions ol {
+      list-style: none;
+      padding-left: 0;
+      counter-reset: action;
+    }
+    .section-actions li {
+      counter-increment: action;
+      padding: 0.7rem 0.85rem 0.7rem 2.75rem;
+      margin-bottom: 0.55rem;
+      background: #fff;
+      border: 1px solid #fed7aa;
+      border-left: 4px solid #ea580c;
+      border-radius: 0 8px 8px 0;
+      position: relative;
+    }
+    .section-actions li::before {
+      content: counter(action);
+      position: absolute;
+      left: 0.75rem;
+      top: 0.65rem;
+      width: 1.35rem;
+      height: 1.35rem;
+      background: #ea580c;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 0.72rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .note-box a { color: #b45309; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th, td { padding: 0.65rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: #f1f5f9; font-weight: 600; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    tbody tr:hover { background: #fafbfc; }
+    tr:last-child td { border-bottom: none; }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-implemented, .badge-covered { background: var(--pass-bg); color: var(--pass); }
+    .badge-partial { background: var(--warn-bg); color: var(--warn); }
+    .badge-missing { background: var(--fail-bg); color: var(--fail); }
+    .badge-na, .badge-not-verified, .badge-not-assessable { background: var(--na-bg); color: var(--na); }
+    .badge-dev, .badge-unit { background: var(--dev-bg); color: var(--dev); }
+    .badge-shared, .badge-spot { background: var(--warn-bg); color: var(--warn); }
+    .badge-qa, .badge-e2e, .badge-manual { background: var(--qa-bg); color: var(--qa); }
+    .badge-integration { background: var(--integration-bg); color: var(--integration); }
+    .tier-stack { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+    .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+    .metric-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      border-left-width: 4px;
+      background: #fff;
+      transition: box-shadow 0.15s ease;
+    }
+    .metric-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .metric-card .label { font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 0.35rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .metric-card .metric-value { font-size: 1.65rem; font-weight: 700; line-height: 1.2; }
+    .metric-card .note { font-size: 0.75rem; color: var(--muted); margin-top: 0.4rem; line-height: 1.4; }
+    .metric-card.metric-good { border-left-color: var(--pass); background: linear-gradient(135deg, #fff 0%, var(--pass-bg) 100%); }
+    .metric-card.metric-good .metric-value { color: var(--pass); }
+    .metric-card.metric-warn { border-left-color: var(--warn); background: linear-gradient(135deg, #fff 0%, var(--warn-bg) 100%); }
+    .metric-card.metric-warn .metric-value { color: var(--warn); }
+    .metric-card.metric-fail { border-left-color: var(--fail); background: linear-gradient(135deg, #fff 0%, var(--fail-bg) 100%); }
+    .metric-card.metric-fail .metric-value { color: var(--fail); }
+    .metric-card.metric-na { border-left-color: var(--na); background: linear-gradient(135deg, #fff 0%, var(--na-bg) 100%); }
+    .metric-card.metric-na .metric-value { color: var(--na); font-size: 1.25rem; }
+    .metric-card.metric-info { border-left-color: var(--dev); background: linear-gradient(135deg, #fff 0%, var(--dev-bg) 100%); }
+    .metric-card.metric-info .metric-value { color: var(--dev); font-size: 1.1rem; }
+    .metric-card.metric-qa { border-left-color: var(--qa); background: linear-gradient(135deg, #fff 0%, var(--qa-bg) 100%); }
+    .metric-card.metric-qa .metric-value { color: var(--qa); font-size: 1.1rem; }
+    ul, ol { padding-left: 1.25rem; }
+    li { margin-bottom: 0.4rem; }
+    li.critical { color: var(--fail); }
+    li.high { color: var(--warn); }
+    li.medium { color: var(--muted); }
+    code { background: #f1f5f9; padding: 0.12rem 0.35rem; border-radius: 3px; font-size: 0.82rem; color: #334155; }
+
+    footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Coverage validation: {{ISSUE_KEY}} — {{STORY_TITLE}}</h1>
+      <div class="meta">
+        <strong>Jira:</strong> <a href="{{JIRA_URL}}" target="_blank">{{ISSUE_KEY}}</a> &nbsp;|&nbsp;
+        <strong>Status:</strong> {{ISSUE_STATUS}} &nbsp;|&nbsp;
+        <strong>Type:</strong> {{ISSUE_TYPE}} &nbsp;|&nbsp;
+        <strong>Generated:</strong> {{GENERATED_DATE}}
+      </div>
+      <div class="verdict verdict-{{VERDICT_CLASS}}">{{VERDICT}} — {{VERDICT_RATIONALE}}</div>
+    </header>
+
+    <section class="report-section section-summary">
+      <div class="section-head"><span class="section-num">1</span><h2>Coverage summary</h2></div>
+      <div class="section-body">
+        <div class="metric-grid">
+          <div class="metric-card {{REQ_COVERAGE_CLASS}}">
+            <div class="label">Dev code coverage</div>
+            <div class="metric-value">{{REQ_COVERAGE_PCT}}</div>
+            <div class="note">{{REQ_COVERAGE_DETAIL}} — Jira AC → production code</div>
+          </div>
+          <div class="metric-card {{DEV_COVERAGE_CLASS}}">
+            <div class="label">Dev unit / integration test coverage</div>
+            <div class="metric-value">{{DEV_COVERAGE_PCT}}</div>
+            <div class="note">{{DEV_COVERAGE_DETAIL}} — unit &amp; integration tests in PR</div>
+          </div>
+          <div class="metric-card metric-qa">
+            <div class="label">QA scope remaining</div>
+            <div class="metric-value">{{QA_SCOPE_SUMMARY}}</div>
+            <div class="note">Requirements needing QA E2E, manual, or regression</div>
+          </div>
+          <div class="metric-card {{CI_LINE_CLASS}}">
+            <div class="label">CI line coverage</div>
+            <div class="metric-value">{{CI_LINE_COVERAGE}}</div>
+            <div class="note">{{CI_LINE_NOTE}}</div>
+          </div>
+          <div class="metric-card {{CI_BRANCH_CLASS}}">
+            <div class="label">CI branch coverage</div>
+            <div class="metric-value">{{CI_BRANCH_COVERAGE}}</div>
+            <div class="note">{{CI_BRANCH_NOTE}}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="report-section section-pr">
+      <div class="section-head"><span class="section-num">2</span><h2>Linked PR(s)</h2></div>
+      <div class="section-body">
+        {{PR_NOTE}}
+        <table>
+          <thead>
+            <tr><th>PR</th><th>Author</th><th>State</th><th>CI</th></tr>
+          </thead>
+          <tbody>
+            {{PR_ROWS}}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="report-section section-ownership">
+      <div class="section-head"><span class="section-num">3</span><h2>Dev vs QA test ownership</h2></div>
+      <div class="section-body">
+        <p class="section-lead">
+          Dev-owned items should be proven by unit or integration tests in the PR. QA-owned items require functional, E2E, or manual verification outside the PR test suite.
+        </p>
+        <div class="metric-grid">
+          <div class="metric-card metric-info">
+            <div class="label">Covered by dev tests (unit / integration)</div>
+            <ul style="margin-top:0.5rem;">{{DEV_COVERED_LIST}}</ul>
+          </div>
+          <div class="metric-card metric-qa">
+            <div class="label">QA handoff</div>
+            <ul style="margin-top:0.5rem;">{{QA_HANDOFF_LIST}}</ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="report-section section-trace">
+      <div class="section-head"><span class="section-num">4</span><h2>Requirements traceability</h2></div>
+      <div class="section-body">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>ID</th><th>Requirement</th><th>Code</th><th>Dev tests</th><th>Owner</th><th>QA scope</th><th>Evidence</th></tr>
+            </thead>
+            <tbody>
+              {{REQUIREMENT_ROWS}}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="report-section section-review">
+      <div class="section-head"><span class="section-num">5</span><h2>Implementation review</h2></div>
+      <div class="section-body">
+        <div class="review-panel review-positive">
+          <h3>✓ Correctly implemented</h3>
+          <ul>{{CORRECTLY_IMPLEMENTED_LIST}}</ul>
+        </div>
+        <div class="review-panel review-gaps">
+          <h3>⚠ Gaps and concerns</h3>
+          <ul>{{GAPS_LIST}}</ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="report-section section-assumptions">
+      <div class="section-head"><span class="section-num">6</span><h2>Assumptions and open questions</h2></div>
+      <div class="section-body">
+        <ul>{{ASSUMPTIONS_LIST}}</ul>
+      </div>
+    </section>
+
+    <section class="report-section section-actions">
+      <div class="section-head"><span class="section-num">7</span><h2>Recommended actions</h2></div>
+      <div class="section-body">
+        <ol>{{ACTIONS_LIST}}</ol>
+      </div>
+    </section>
+
+    <footer>Generated by msc-code-coverage-validator</footer>
+  </div>
+</body>
+</html>

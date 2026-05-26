@@ -1,0 +1,11 @@
+{
+  "repo": "wbd-msc/your-service",
+  "mode": "interactive",
+  "searchPrIfMissing": true,
+  "writeReport": true,
+  "useCache": true,
+  "cacheMaxAgeHours": 24,
+  "postJiraComment": false,
+  "timezone": "Asia/Kolkata",
+  "timezoneLabel": "IST"
+}
