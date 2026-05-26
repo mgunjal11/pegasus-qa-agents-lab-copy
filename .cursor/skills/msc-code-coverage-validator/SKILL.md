@@ -209,7 +209,15 @@ score(R) = 1.0 if Implemented
 requirement_coverage_pct = round(100 * sum(score) / count(scored items), 1)
 ```
 
-**Test requirement coverage %**
+**Requirements mapped**
+
+Count of Jira AC extracted and scored: `{{REQ_MAPPED_SUMMARY}}` e.g. `3/3 AC`. Detail: `{{REQ_MAPPED_DETAIL}}` e.g. `R1–R3`. Class `{{REQ_MAPPED_CLASS}}`: `metric-good` when all AC mapped, `metric-warn` if partial story scope.
+
+**Open gaps**
+
+From Implementation review gap list: `{{OPEN_GAPS_SUMMARY}}` e.g. `2 High · 2 Med`. `{{OPEN_GAPS_DETAIL}}` one-line context. Class `{{OPEN_GAPS_CLASS}}`: `metric-fail` if any High/Critical, `metric-warn` if Medium only, `metric-good` if none.
+
+**Test requirement coverage %** *(internal only — not shown in summary)*
 
 Same formula using test status (**Covered** = 1.0, **Partial** = 0.5, **Missing** = 0.0) across all scored requirements.
 
@@ -246,7 +254,7 @@ metric_class(pct) =
 
 Apply `{{REQ_COVERAGE_CLASS}}` to **Dev code coverage** (required). Set `{{DEV_COVERAGE_CLASS}}` using the same tiers. Set `{{CI_LINE_CLASS}}` and `{{CI_BRANCH_CLASS}}` to `metric-na` when CI values are **`NA`**; use `metric-good` / `metric-warn` / `metric-fail` when CI percentages are available.
 
-**Coverage summary cards (5 total):** Dev code coverage, Dev unit/integration test coverage, QA scope remaining, CI line coverage, CI branch coverage. Do **not** include Test requirement coverage in the summary.
+**Coverage summary cards (7 total)** in three groups — **Implementation & tests:** Dev code coverage, Dev unit/integration test coverage, Requirements mapped. **QA & release risk:** QA scope remaining, Open gaps. **CI pipeline coverage:** CI line coverage, CI branch coverage. Do **not** include Test requirement coverage or PR traceability in the summary. Use restrained coloring: white cards, colored left border + value only (`metric-good` / `metric-warn` / `metric-fail` / `metric-na` / `metric-neutral`).
 
 ### Step 7: Build HTML report
 
@@ -267,7 +275,9 @@ Read [report-template.html](report-template.html) and produce a **complete, self
 | `{{REQ_COVERAGE_PCT}}`, `{{DEV_COVERAGE_PCT}}` | e.g. `70.0%` or `Not assessable` |
 | `{{REQ_COVERAGE_CLASS}}`, `{{DEV_COVERAGE_CLASS}}` | `metric-good` (≥85%), `metric-warn` (70–84.9%), `metric-fail` (<70%), `metric-na` |
 | `{{REQ_COVERAGE_DETAIL}}`, `{{DEV_COVERAGE_DETAIL}}` | e.g. `3.5/5 scored`, `4/5 dev-owned — 2 unit, 2 integration` |
-| `{{QA_SCOPE_SUMMARY}}` | e.g. `2 E2E, 1 Manual, 3 None (dev-covered)` |
+| `{{REQ_MAPPED_SUMMARY}}`, `{{REQ_MAPPED_DETAIL}}`, `{{REQ_MAPPED_CLASS}}` | e.g. `3/3 AC`, `R1–R3`, `metric-good` |
+| `{{OPEN_GAPS_SUMMARY}}`, `{{OPEN_GAPS_DETAIL}}`, `{{OPEN_GAPS_CLASS}}` | e.g. `2 High · 2 Med`, brief note, `metric-warn` |
+| `{{QA_SCOPE_SUMMARY}}` | e.g. `2 items` — use `metric-neutral` card (no purple) |
 | `{{QA_HANDOFF_LIST}}` | `<li>` items — QA scenarios not covered by dev tests |
 | `{{DEV_COVERED_LIST}}` | `<li>` items — what dev unit/integration tests already prove |
 | `{{CI_LINE_COVERAGE}}`, `{{CI_BRANCH_COVERAGE}}` | Percent or **`NA`** when no PR/CI |

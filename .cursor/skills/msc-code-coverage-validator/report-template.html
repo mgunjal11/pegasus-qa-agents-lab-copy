@@ -271,30 +271,40 @@
     .badge-integration { background: var(--integration-bg); color: var(--integration); }
     .tier-stack { display: flex; flex-wrap: wrap; gap: 0.25rem; }
     .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
-    .metric-card {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1rem 1.1rem;
-      border-left-width: 4px;
-      background: #fff;
-      transition: box-shadow 0.15s ease;
+    .summary-groups { display: flex; flex-direction: column; gap: 1.35rem; }
+    .summary-group-title {
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+      color: #64748b; margin: 0 0 0.65rem; padding-bottom: 0.4rem; border-bottom: 1px solid #e2e8f0;
     }
-    .metric-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-    .metric-card .label { font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 0.35rem; text-transform: uppercase; letter-spacing: 0.03em; }
-    .metric-card .metric-value { font-size: 1.65rem; font-weight: 700; line-height: 1.2; }
-    .metric-card .note { font-size: 0.75rem; color: var(--muted); margin-top: 0.4rem; line-height: 1.4; }
-    .metric-card.metric-good { border-left-color: var(--pass); background: linear-gradient(135deg, #fff 0%, var(--pass-bg) 100%); }
-    .metric-card.metric-good .metric-value { color: var(--pass); }
-    .metric-card.metric-warn { border-left-color: var(--warn); background: linear-gradient(135deg, #fff 0%, var(--warn-bg) 100%); }
-    .metric-card.metric-warn .metric-value { color: var(--warn); }
-    .metric-card.metric-fail { border-left-color: var(--fail); background: linear-gradient(135deg, #fff 0%, var(--fail-bg) 100%); }
-    .metric-card.metric-fail .metric-value { color: var(--fail); }
-    .metric-card.metric-na { border-left-color: var(--na); background: linear-gradient(135deg, #fff 0%, var(--na-bg) 100%); }
-    .metric-card.metric-na .metric-value { color: var(--na); font-size: 1.25rem; }
+    .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; }
+    .summary-grid-2 { grid-template-columns: repeat(2, 1fr); max-width: 66%; }
+    @media (max-width: 900px) {
+      .summary-grid, .summary-grid-2 { grid-template-columns: 1fr; max-width: none; }
+    }
+    .metric-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 0.95rem 1rem;
+      border-left-width: 3px;
+      background: #fff;
+    }
+    .metric-card .label { font-size: 0.76rem; font-weight: 600; color: #64748b; margin-bottom: 0.3rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .metric-card .metric-value { font-size: 1.5rem; font-weight: 700; line-height: 1.2; color: #0f172a; }
+    .metric-card .note { font-size: 0.74rem; color: #64748b; margin-top: 0.35rem; line-height: 1.4; }
+    .section-summary .metric-card.metric-good { border-left-color: #15803d; }
+    .section-summary .metric-card.metric-good .metric-value { color: #15803d; }
+    .section-summary .metric-card.metric-warn { border-left-color: #b45309; }
+    .section-summary .metric-card.metric-warn .metric-value { color: #b45309; }
+    .section-summary .metric-card.metric-fail { border-left-color: #b91c1c; }
+    .section-summary .metric-card.metric-fail .metric-value { color: #b91c1c; }
+    .section-summary .metric-card.metric-na { border-left-color: #94a3b8; }
+    .section-summary .metric-card.metric-na .metric-value { color: #64748b; font-size: 1.2rem; }
+    .section-summary .metric-card.metric-neutral { border-left-color: #cbd5e1; }
+    .section-summary .metric-card.metric-neutral .metric-value { color: #334155; font-size: 1.15rem; }
     .metric-card.metric-info { border-left-color: var(--dev); background: linear-gradient(135deg, #fff 0%, var(--dev-bg) 100%); }
     .metric-card.metric-info .metric-value { color: var(--dev); font-size: 1.1rem; }
-    .metric-card.metric-qa { border-left-color: var(--qa); background: linear-gradient(135deg, #fff 0%, var(--qa-bg) 100%); }
-    .metric-card.metric-qa .metric-value { color: var(--qa); font-size: 1.1rem; }
+    .metric-card.metric-qa { border-left-color: #64748b; background: #f8fafc; }
+    .metric-card.metric-qa .metric-value { color: #334155; font-size: 1.15rem; }
     ul, ol { padding-left: 1.25rem; }
     li { margin-bottom: 0.4rem; }
     li.critical { color: var(--fail); }
@@ -321,31 +331,56 @@
     <section class="report-section section-summary">
       <div class="section-head"><span class="section-num">1</span><h2>Coverage summary</h2></div>
       <div class="section-body">
-        <div class="metric-grid">
-          <div class="metric-card {{REQ_COVERAGE_CLASS}}">
-            <div class="label">Dev code coverage</div>
-            <div class="metric-value">{{REQ_COVERAGE_PCT}}</div>
-            <div class="note">{{REQ_COVERAGE_DETAIL}} — Jira AC → production code</div>
+        <div class="summary-groups">
+          <div>
+            <div class="summary-group-title">Implementation &amp; tests</div>
+            <div class="summary-grid">
+              <div class="metric-card {{REQ_COVERAGE_CLASS}}">
+                <div class="label">Dev code coverage</div>
+                <div class="metric-value">{{REQ_COVERAGE_PCT}}</div>
+                <div class="note">{{REQ_COVERAGE_DETAIL}} — Jira AC → production code</div>
+              </div>
+              <div class="metric-card {{DEV_COVERAGE_CLASS}}">
+                <div class="label">Dev unit / integration test coverage</div>
+                <div class="metric-value">{{DEV_COVERAGE_PCT}}</div>
+                <div class="note">{{DEV_COVERAGE_DETAIL}} — unit &amp; integration tests in PR</div>
+              </div>
+              <div class="metric-card {{REQ_MAPPED_CLASS}}">
+                <div class="label">Requirements mapped</div>
+                <div class="metric-value">{{REQ_MAPPED_SUMMARY}}</div>
+                <div class="note">{{REQ_MAPPED_DETAIL}} — acceptance criteria from Jira</div>
+              </div>
+            </div>
           </div>
-          <div class="metric-card {{DEV_COVERAGE_CLASS}}">
-            <div class="label">Dev unit / integration test coverage</div>
-            <div class="metric-value">{{DEV_COVERAGE_PCT}}</div>
-            <div class="note">{{DEV_COVERAGE_DETAIL}} — unit &amp; integration tests in PR</div>
+          <div>
+            <div class="summary-group-title">QA &amp; release risk</div>
+            <div class="summary-grid summary-grid-2">
+              <div class="metric-card metric-neutral">
+                <div class="label">QA scope remaining</div>
+                <div class="metric-value">{{QA_SCOPE_SUMMARY}}</div>
+                <div class="note">E2E, manual, or regression still required</div>
+              </div>
+              <div class="metric-card {{OPEN_GAPS_CLASS}}">
+                <div class="label">Open gaps</div>
+                <div class="metric-value">{{OPEN_GAPS_SUMMARY}}</div>
+                <div class="note">{{OPEN_GAPS_DETAIL}} — from implementation review</div>
+              </div>
+            </div>
           </div>
-          <div class="metric-card metric-qa">
-            <div class="label">QA scope remaining</div>
-            <div class="metric-value">{{QA_SCOPE_SUMMARY}}</div>
-            <div class="note">Requirements needing QA E2E, manual, or regression</div>
-          </div>
-          <div class="metric-card {{CI_LINE_CLASS}}">
-            <div class="label">CI line coverage</div>
-            <div class="metric-value">{{CI_LINE_COVERAGE}}</div>
-            <div class="note">{{CI_LINE_NOTE}}</div>
-          </div>
-          <div class="metric-card {{CI_BRANCH_CLASS}}">
-            <div class="label">CI branch coverage</div>
-            <div class="metric-value">{{CI_BRANCH_COVERAGE}}</div>
-            <div class="note">{{CI_BRANCH_NOTE}}</div>
+          <div>
+            <div class="summary-group-title">CI pipeline coverage</div>
+            <div class="summary-grid summary-grid-2">
+              <div class="metric-card {{CI_LINE_CLASS}}">
+                <div class="label">CI line coverage</div>
+                <div class="metric-value">{{CI_LINE_COVERAGE}}</div>
+                <div class="note">{{CI_LINE_NOTE}}</div>
+              </div>
+              <div class="metric-card {{CI_BRANCH_CLASS}}">
+                <div class="label">CI branch coverage</div>
+                <div class="metric-value">{{CI_BRANCH_COVERAGE}}</div>
+                <div class="note">{{CI_BRANCH_NOTE}}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

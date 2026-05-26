@@ -68,6 +68,8 @@ Copy and edit for your repo / timezone:
 cp .cursor/skills/msc-code-coverage-validator/validator.defaults.example.json .coverage-validator.defaults.json
 ```
 
+Guide deck: `docs/MSC-Code-Coverage-Validator-Guide.pptx` — run `python scripts/generate_coverage_validator_ppt.py`
+
 ---
 
 ## Outputs
@@ -75,7 +77,8 @@ cp .cursor/skills/msc-code-coverage-validator/validator.defaults.example.json .c
 | Agent | Path |
 |-------|------|
 | Test cases | `testcases/{ISSUE-KEY}-testcases.xlsx` |
-| Coverage report | `reports/{ISSUE-KEY}-{MM-DD-YYYY-HH-MM-SS}-{TZ}.html` |
+| Coverage report | `reports/{ISSUE-KEY}-{MM-DD-YYYY-HH-MM-SS}-{TZ}.html` (7-card summary) |
+| Coverage validator PPT | `docs/MSC-Code-Coverage-Validator-Guide.pptx` |
 | Jira bug | Issue key + URL in chat (created in MSC project) |
 
 Reports use **your laptop local timezone** (e.g. `IST`, `EST`).
