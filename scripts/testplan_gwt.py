@@ -6,8 +6,22 @@ from __future__ import annotations
 import re
 from typing import Any
 
+# Common spreadsheet typos for Then (e.g. MSC-195138 TC11 uses "Than:")
+GWT_TYPO_RE = re.compile(r"\b(Than|Tehn|Them)\s*:", re.IGNORECASE)
 GWT_MARKER_RE = re.compile(r"(Given|When|Then)\s*:?\s*", re.IGNORECASE)
-GWT_LINE_RE = re.compile(r"^(Given|When|Then)\s*:?\s*", re.IGNORECASE)
+GWT_LINE_RE = re.compile(r"^(Given|When|Then|Than|Tehn|Them)\s*:?\s*", re.IGNORECASE)
+
+
+def normalize_gwt_typos(text: str) -> str:
+    """Normalize frequent Then misspellings before GWT parsing."""
+    return GWT_TYPO_RE.sub("Then:", text)
+
+
+def gwt_key_from_marker(marker: str) -> str:
+    lower = marker.lower()
+    if lower in {"than", "tehn", "them"}:
+        return "then"
+    return lower
 
 STEP_BLOB_ALIASES: tuple[str, ...] = (
     "step summary",
@@ -28,7 +42,7 @@ def is_step_blob_column(header_name: str) -> bool:
 
 def parse_gwt_from_text(text: str) -> dict[str, str]:
     """Split free-form step text into given/when/then (any column layout)."""
-    text = (text or "").strip()
+    text = normalize_gwt_typos((text or "").strip())
     if not text:
         return {}
 
@@ -38,7 +52,7 @@ def parse_gwt_from_text(text: str) -> dict[str, str]:
 
     parsed: dict[str, str] = {}
     for i, match in enumerate(markers):
-        key = match.group(1).lower()
+        key = gwt_key_from_marker(match.group(1))
         start = match.start()
         end = markers[i + 1].start() if i + 1 < len(markers) else len(text)
         chunk = text[start:end].strip()
@@ -84,10 +98,9 @@ def has_complete_gwt(steps: dict[str, str]) -> bool:
     combined = "\n".join(normalized.values())
     if not combined:
         combined = "\n".join(str(v) for v in steps.values() if v)
-    return bool(
-        GWT_MARKER_RE.search(combined)
-        and len({m.group(1).lower() for m in GWT_MARKER_RE.finditer(combined)}) >= 3
-    )
+    combined = normalize_gwt_typos(combined)
+    keys = {gwt_key_from_marker(m.group(1)) for m in GWT_MARKER_RE.finditer(combined)}
+    return {"given", "when", "then"}.issubset(keys)
 
 
 def steps_for_display(steps: dict[str, str]) -> dict[str, str]:

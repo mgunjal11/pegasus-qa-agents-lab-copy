@@ -28,12 +28,7 @@ replacements = {
     "{{ISSUE_TYPE}}": "Story",
     "{{VERDICT}}": "Pass with gaps",
     "{{VERDICT_CLASS}}": "pass-gaps",
-    "{{VERDICT_RATIONALE}}": (
-        "Merged pegasus-reps #22 (RepsPoller FIFO by header.timestamp) and pegasus-texttransform #75 "
-        "(media request in status + correlation metadata) address core race/status issues; "
-        "FF Race Condition.xlsx test plan (11 E2E scenarios, 66.7% AC coverage) lacks R3 PrepNotRequired case; "
-        "explicit mascot-api-transform handler not in linked PRs."
-    ),
+    "{{VERDICT_RATIONALE}}": "",  # set after test plan load
     "{{REQ_COVERAGE_PCT}}": "83.3%",
     "{{REQ_COVERAGE_CLASS}}": "metric-warn",
     "{{REQ_COVERAGE_DETAIL}}": "2.5/3 scored",
@@ -46,7 +41,7 @@ replacements = {
     "{{QA_SCOPE_SUMMARY}}": "3 items",
     "{{OPEN_GAPS_SUMMARY}}": "1 High · 3 Med",
     "{{OPEN_GAPS_CLASS}}": "metric-warn",
-    "{{OPEN_GAPS_DETAIL}}": "mascot-api-transform PrepNotRequired; R3 no TC; GWT incomplete; Mascot E2E",
+    "{{OPEN_GAPS_DETAIL}}": "mascot-api-transform PrepNotRequired; R3 no TC; 1 TC missing full GWT; Mascot E2E",
     "{{CI_LINE_COVERAGE}}": "NA",
     "{{CI_LINE_CLASS}}": "metric-na",
     "{{CI_LINE_NOTE}}": "PRs merged; codecov prefetch unavailable",
@@ -69,10 +64,7 @@ replacements = {
 <li><strong>pegasus-texttransform#75</strong> — Status events retain <code>urn:wbd:distribute:request-id</code> in correlationMetadata for Mascot status accuracy</li>
 <li><strong>Test plan:</strong> Jira attachment <code>FF Race Condition.xlsx</code> — Scenarios sheet, 11 E2E race-condition scenarios (TC1–TC11)</li>
 <li>Jira evidence attachments document before/after fulfill job status for regression analysis</li>""",
-    "{{GAPS_LIST}}": """<li class="high"><strong>High:</strong> Explicit PrepNotRequired-without-PickRequested handler in <code>mascot-api-transform</code> not found in linked PRs</li>
-<li class="medium"><strong>Medium:</strong> Test plan covers R1/R2 only (66.7%) — no scenario for R3 PrepNotRequired-without-PickRequested</li>
-<li class="medium"><strong>Medium:</strong> 0/11 test cases have full Given/When/Then in Step Summary — steps embedded in When field</li>
-<li class="medium"><strong>Medium:</strong> Mascot UI E2E not in dev test suite — prod log examples in Jira comments need QA replay</li>""",
+    "{{GAPS_LIST}}": "",
     "{{ASSUMPTIONS_LIST}}": """<li>Root cause fix is event publish ordering via RepsPoller + accurate status payloads via texttransform — not mascot-api-transform code in this validation</li>
 <li>Larger mongo read/write race deferred to separate ticket per Jira description</li>
 <li>Both PRs merged and deployed to SIT per Jira comments (Allyson Yao, May 2026)</li>""",
@@ -92,6 +84,9 @@ if tp_pct is None:
     replacements["{{TESTPLAN_ROWS}}"] = '<tr><td colspan="6">No test plan attachment</td></tr>'
     replacements["{{TESTPLAN_GAPS_LIST}}"] = (
         '<li class="medium">No attached test plan — acceptance criteria not mapped to formal cases</li>'
+    )
+    replacements["{{GAPS_LIST}}"] = (
+        '<li class="medium"><strong>Medium:</strong> No QMetry test plan parsed — re-attach or download FF Race Condition.xlsx</li>'
     )
 else:
     replacements["{{TESTPLAN_COVERAGE_PCT}}"] = f"{tp_pct}%"
@@ -116,6 +111,19 @@ else:
             f'<li class="medium">{incomplete} test case(s) missing full Given/When/Then in step text</li>'
         )
     replacements["{{TESTPLAN_GAPS_LIST}}"] = "".join(gaps)
+    impl_gaps = """<li class="high"><strong>High:</strong> Explicit PrepNotRequired-without-PickRequested handler in <code>mascot-api-transform</code> not found in linked PRs</li>
+<li class="medium"><strong>Medium:</strong> Test plan covers R1/R2 only (66.7%) — no scenario for R3 PrepNotRequired-without-PickRequested</li>"""
+    if incomplete:
+        impl_gaps += f'<li class="medium"><strong>Medium:</strong> {incomplete} test case(s) missing full Given/When/Then in step text</li>'
+    impl_gaps += '<li class="medium"><strong>Medium:</strong> Mascot UI E2E not in dev test suite — prod log examples in Jira comments need QA replay</li>'
+    replacements["{{GAPS_LIST}}"] = impl_gaps
+    gwt_n = cov.get("completeGwtCount", 0)
+    tc_n = cov.get("testCaseCount", 11)
+    replacements["{{VERDICT_RATIONALE}}"] = (
+        f"Merged pegasus-reps #22 and pegasus-texttransform #75 address core race/status issues; "
+        f"FF Race Condition.xlsx ({tc_n} E2E scenarios, {gwt_n}/{tc_n} full Given/When/Then, "
+        f"{tp_pct}% test plan AC coverage, Mascot links in Evidence); R3 and mascot-api-transform gap remain."
+    )
 
 out, generated, tz = report_paths(KEY, root=ROOT)
 replacements["{{GENERATED_DATE}}"] = generated

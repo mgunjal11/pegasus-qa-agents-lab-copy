@@ -34,6 +34,16 @@ def test_normalize_single_blob() -> None:
     assert all(norm.get(k) for k in ("given", "when", "then"))
 
 
+def test_then_typo_than() -> None:
+    from testplan_gwt import normalize_steps  # noqa: E402
+
+    steps = {
+        "given": "Given: Fulfill LDCI asset goes for Normalization in Acquire",
+        "when": "When: an update is trigger from acquire side\nThan: The workflow should get completed",
+    }
+    assert has_complete_gwt(normalize_steps(steps))
+
+
 def test_parse_without_colons() -> None:
     from testplan_gwt import normalize_steps  # noqa: E402
 
@@ -68,6 +78,7 @@ def test_ff_race_condition_file() -> None:
 if __name__ == "__main__":
     test_parse_combined_test_steps()
     test_normalize_single_blob()
+    test_then_typo_than()
     test_parse_without_colons()
     test_caption_monitoring_sheet()
     test_ff_race_condition_file()

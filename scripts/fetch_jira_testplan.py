@@ -34,9 +34,11 @@ from jira_env import (
     load_dotenv,
 )
 from testplan_gwt import (
+    gwt_key_from_marker,
     has_complete_gwt,
     is_step_blob_column,
     merge_steps,
+    normalize_gwt_typos,
     normalize_steps,
     parse_gwt_from_text,
 )
@@ -66,7 +68,7 @@ TESTPLAN_NAME_RE = re.compile(
 )
 TESTPLAN_EXT = {".xlsx", ".xls", ".tsv", ".csv", ".txt"}
 REQ_ID_RE = re.compile(r"\bR(\d+)\b", re.IGNORECASE)
-GWT_RE = re.compile(r"^(Given|When|Then)\s*:?\s*", re.IGNORECASE)
+GWT_RE = re.compile(r"^(Given|When|Then|Than|Tehn|Them)\s*:?\s*", re.IGNORECASE)
 ISSUE_KEY_RE = re.compile(r"\b(MSC-\d+)\b", re.IGNORECASE)
 SHAREPOINT_URL_RE = re.compile(r"https://[^\s\"']*sharepoint\.com[^\s\"']*", re.IGNORECASE)
 XLSX_FILE_PARAM_RE = re.compile(r"file=([^&\"'\s]+\.xlsx)", re.IGNORECASE)
@@ -514,13 +516,14 @@ def _cell(row: list[str], col_idx: dict[str, int], name: str) -> str:
 def _assign_step(tc: TestCase, text: str) -> None:
     if not text:
         return
+    text = normalize_gwt_typos(text)
     parsed = parse_gwt_from_text(text)
     if len(parsed) >= 2:
         tc.steps = merge_steps(tc.steps, parsed)
         return
     match = GWT_RE.match(text.strip())
     if match:
-        key = match.group(1).lower()
+        key = gwt_key_from_marker(match.group(1))
         tc.steps[key] = text.strip()
     elif "given" not in tc.steps:
         tc.steps["given"] = text.strip()
