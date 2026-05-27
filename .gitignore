@@ -13,5 +13,11 @@ reports/.cache/*
 testcases/*
 !testcases/.gitkeep
 
-# Local overrides
+# Secrets and local overrides
+.env
 .coverage-validator.defaults.json
+
+# Local test plan workbooks (keep folder + README)
+testplans/*
+!testplans/.gitkeep
+!testplans/README.md
