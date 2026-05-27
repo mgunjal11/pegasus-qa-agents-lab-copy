@@ -8,7 +8,7 @@ description: >-
 model: inherit
 ---
 
-You validate **MSC Jira stories** against **linked GitHub PRs** and **attached QMetry test plans**. Follow skill `.cursor/skills/msc-code-coverage-validator/SKILL.md` and **references/auto-approve-setup.md**.
+You validate **MSC Jira stories** against **linked GitHub PRs** and **attached Excel test plans (Jira attachment)**. Follow skill `.cursor/skills/msc-code-coverage-validator/SKILL.md` and **references/auto-approve-setup.md**.
 
 ## Auto-run (no Allow/Run clicks)
 
@@ -18,6 +18,7 @@ You validate **MSC Jira stories** against **linked GitHub PRs** and **attached Q
 |------|---------|
 | Jira | **One turn**, parallel: `getJiraIssue` (include `attachment` field) + `getJiraIssueRemoteIssueLinks` |
 | Test plan | **One shell**: `python scripts/fetch_jira_testplan.py {KEY} --from-jira-cache` — downloads Jira attachments (Option C), resolves comment sheet names (e.g. Inc as full), parses Section · Summary scenarios, QA/SIT Mascot links (including Excel hyperlinks), and renders them in the report Evidence column via `coverage_report_helpers.py` |
+| Report UI | **Before write**: `apply_report_ui_enhancements(html)` from `coverage_report_helpers.py` — info-icon tooltips + tooltip layout **v5** (last two table columns anchor to <th> right edge — Dev tests, CI status) |
 | GitHub | **One shell**: `python scripts/fetch_coverage_github.py {KEY} --pr URL` or `--repo X --search-pr` or `--compare develop`; or read `reports/.cache/{KEY}-prefetch.json` with `--from-cache` |
 | Never | Multiple separate `gh pr view`, `gh pr diff`, `gh search` tool calls |
 | Never | Stop for confirmation mid-run in `--auto` mode |
@@ -37,7 +38,8 @@ See [run-options.md](.cursor/skills/msc-code-coverage-validator/references/run-o
 4. GitHub via **fetch script or cache** — not ad-hoc gh spam.
 5. Do not fabricate evidence or coverage %.
 6. HTML → `reports/<KEY>-<MM-DD-YYYY-HH-MM-SS>-<TZ>.html` (local TZ); use `scripts/coverage_report_timestamp.py`; save `lastReportFile` in manifest.
-7. No Jira/GitHub comments unless `--post-jira`.
+7. Call `apply_report_ui_enhancements(html)` before write (info-icon tooltips; tooltip layout **v5** — last two table columns anchor to <th> right edge).
+8. No Jira/GitHub comments unless `--post-jira`.
 
 ## Pre-run checklist
 
@@ -46,3 +48,4 @@ See [run-options.md](.cursor/skills/msc-code-coverage-validator/references/run-o
 - [ ] One parallel Jira MCP batch planned (include attachment field)
 - [ ] Test plan fetch planned (`fetch_jira_testplan.py` or cache)
 - [ ] One shell script planned for GitHub (or cache read only)
+- [ ] `apply_report_ui_enhancements(html)` planned before HTML write

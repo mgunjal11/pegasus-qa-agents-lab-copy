@@ -83,7 +83,7 @@
     /* Section themes — management-presentable */
     .report-section {
       position: relative;
-      overflow: hidden;
+      overflow: visible;
       border-radius: 12px;
       padding: 0;
       margin-bottom: 1.5rem;
@@ -130,6 +130,8 @@
     .section-pr .section-body { background: linear-gradient(180deg, #f5f3ff 0%, #fff 100%); }
     .section-pr table th { background: #eef2ff; color: #3730a3; }
     .section-pr tbody tr:nth-child(even) { background: #fafafe; }
+    .section-pr .ci-detail { font-size: 0.85em; color: #64748b; }
+    .section-pr td code { font-size: 0.88em; word-break: break-word; }
     .section-ownership { border: 1px solid #67e8f9; }
     .section-ownership .section-head { background: linear-gradient(135deg, #0e7490 0%, #0891b2 100%); }
     .section-ownership .section-body { background: linear-gradient(180deg, #f0fdfa 0%, #fff 100%); }
@@ -402,7 +404,7 @@
         {{PR_NOTE}}
         <table>
           <thead>
-            <tr><th>PR</th><th>Author</th><th>State</th><th>CI</th></tr>
+            <tr><th>PR</th><th>Repo</th><th>State</th><th>Title</th><th>Dev tests</th><th>CI status</th></tr>
           </thead>
           <tbody>
             {{PR_ROWS}}

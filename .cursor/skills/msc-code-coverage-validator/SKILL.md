@@ -87,7 +87,7 @@ Task Progress:
 - [ ] Step 5: Fetch and parse attached QMetry test plan (unless `--skip-testplan`)
 - [ ] Step 6: Map requirements to code, tests, test plan cases, and dev/QA ownership
 - [ ] Step 7: Compute coverage percentages (including dev test and test plan coverage)
-- [ ] Step 8: Build HTML report with dev vs QA and test plan sections
+- [ ] Step 8: Build HTML report with dev vs QA and test plan sections; run `apply_report_ui_enhancements()`
 - [ ] Step 9: Write report file
 ```
 
@@ -371,7 +371,45 @@ Read [report-template.html](report-template.html) and produce a **complete, self
 | `{{CI_LINE_NOTE}}`, `{{CI_BRANCH_NOTE}}` | e.g. `Source: codecov` or `No PR for MSC-204417; develop branch only` |
 | `{{CI_LINE_CLASS}}`, `{{CI_BRANCH_CLASS}}` | `metric-na` when unavailable; else tier class if numeric |
 | `{{PR_NOTE}}` | Optional `<div class="note-box">…</div>` when no PR linked; empty string if PR exists |
-| `{{PR_ROWS}}` | HTML `<tr>` rows for linked PRs |
+| `{{PR_ROWS}}` | HTML `<tr>` rows for section 2 — use `coverage_report_helpers.render_pr_rows()` |
+
+**Section 2 Linked PR(s)** — six columns:
+
+| Column | Content |
+|--------|---------|
+| PR | Link `#number` to GitHub PR URL |
+| Repo | `org/repo` |
+| State | open / MERGED / CLOSED from `gh pr view` |
+| Title | PR title from `gh pr view --json title` |
+| Dev tests | Test names from PR diff (helper wraps in `<code>`) |
+| CI status | `gh pr checks` — **N/A** when empty or prefetch failed |
+
+```python
+from coverage_report_helpers import render_pr_rows, render_pr_rows_from_prefetch
+rows = render_pr_rows_from_prefetch("MSC-205625", dev_tests_by_number={161: "TestDomino..."})
+```
+
+Never put PR title or dev tests in the CI status column.
+
+**Report UI enhancements (mandatory before write)**
+
+After replacing all placeholders, pass the HTML through **`coverage_report_helpers.apply_report_ui_enhancements(html)`** — idempotent; upgrades legacy tooltip CSS (v1–v4) to **v5**.
+
+The helper adds:
+
+- **Info-icon tooltips** (`i` badge) on verdict, section headings, Coverage summary metric labels, table column headers (Linked PR(s), test plan, traceability), Dev vs QA ownership labels, and review panel headings
+- **Linked PR table** — build body rows with `render_pr_rows()` / `render_pr_rows_from_prefetch()`; plain `<thead>` headers are upgraded automatically by `inject_pr_table_header_tooltips()`
+- **Tooltip layout fix v5** — `.container` and `.report-section` use `overflow: visible`. Table header tooltips: default columns anchor **left** from the icon; **last two columns** (`th:nth-last-child(-n+2)`, e.g. **Dev tests** and **CI status** in Linked PR(s)) anchor to the **right edge of the `<th>` cell** (not the narrow label row) so the full tooltip text (e.g. “Key unit or integration test classes… added or changed in the PR…”) is visible and not clipped
+
+Do **not** hand-roll tooltip CSS in generated reports; always call the helper once before write. Base template `report-template.html` uses `.report-section { overflow: visible; }` — do not revert to `overflow: hidden`.
+
+```python
+from coverage_report_helpers import apply_report_ui_enhancements, render_pr_rows_from_prefetch
+
+html = filled_template  # all {{PLACEHOLDER}} tokens replaced
+html = apply_report_ui_enhancements(html)
+```
+
 | `{{REQUIREMENT_ROWS}}` | HTML `<tr>` rows — Code, Dev tests, Owner, QA scope, Evidence (see below) |
 | `{{CORRECTLY_IMPLEMENTED_LIST}}` | `<li>` items |
 | `{{GAPS_LIST}}` | `<li class="critical|high|medium">` items |
@@ -403,6 +441,8 @@ In chat, give a **brief summary** (verdict + dev code coverage %, dev unit/integ
 ### Step 9: Write output
 
 Skip file write when `--no-write` or `writeReport: false` in manifest/defaults (chat summary only).
+
+**Before write:** ensure `apply_report_ui_enhancements(html)` has been applied (Step 8).
 
 ```bash
 mkdir -p reports reports/.cache

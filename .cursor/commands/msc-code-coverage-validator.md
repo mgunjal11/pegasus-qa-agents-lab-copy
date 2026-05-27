@@ -1,6 +1,6 @@
 # MSC code coverage validator
 
-Validate the Jira issue in `$ARGUMENTS` against linked GitHub PR(s) and attached QMetry test plan.
+Validate the Jira issue in `$ARGUMENTS` against linked GitHub PR(s) and attached Excel test plan (Jira attachment).
 
 ## Required behavior (no manual Allow/Run stops)
 
@@ -11,6 +11,7 @@ Validate the Jira issue in `$ARGUMENTS` against linked GitHub PR(s) and attached
 5. **GitHub** — one shell only: `python scripts/prefetch_coverage_inputs.py {KEY} --pr {URL}` or `python scripts/fetch_coverage_github.py {KEY} --repo {repo}`; if cache is fresh use `--from-cache` and skip gh.
 6. **Never** issue multiple separate `gh` calls when a script or cache can be used.
 7. Follow skill `.cursor/skills/msc-code-coverage-validator/SKILL.md` completely (dev/QA sections, test plan validation, HTML report).
+8. **Report UI** — before write, run HTML through `apply_report_ui_enhancements()` in `scripts/coverage_report_helpers.py` (info-icon tooltips; tooltip layout v5 — last two table columns anchor to th right edge, e.g. Dev tests / CI status).
 
 If PR URL is unknown, use manifest/repo from defaults; search once via prefetch script, not repeated gh calls.
 

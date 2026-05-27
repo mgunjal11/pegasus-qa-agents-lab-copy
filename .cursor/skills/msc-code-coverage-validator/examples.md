@@ -9,9 +9,9 @@ Illustrative output (abbreviated). Numbers are fictional for format reference.
 
 ### Linked PR(s)
 
-| PR | Author | State | CI |
-|----|--------|-------|-----|
-| [wbd-msc/media-lib-rasp#412](https://github.com/wbd-msc/media-lib-rasp/pull/412) | @devuser | open | passed |
+| PR | Repo | State | Title | Dev tests | CI status |
+|----|------|-------|-------|-----------|------------|
+| [#412](https://github.com/wbd-msc/media-lib-rasp/pull/412) | `wbd-msc/media-lib-rasp` | open | Add retry on RASP timeout | `test_rasp_client.py` | Passed |
 
 ### Coverage summary
 

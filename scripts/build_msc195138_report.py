@@ -8,7 +8,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from coverage_report_helpers import load_testplan_cache, render_testplan_rows  # noqa: E402
+from coverage_report_helpers import (  # noqa: E402
+    load_testplan_cache,
+    render_pr_rows,
+    render_testplan_rows,
+)
 from coverage_report_timestamp import report_paths  # noqa: E402
 
 KEY = "MSC-195138"
@@ -49,8 +53,28 @@ replacements = {
     "{{CI_BRANCH_CLASS}}": "metric-na",
     "{{CI_BRANCH_NOTE}}": "PRs merged; codecov prefetch unavailable",
     "{{PR_NOTE}}": "",
-    "{{PR_ROWS}}": """<tr><td><a href="https://github.com/wbd-msc/pegasus-reps/pull/22" target="_blank">pegasus-reps#22</a></td><td>@khannanny</td><td>MERGED</td><td>RepsPoller — publish unpublished reps_events in timestamp order</td></tr>
-<tr><td><a href="https://github.com/wbd-msc/pegasus-texttransform/pull/75" target="_blank">pegasus-texttransform#75</a></td><td>@khannanny</td><td>MERGED</td><td>mediaRequest in status; correlationMetadata; header.timestamp</td></tr>""",
+    "{{PR_ROWS}}": render_pr_rows(
+        [
+            {
+                "url": "https://github.com/wbd-msc/pegasus-reps/pull/22",
+                "number": 22,
+                "repo": "wbd-msc/pegasus-reps",
+                "state": "MERGED",
+                "title": "RepsPoller — publish unpublished reps_events in timestamp order",
+                "dev_tests": "test_poller_service.py",
+                "checks": None,
+            },
+            {
+                "url": "https://github.com/wbd-msc/pegasus-texttransform/pull/75",
+                "number": 75,
+                "repo": "wbd-msc/pegasus-texttransform",
+                "state": "MERGED",
+                "title": "mediaRequest in status; correlationMetadata; header.timestamp",
+                "dev_tests": "test_helper.py",
+                "checks": None,
+            },
+        ]
+    ),
     "{{DEV_COVERED_LIST}}": """<li><strong>R1</strong> — <code>poller_service.py</code> streams unpublished <code>reps_events</code> ordered by <code>header.timestamp</code>; <code>test_poller_service.py</code> (404 lines, unit)</li>
 <li><strong>R2</strong> — <code>helper.py</code> <code>create_wings_status_message</code> preserves <code>correlationMetadata</code> and UTC <code>header.timestamp</code>; <code>test_helper.py</code> asserts request id namespace (unit)</li>
 <li><strong>R3</strong> — indirect: ordered SNS publish reduces Pick-before-PickRequested errors; no unit test for PrepNotRequired-without-PickRequested</li>""",

@@ -11,9 +11,9 @@ This markdown file is an optional reference for structure only.
 
 ### Linked PR(s)
 
-| PR | Author | State | CI |
-|----|--------|-------|-----|
-| [{org}/{repo}#{number}]({pr_url}) | @{author} | {open|merged|closed} | {passed|failed|pending} |
+| PR | Repo | State | Title | Dev tests | CI status |
+|----|------|-------|-------|-----------|------------|
+| [#{number}]({pr_url}) | {org}/{repo} | {state} | {title} | {dev_tests} | Passed / Failed / N/A |
 
 ### Coverage summary
 

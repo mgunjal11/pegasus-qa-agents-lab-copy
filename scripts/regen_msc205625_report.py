@@ -9,7 +9,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from coverage_report_helpers import load_testplan_cache, render_testplan_rows  # noqa: E402
+from coverage_report_helpers import (  # noqa: E402
+    load_testplan_cache,
+    render_pr_rows,
+    render_testplan_rows,
+)
 from coverage_report_timestamp import report_paths  # noqa: E402
 
 KEY = "MSC-205625"
@@ -93,6 +97,33 @@ def main() -> None:
         f'<div class="verdict verdict-pass-gaps">{verdict}</div>',
         html,
         count=1,
+    )
+
+    pr_rows = render_pr_rows(
+        [
+            {
+                "url": "https://github.com/wbd-msc/pegasus-pick-genie/pull/161",
+                "number": 161,
+                "repo": "wbd-msc/pegasus-pick-genie",
+                "state": "Merged",
+                "title": "Passport routing for incremental-as-full PFT Clear",
+                "dev_tests": "TestDominoPassportRouting, passport_manager unit tests",
+                "checks": None,
+            }
+        ]
+    )
+    html = re.sub(
+        r"<tr><th>PR</th><th>Author</th><th>State</th><th>CI</th></tr>",
+        "<tr><th>PR</th><th>Repo</th><th>State</th><th>Title</th><th>Dev tests</th><th>CI status</th></tr>",
+        html,
+        count=1,
+    )
+    html = re.sub(
+        r'(<section class="report-section section-pr">.*?<tbody>\s*)(.*?)(\s*</tbody>)',
+        lambda m: m.group(1) + pr_rows + m.group(3),
+        html,
+        count=1,
+        flags=re.DOTALL,
     )
 
     out.write_text(html, encoding="utf-8")

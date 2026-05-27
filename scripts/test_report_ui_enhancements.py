@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+from coverage_report_helpers import (
+    SECTION_HEADER_INFO,
+    TESTPLAN_TABLE_COLUMN_INFO,
+    TRACE_TABLE_COLUMN_INFO,
+    apply_report_ui_enhancements,
+)
+
+
+MINIMAL_REPORT = """
+<style></style>
+<header>
+  <div class="verdict verdict-pass-gaps">Pass with gaps — example rationale.</div>
+</header>
+<section class="report-section section-summary">
+  <div class="section-head"><span class="section-num">1</span><h2>Coverage summary</h2></div>
+  <div class="section-body">
+    <div class="summary-group-title">Implementation &amp; tests</div>
+    <div class="label">Dev code coverage</div>
+  </div>
+</section>
+<section class="report-section section-pr">
+  <table><thead><tr><th>PR</th></tr></thead><tbody></tbody></table>
+</section>
+<section class="report-section section-testplan">
+  <table><thead><tr><th>TC</th><th>Scenario</th></tr></thead><tbody></tbody></table>
+  <div class="review-panel review-gaps"><h3>Test plan gaps</h3></div>
+</section>
+<section class="report-section section-ownership">
+  <div class="label">QA handoff</div>
+</section>
+<section class="report-section section-trace">
+  <table><thead><tr><th>ID</th><th>Requirement</th></tr></thead><tbody></tbody></table>
+</section>
+<section class="report-section section-review">
+  <div class="review-panel review-positive"><h3>✓ Correctly implemented</h3></div>
+</section>
+<section class="report-section section-assumptions">
+  <div class="section-head"><h2>Assumptions and open questions</h2></div>
+</section>
+<section class="report-section section-actions">
+  <div class="section-head"><h2>Recommended actions</h2></div>
+</section>
+"""
+
+
+def test_apply_report_ui_enhancements_covers_all_sections():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    assert 'aria-label="About verdict"' in out
+    assert "About Coverage summary" in out
+    assert "About Linked PR(s)" not in out or "section-pr" in out
+    assert "group-title-row" in out
+    assert "About TC" in out
+    assert "About ID" in out
+    assert "About QA handoff" in out
+    assert "About Test plan gaps" in out
+    assert "tooltip layout fix v5" in out
+    assert "section-head .heading-label-row .metric-info-tooltip" in out
+    assert "th:nth-last-child(2) .metric-info-tooltip" in out
+    twice = apply_report_ui_enhancements(out)
+    assert twice.count('class="metric-info-tip"') == out.count('class="metric-info-tip"')
+
+
+def test_table_column_counts():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    assert out.count("About TC") >= 1
+    assert len(TESTPLAN_TABLE_COLUMN_INFO) == 6
+    assert len(TRACE_TABLE_COLUMN_INFO) == 7
+
+
+def test_tooltip_layout_fix_upgrades_legacy_css():
+    legacy = MINIMAL_REPORT.replace(
+        "</style>",
+        """
+    /* tooltip layout fix — prevent clipping in panels and sections */
+    .report-section,
+    .report-section .section-body,
+    .review-panel { overflow: visible !important; }
+    th .metric-info-tooltip { left: 50% !important; }
+    th:last-child .metric-info-tooltip { left: auto !important; right: 0 !important; }
+  </style>""",
+        1,
+    )
+    out = apply_report_ui_enhancements(legacy)
+    assert "tooltip layout fix v5" in out
+    assert "th .metric-info-tooltip { left: 50%" not in out.replace(" ", "")
+    assert "th:nth-last-child(2) .metric-info-tooltip" in out
+    assert "section-head .heading-label-row .metric-info-tooltip" in out
+
+
+def test_tooltip_layout_fix_upgrades_v2_css():
+    v2 = MINIMAL_REPORT.replace(
+        "</style>",
+        """
+    /* tooltip layout fix v2 — prevent clipping in panels and sections */
+    th .metric-info-tooltip { left: auto !important; right: 0 !important; }
+  </style>""",
+        1,
+    )
+    out = apply_report_ui_enhancements(v2)
+    assert "tooltip layout fix v5" in out
+    assert "tooltip layout fix v2" not in out
+    assert "th:nth-last-child(2) .metric-info-tooltip" in out
+
+
+def test_pr_table_dev_tests_tooltip_right_aligned_to_th():
+    html = """
+    <style></style>
+    <section class="report-section section-pr">
+      <table><thead><tr><th>PR</th><th>Repo</th><th>State</th><th>Title</th><th>Dev tests</th><th>CI status</th></tr></thead><tbody></tbody></table>
+    </section>
+    """
+    out = apply_report_ui_enhancements(html)
+    assert "th:nth-last-child(2) .metric-info-tooltip" in out
+    assert "th:nth-last-child(-n+2)" in out
+    assert "translateX(-50%)" not in out
+    assert 'aria-label="About Dev tests"' in out
+    assert "Key unit or integration test classes or files added or changed in the PR" in out
+    assert "dev-owned acceptance criteria" in out
