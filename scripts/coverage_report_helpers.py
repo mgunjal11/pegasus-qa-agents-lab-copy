@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from testplan_gwt import steps_for_display
+
 
 def esc(text: str) -> str:
     return html.escape(text, quote=True)
@@ -27,12 +29,17 @@ def render_mascot_links(links: list[dict[str, str]]) -> str:
 
 
 def render_gwt_steps(steps: dict[str, str]) -> str:
+    normalized = steps_for_display(steps)
     chunks = []
     for key in ("given", "when", "then"):
-        val = steps.get(key, "")
+        val = normalized.get(key, "")
         if val:
             chunks.append(esc(val))
-    return "<br>".join(chunks) if chunks else "—"
+    if chunks:
+        return "<br>".join(chunks)
+    # Fallback: show combined step text when GWT is present but not split
+    combined = "\n".join(str(v) for v in steps.values() if v)
+    return esc(combined) if combined.strip() else "—"
 
 
 def pr_alignment_for_tc(mapped: list[str]) -> str:

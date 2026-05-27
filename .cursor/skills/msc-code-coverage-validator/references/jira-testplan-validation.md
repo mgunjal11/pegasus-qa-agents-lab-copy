@@ -116,7 +116,7 @@ For each mapped pair (`R{n}` ↔ `TC{x}`):
 
 **Test plan completeness** — e.g. `5 test cases · 5/5 full Given When Then · 3/4 acceptance criteria covered` or `Referenced: Domino Test Plan.xlsx · Inc as full · 0 parsed (local file missing)`.
 
-**Domino attachment fields parsed:** `section`, `summary` (high-level scenario), Given/When/Then steps, `mascot_links` (QA/SIT Mascot columns), Story. Report note from `testPlanSummaryNote`: `Downloaded {file} from Jira attachment comment sheet {comment sheet} → Excel tab {tab} · N scenarios for {KEY}.`
+**Attachment fields parsed:** `section`, `summary` (high-level scenario), Given/When/Then steps (from **any** step column — `Step Summary`, `Test Steps`, etc.; split combined blobs via `testplan_gwt.py`), `mascot_links` (QA/SIT Mascot link columns and hyperlinks), Story. **Given When Then completeness** counts test cases with all three markers in step **content**, not whether columns are named Given/When/Then. Report Evidence column uses `render_mascot_links`. Report note from `testPlanSummaryNote`.
 
 ## Report placeholders
 

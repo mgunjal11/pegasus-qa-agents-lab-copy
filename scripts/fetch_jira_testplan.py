@@ -33,6 +33,13 @@ from jira_env import (
     fetch_issue_attachments,
     load_dotenv,
 )
+from testplan_gwt import (
+    has_complete_gwt,
+    is_step_blob_column,
+    merge_steps,
+    normalize_steps,
+    parse_gwt_from_text,
+)
 
 try:
     from openpyxl import load_workbook
@@ -59,7 +66,7 @@ TESTPLAN_NAME_RE = re.compile(
 )
 TESTPLAN_EXT = {".xlsx", ".xls", ".tsv", ".csv", ".txt"}
 REQ_ID_RE = re.compile(r"\bR(\d+)\b", re.IGNORECASE)
-GWT_RE = re.compile(r"^(Given|When|Then)\s*:", re.IGNORECASE)
+GWT_RE = re.compile(r"^(Given|When|Then)\s*:?\s*", re.IGNORECASE)
 ISSUE_KEY_RE = re.compile(r"\b(MSC-\d+)\b", re.IGNORECASE)
 SHAREPOINT_URL_RE = re.compile(r"https://[^\s\"']*sharepoint\.com[^\s\"']*", re.IGNORECASE)
 XLSX_FILE_PARAM_RE = re.compile(r"file=([^&\"'\s]+\.xlsx)", re.IGNORECASE)
@@ -91,7 +98,7 @@ EVIDENCE_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
         "test objective",
     ),
     "given": ("preconditions", "precondition", "given", "prerequisites", "setup"),
-    "when": ("steps", "step", "actions", "when", "test steps", "step summary"),
+    "when": ("when",),
     "then": ("expected", "expected result", "then", "verification", "expected outcome"),
     "story": ("story", "jira", "jira id", "ticket", "issue", "issue key", "jira key", "bug"),
     "status": ("status", "result", "pass/fail", "execution status", "test status"),
@@ -118,21 +125,51 @@ class TestCase:
     mascot_links: list[dict[str, str]] = field(default_factory=list)
 
 
+def _xlsx_cell_text(cell: Any) -> str:
+    """Cell value; use Excel hyperlink target when display text is e.g. 'Mascot'."""
+    val = "" if cell.value is None else str(cell.value).strip()
+    target = ""
+    hl = getattr(cell, "hyperlink", None)
+    if hl is not None and getattr(hl, "target", None):
+        target = str(hl.target).strip()
+    if target and MASCOT_URL_RE.search(target):
+        return target
+    if val and MASCOT_URL_RE.search(val):
+        return val
+    if target and val.lower() in {"mascot", "link", "url", "open"}:
+        return target
+    return val
+
+
+def _mascot_column_label(header_name: str) -> str:
+    return re.sub(r"\s+", " ", header_name.replace("QA-", "").replace("SIT-", "").strip())
+
+
 def extract_mascot_links(header: list[str], row: list[str]) -> list[dict[str, str]]:
-    """Pull Mascot fulfillment URLs from Domino evidence columns."""
+    """Pull Mascot fulfillment URLs from QA/SIT mascot columns and any row cell."""
     links: list[dict[str, str]] = []
     seen: set[str] = set()
+
+    def add_urls(cell: str, label: str) -> None:
+        if not cell:
+            return
+        for url in MASCOT_URL_RE.findall(cell):
+            if url not in seen:
+                seen.add(url)
+                links.append({"label": label or "Mascot", "url": url})
+
     for idx, name in enumerate(header):
         if "mascot" not in name.lower():
             continue
         cell = row[idx].strip() if idx < len(row) else ""
-        if not cell:
+        add_urls(cell, _mascot_column_label(name))
+
+    # Fallback: URLs in other columns (e.g. Comments, Evidence) not named mascot
+    for idx, cell in enumerate(row):
+        if idx < len(header) and "mascot" in header[idx].lower():
             continue
-        label = re.sub(r"\s+", " ", name.replace("QA-", "").replace("SIT-", "").strip())
-        for url in MASCOT_URL_RE.findall(cell):
-            if url not in seen:
-                seen.add(url)
-                links.append({"label": label, "url": url})
+        add_urls(cell.strip() if cell else "", "Evidence")
+
     return links
 
 
@@ -455,10 +492,11 @@ def _fix_step_summary_rows(rows: list[list[str]]) -> list[list[str]]:
                 if GWT_RE.match(text):
                     step = text
                     break
-        if step.startswith(("When:", "Then:")):
+        step_match = GWT_RE.match(step)
+        if step_match and step_match.group(1).lower() in ("when", "then"):
             padded[0] = ""
             padded[step_idx] = step
-        elif step.startswith("Given:") and padded[0].strip():
+        elif step_match and step_match.group(1).lower() == "given" and padded[0].strip():
             padded[step_idx] = step
         else:
             padded[step_idx] = step
@@ -476,12 +514,49 @@ def _cell(row: list[str], col_idx: dict[str, int], name: str) -> str:
 def _assign_step(tc: TestCase, text: str) -> None:
     if not text:
         return
+    parsed = parse_gwt_from_text(text)
+    if len(parsed) >= 2:
+        tc.steps = merge_steps(tc.steps, parsed)
+        return
     match = GWT_RE.match(text.strip())
     if match:
         key = match.group(1).lower()
         tc.steps[key] = text.strip()
     elif "given" not in tc.steps:
         tc.steps["given"] = text.strip()
+
+
+def _ingest_step_columns(
+    tc: TestCase,
+    header: list[str],
+    padded: list[str],
+    cols: dict[str, int],
+) -> None:
+    """Load steps from dedicated GWT columns and any step-blob column (content-based)."""
+
+    def col(name: str) -> str:
+        idx = cols.get(name)
+        if idx is None or idx >= len(padded):
+            return ""
+        return padded[idx].strip()
+
+    blobs: list[str] = []
+    for idx, name in enumerate(header):
+        if is_step_blob_column(name):
+            cell = padded[idx].strip() if idx < len(padded) else ""
+            if cell:
+                blobs.append(cell)
+    for key in ("given", "when", "then"):
+        val = col(key)
+        if val:
+            blobs.append(val)
+    for blob in blobs:
+        parsed = parse_gwt_from_text(blob)
+        if parsed:
+            tc.steps = merge_steps(tc.steps, parsed)
+        else:
+            _assign_step(tc, blob)
+    tc.steps = normalize_steps(tc.steps)
 
 
 def _summary_from_steps(tc: TestCase) -> str:
@@ -553,6 +628,7 @@ def rows_to_cases(rows: list[list[str]], source: str, sheet: str = "") -> list[T
 
     flush()
     for tc in cases:
+        tc.steps = normalize_steps(tc.steps)
         if not tc.summary:
             tc.summary = _summary_from_steps(tc)
     return [tc for tc in cases if tc.summary or tc.steps]
@@ -610,13 +686,18 @@ def parse_evidence_rows(
                 elif story:
                     continue
 
-        if not summary and not any(col(k) for k in ("given", "when", "then")):
+        step_blob = " ".join(
+            padded[idx].strip()
+            for idx, name in enumerate(header)
+            if is_step_blob_column(name) and idx < len(padded) and padded[idx].strip()
+        )
+        if not summary and not step_blob and not any(col(k) for k in ("given", "when", "then")):
             continue
 
         tc_num += 1
         tc = TestCase(
             id=f"TC{tc_num}",
-            summary=summary or col("when")[:120] or f"Row {tc_num + 1}",
+            summary=summary or f"Row {tc_num + 1}",
             story=story or issue_key or "",
             priority=col("priority"),
             test_type=col("test_type") or "End to End",
@@ -624,13 +705,11 @@ def parse_evidence_rows(
             regression="",
             source_file=source,
             source_sheet=sheet,
+            mascot_links=extract_mascot_links(header, padded),
         )
-        for step_key in ("given", "when", "then"):
-            val = col(step_key)
-            if val:
-                if not GWT_RE.match(val):
-                    val = f"{step_key.capitalize()}: {val}"
-                tc.steps[step_key] = val
+        _ingest_step_columns(tc, header, padded, cols)
+        if not tc.summary or tc.summary.startswith("Row "):
+            tc.summary = _summary_from_steps(tc) if tc.steps else (summary or f"Row {tc_num + 1}")
         cases.append(tc)
     return cases
 
@@ -664,21 +743,30 @@ def _pick_worksheet(wb: Any, sheet_name: str | None) -> Any:
 def read_xlsx_sheet_rows(path: Path, sheet_name: str | None) -> tuple[list[list[str]], str]:
     if load_workbook is None:
         raise RuntimeError("openpyxl is required. Run: pip install openpyxl")
-    wb = load_workbook(path, read_only=True, data_only=True)
+    # read_only=False so Excel hyperlinks (display text "Mascot") resolve to URLs
+    wb = load_workbook(path, read_only=False, data_only=True)
     ws = _pick_worksheet(wb, sheet_name)
     actual_sheet = ws.title
     rows: list[list[str]] = []
-    for row in ws.iter_rows(values_only=True):
-        rows.append(["" if v is None else str(v).strip() for v in row])
+    for row in ws.iter_rows():
+        rows.append([_xlsx_cell_text(cell) for cell in row])
     wb.close()
     return rows, actual_sheet
 
 
+def _header_has_serial_column(lower: list[str]) -> bool:
+    return any(re.sub(r"[\s._-]", "", h) in {"srno", "srnumber", "sno"} for h in lower)
+
+
+def is_step_summary_sheet(header: list[str]) -> bool:
+    """QMetry / Domino layout: Summary + Step Summary (column names may vary)."""
+    lower = [h.lower().strip() for h in header]
+    return "summary" in lower and any("step summary" in h for h in lower)
+
+
 def is_domino_testplan_header(header: list[str]) -> bool:
     lower = [h.lower().strip() for h in header]
-    return "summary" in lower and any("step summary" in h for h in lower) and (
-        (lower and lower[0] == "srno") or "srno" in lower
-    )
+    return is_step_summary_sheet(header) and _header_has_serial_column(lower)
 
 
 def parse_domino_rows(
@@ -760,6 +848,7 @@ def parse_domino_rows(
 
     flush()
     for tc in cases:
+        tc.steps = normalize_steps(tc.steps)
         if not tc.summary:
             tc.summary = _summary_from_steps(tc)
 
@@ -796,9 +885,9 @@ def read_xlsx_cases(path: Path, sheet_name: str | None = None, issue_key: str | 
     if not rows:
         return []
     header = [c.strip() for c in rows[0]]
-    if is_domino_testplan_header(header):
+    if is_domino_testplan_header(header) or is_step_summary_sheet(header):
         return parse_domino_rows(rows, path.name, actual_sheet, issue_key)
-    if is_qmetry_header(header) or ("Summary" in header and "Step Summary" in header):
+    if is_qmetry_header(header):
         if is_qmetry_header(header):
             normalized = [QMETRY_COLUMNS]
             for row in rows[1:]:
@@ -874,7 +963,7 @@ def compute_testplan_coverage(cases: list[TestCase], requirements: list[dict[str
     else:
         pct = round(100 * len(covered_reqs & set(scored)) / len(scored), 1)
 
-    complete_gwt = sum(1 for tc in cases if all(k in tc.steps for k in ("given", "when", "then")))
+    complete_gwt = sum(1 for tc in cases if has_complete_gwt(tc.steps))
     return {
         "testplanCoveragePct": pct,
         "requirementCount": len(scored),
@@ -954,8 +1043,14 @@ def resolve_testplan_files(
             auth_error = str(exc)
 
     if not downloaded and testplan_refs:
+        att_names = {a.get("filename") for a in attachments if a.get("filename")}
+        refs_to_use = testplan_refs
+        if att_names:
+            matched = [r for r in testplan_refs if r.get("filename") in att_names]
+            if matched:
+                refs_to_use = matched
         seen_paths: set[str] = set()
-        for ref in testplan_refs:
+        for ref in refs_to_use:
             path, sheet = resolve_local_file(issue_key, ref, run_opts)
             sheet = sheet_override or sheet
             meta.append(
@@ -1031,6 +1126,15 @@ def main() -> int:
         issue_key, args.from_jira_cache, args.attachment, args.sheet, args.site
     )
 
+    jira_files = [
+        m.get("filename")
+        for m in attachment_meta
+        if m.get("source") == "jira_attachment" and m.get("localFound", True)
+    ]
+    if jira_files and not args.attachment:
+        allowed = set(jira_files)
+        files = [(p, s) for p, s in files if p.name in allowed]
+
     all_cases: list[TestCase] = []
     parse_errors: list[str] = []
     sheets_used: list[str] = []
@@ -1044,6 +1148,8 @@ def main() -> int:
             parse_errors.append(f"{path.name} [{sheet or 'default'}]: {exc}")
 
     requirements = extract_requirements(jira_cache if jira_cache.exists() else None)
+    for tc in all_cases:
+        tc.steps = normalize_steps(tc.steps)
     if requirements and all_cases:
         map_testcases_to_requirements(all_cases, requirements)
 

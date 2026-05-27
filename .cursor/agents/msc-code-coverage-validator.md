@@ -17,7 +17,7 @@ You validate **MSC Jira stories** against **linked GitHub PRs** and **attached Q
 | Rule | Do this |
 |------|---------|
 | Jira | **One turn**, parallel: `getJiraIssue` (include `attachment` field) + `getJiraIssueRemoteIssueLinks` |
-| Test plan | **One shell**: `python scripts/fetch_jira_testplan.py {KEY} --from-jira-cache` — downloads Jira attachments (Option C), resolves comment sheet names (e.g. Inc as full), parses Section · Summary scenarios and Mascot evidence links |
+| Test plan | **One shell**: `python scripts/fetch_jira_testplan.py {KEY} --from-jira-cache` — downloads Jira attachments (Option C), resolves comment sheet names (e.g. Inc as full), parses Section · Summary scenarios, QA/SIT Mascot links (including Excel hyperlinks), and renders them in the report Evidence column via `coverage_report_helpers.py` |
 | GitHub | **One shell**: `python scripts/fetch_coverage_github.py {KEY} --pr URL` or `--repo X --search-pr` or `--compare develop`; or read `reports/.cache/{KEY}-prefetch.json` with `--from-cache` |
 | Never | Multiple separate `gh pr view`, `gh pr diff`, `gh search` tool calls |
 | Never | Stop for confirmation mid-run in `--auto` mode |

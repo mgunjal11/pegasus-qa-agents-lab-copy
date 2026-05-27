@@ -1,26 +1,42 @@
-# Pegasus QA Agents Lab
+# TestCursor — agent instructions
 
-Three Cursor agents for MSC QA on [wbdstreaming.atlassian.net](https://wbdstreaming.atlassian.net).
+## Purpose
 
-| Agent | Invoke | Output |
-|-------|--------|--------|
-| **msc-testcase-writer** | `@msc-testcase-writer MSC-1234` | `testcases/{KEY}-testcases.xlsx` (QMetry FF2.0) |
-| **msc-code-coverage-validator** | `/msc-code-coverage-validator MSC-1234` | `reports/{KEY}-{timestamp}-{TZ}.html` (8-card summary, dev vs QA) |
-| **msc-jira-bug** | `@msc-jira-bug` + defect description | MSC Bug in Jira (after explicit approval) |
+Generate **QMetry-format test cases** as downloadable Excel from Jira stories on `wbdstreaming.atlassian.net`.
 
-## Skills
+## QMetry format (matches QMetry FF2.0.xlsx)
 
-| Skill | Path |
-|-------|------|
-| QMetry test cases from Jira | `.cursor/skills/jira-story-testcases/SKILL.md` |
-| Coverage vs PR + test plan | `.cursor/skills/msc-code-coverage-validator/SKILL.md` |
-| MSC Bug filing | `.cursor/skills/jira-msc-bug/SKILL.md` |
+**Sheet name:** `QMetry Template`
 
-## Coverage validator extras (vs jira-bug)
+**11 columns:**
 
-- `gh` CLI + `.coverage-validator.defaults.json` (optional `repo`, timezone)
-- `.env` — `ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN` for Jira test plan attachments
-- `testplans/` — local Excel when Jira references SharePoint sheets
-- Auto-approve: `python scripts/install_coverage_validator_permissions.py` — see [auto-approve-setup.md](.cursor/skills/msc-code-coverage-validator/references/auto-approve-setup.md)
+```
+Summary | Automatable | Automation Status | Priority | Folders | Step Summary | Test Type | Status | Regression Test (Y/N) | Story | TestData Dependent
+```
 
-Full teammate setup: [README.md](README.md)
+**3 rows per test case** — Given/When/Then in **Step Summary** only. Excel merges all metadata columns vertically (including **Status**); Step Summary is not merged.
+
+**Summary:** `{ISSUE-KEY}_{descriptive scenario and verification}`
+
+## Output
+
+```bash
+python scripts/generate_qmetry_excel.py testcases/<KEY>-testcases.tsv
+```
+
+Primary file: `testcases/<KEY>-testcases.xlsx`
+
+Subagents:
+
+| Agent | Purpose |
+|-------|---------|
+| **msc-testcase-writer** | QMetry test cases from Jira stories |
+| **msc-code-coverage-validator** | `/msc-code-coverage-validator KEY` — validates Jira AC + attached QMetry test plan vs linked PR; auto-run with permissions allowlist |
+
+Skill: `.cursor/skills/msc-code-coverage-validator/SKILL.md`
+
+Auto-approve: `.cursor/skills/msc-code-coverage-validator/references/auto-approve-setup.md`
+
+Install once: `python scripts/install_coverage_validator_permissions.py`
+
+Report output: `reports/<ISSUE-KEY>-<MM-DD-YYYY-HH-MM-SS>-<TZ>.html` (local timezone — IST, EST, etc.)
