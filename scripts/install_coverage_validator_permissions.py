@@ -15,6 +15,7 @@ PERMS = {
         "gh",
         "python scripts/prefetch_coverage_inputs.py",
         "python scripts/fetch_coverage_github.py",
+        "python scripts/fetch_jira_testplan.py",
         "mkdir",
     ],
 }

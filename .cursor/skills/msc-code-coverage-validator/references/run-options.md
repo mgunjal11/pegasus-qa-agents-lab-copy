@@ -44,6 +44,8 @@ Modes combine: `--fetch-only` takes precedence; `--from-cache` skips gh when cac
 | `--manifest PATH` | `--manifest my-run.json` | Load options from JSON file |
 | `--skip-pr-search` | | Do not search Jira/heuristics when `--pr` provided |
 | `--skip-jira` | | Use cached Jira markdown only (fetch-only must have run first) |
+| `--skip-testplan` | | Skip attached test plan fetch and validation |
+| `--sheet NAME` | `--sheet "Inc as full"` | Excel sheet for comment-referenced / Domino test plans |
 | `--post-jira` | | Post summary comment to Jira (default off) |
 | `--cache-max-age H` | `--cache-max-age 48` | Hours before cache is stale (default 24) |
 
@@ -58,7 +60,9 @@ Copy [validator.defaults.example.json](../validator.defaults.example.json) to re
   "searchPrIfMissing": true,
   "writeReport": true,
   "useCache": true,
-  "cacheMaxAgeHours": 24
+  "validateTestPlan": true,
+  "testPlanPath": "testplans/Domino Test Plan.xlsx",
+  "testPlanSheet": "Inc as full"
 }
 ```
 
@@ -87,7 +91,8 @@ After a successful run the agent may write the manifest to `reports/.cache/{ISSU
 ```
 reports/.cache/
   {ISSUE-KEY}-prefetch.json    # GitHub PR view, diff, checks, codecov (from prefetch script)
-  {ISSUE-KEY}-jira.json        # Jira issue markdown + remote links (from agent fetch-only)
+  {ISSUE-KEY}-jira.json        # Jira issue markdown + remote links + attachments (from agent fetch-only)
+  {ISSUE-KEY}-testplan.json    # Parsed test cases; testPlanReferences from comments/SharePoint
   {ISSUE-KEY}-manifest.json    # Last-used run options
 ```
 

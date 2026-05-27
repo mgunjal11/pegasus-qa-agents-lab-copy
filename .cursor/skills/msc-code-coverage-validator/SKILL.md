@@ -1,25 +1,28 @@
 ---
 name: msc-code-coverage-validator
 description: >-
-  Validates MSC Jira story implementation against linked GitHub PRs. Fetches Jira
-  via Atlassian MCP, resolves PR links, reviews code with gh CLI, maps acceptance
-  criteria to implementation and tests, differentiates dev-owned unit/integration
-  coverage from QA-owned E2E/manual scope, and reports requirement coverage % plus
-  CI test coverage as a downloadable HTML report. Use when validating an MSC Jira
-  ticket against its PR, checking whether code matches the story description,
-  asking what dev tests cover vs what QA must verify, or asking for coverage % for
-  acceptance criteria on wbdstreaming.atlassian.net. Supports --auto, --fetch-only,
-  --from-cache, --pr, --repo, and manifest files to avoid repeated manual fetches.
+  Validates MSC Jira story implementation against linked GitHub PRs and attached
+  QMetry test plans. Fetches Jira via Atlassian MCP (including attachments),
+  resolves PR links, reviews code with gh CLI, maps acceptance criteria to
+  implementation, dev tests, and QA test plan cases, differentiates dev-owned
+  unit/integration coverage from QA-owned E2E/manual scope, and reports requirement
+  coverage % plus CI test coverage as a downloadable HTML report. Use when validating
+  an MSC Jira ticket against its PR and test plan, checking whether code matches
+  the story description and attached test cases, asking what dev tests cover vs what
+  QA must verify, or asking for coverage % for acceptance criteria on
+  wbdstreaming.atlassian.net. Supports --auto, --fetch-only, --from-cache, --pr,
+  --repo, --skip-testplan, and manifest files to avoid repeated manual fetches.
 ---
 
 # MSC code coverage validator
 
-Validate that GitHub PR(s) linked to an MSC Jira story implement the described requirements and quantify coverage at four levels, **separating dev test ownership from QA handoff**:
+Validate that GitHub PR(s) linked to an MSC Jira story implement the described requirements, that **attached QMetry test plans** cover the acceptance criteria, and quantify coverage at five levels, **separating dev test ownership from QA handoff**:
 
 | Metric | Meaning |
 |--------|---------|
 | **Dev code coverage %** | Share of Jira AC/requirements with matching production code (display label; was “Requirement coverage”) |
 | **Dev unit/integration test coverage %** | Share of **dev-owned** AC/requirements covered by unit and/or integration tests in the PR (shown in Coverage summary) |
+| **Test plan acceptance criteria coverage %** | Share of Jira acceptance criteria/requirements with ≥1 mapped test case in the attached test plan |
 | **Test requirement coverage %** | *(internal)* Share of AC with any automated test evidence — computed for traceability but **not shown** in Coverage summary |
 | **CI line coverage %** | Line/branch coverage from PR checks (Codecov, SonarQube, pytest-cov, etc.) when reported |
 
@@ -39,7 +42,7 @@ Pattern references: `plan-aware-review`, `pr-review`, and `plan-feature` from [m
 
 Parse the user message and merge options from (highest priority wins):
 
-1. **Inline flags** — `--auto`, `--fetch-only`, `--from-cache`, `--pr URL`, `--repo org/repo`, `--write`, `--no-write`, `--manifest PATH`, `--skip-pr-search`, `--skip-jira`, `--post-jira`, `--cache-max-age N`
+1. **Inline flags** — `--auto`, `--fetch-only`, `--from-cache`, `--pr URL`, `--repo org/repo`, `--write`, `--no-write`, `--manifest PATH`, `--skip-pr-search`, `--skip-jira`, `--skip-testplan`, `--post-jira`, `--cache-max-age N`
 2. **Manifest** — `reports/.cache/{ISSUE-KEY}-manifest.json` or path from `--manifest`
 3. **Workspace defaults** — `.coverage-validator.defaults.json` at repo root (see [validator.defaults.example.json](validator.defaults.example.json))
 
@@ -59,7 +62,7 @@ Parse the user message and merge options from (highest priority wins):
 3. **One shell turn** — `python scripts/fetch_coverage_github.py {KEY} ...` or read cache; never N separate `gh` invocations.
 4. **`--from-cache`** when `reports/.cache/{KEY}-prefetch.json` is fresh.
 
-**Cache paths:** `reports/.cache/{ISSUE-KEY}-prefetch.json`, `{ISSUE-KEY}-jira.json`, `{ISSUE-KEY}-manifest.json`
+**Cache paths:** `reports/.cache/{ISSUE-KEY}-prefetch.json`, `{ISSUE-KEY}-jira.json`, `{ISSUE-KEY}-testplan.json`, `{ISSUE-KEY}-manifest.json`
 
 **GitHub prefetch (recommended to avoid repeated gh approvals):**
 
@@ -81,10 +84,11 @@ Task Progress:
 - [ ] Step 2: Fetch Jira story and extract requirements
 - [ ] Step 3: Resolve linked GitHub PR(s)
 - [ ] Step 4: Fetch PR changes and CI status
-- [ ] Step 5: Map requirements to code, tests, and dev/QA ownership
-- [ ] Step 6: Compute coverage percentages (including dev test coverage)
-- [ ] Step 7: Build HTML report with dev vs QA sections
-- [ ] Step 8: Write report file
+- [ ] Step 5: Fetch and parse attached QMetry test plan (unless `--skip-testplan`)
+- [ ] Step 6: Map requirements to code, tests, test plan cases, and dev/QA ownership
+- [ ] Step 7: Compute coverage percentages (including dev test and test plan coverage)
+- [ ] Step 8: Build HTML report with dev vs QA and test plan sections
+- [ ] Step 9: Write report file
 ```
 
 ### Step 1: Resolve issue
@@ -99,9 +103,10 @@ Otherwise:
 
 1. Resolve `cloudId`: pass `wbdstreaming.atlassian.net` first; if that fails, call `getAccessibleAtlassianResources`.
 2. Call `getJiraIssue` with `responseContentFormat: "markdown"`.
-3. Request fields: `summary`, `description`, `issuetype`, `status`, `priority`, `components`, `labels`, `comment`, `issuelinks`, and acceptance-criteria custom fields visible in the response (common hint: `customfield_10037`).
+3. Request fields: `summary`, `description`, `issuetype`, `status`, `priority`, `components`, `labels`, `comment`, `issuelinks`, `attachment`, and acceptance-criteria custom fields visible in the response (common hint: `customfield_10037`).
 4. In **`fetch-only`** or **`auto`** mode, also call `getJiraIssueRemoteIssueLinks` in parallel with step 2.
-5. Extract discrete **requirement items** from:
+5. Persist **attachment metadata** and **comment bodies** (plain text or ADF flattened) in `reports/.cache/{KEY}-jira.json` — required for SharePoint test plan links and sheet names (e.g. *Inc as full*). Run `python scripts/fetch_jira_testplan.py {KEY} --from-jira-cache` to auto-populate `testPlanReferences` in the cache.
+6. Extract discrete **requirement items** from:
    - Acceptance criteria (bullets, numbered lists, Given/When/Then)
    - User story scope in description
    - Explicit in-scope / out-of-scope statements
@@ -153,7 +158,45 @@ For CI line coverage, see [references/github-coverage.md](references/github-cove
 
 Record: changed file paths, test files in diff (tag each as **unit** or **integration** using path/framework heuristics), CI pass/fail, and any coverage numbers from check output or bot comments.
 
-### Step 5: Map requirements to code, tests, and dev/QA ownership
+In **`fetch-only`** mode, write cache to `reports/.cache/{KEY}-jira.json` (issue markdown, fields, remote links, attachments, extracted requirements) and stop unless GitHub prefetch is also requested.
+
+### Step 5: Fetch and parse attached test plan
+
+Skip when **`--skip-testplan`** or manifest/defaults set `validateTestPlan: false`.
+
+Read [references/jira-testplan-validation.md](references/jira-testplan-validation.md).
+
+**Prefer cache:** If `--from-cache` and `reports/.cache/{KEY}-testplan.json` is fresh, read parsed test cases from cache.
+
+**Otherwise** run once (same shell block as GitHub prefetch is OK):
+
+```bash
+python scripts/fetch_jira_testplan.py {ISSUE-KEY} --from-jira-cache
+```
+
+**SharePoint / comment-referenced plans** (e.g. *Refer Inc as full sheet for Test plan and evidence* → `Domino Test Plan.xlsx`): the script extracts `testPlanReferences` from Jira comments. Place the Excel locally at `testplans/Domino Test Plan.xlsx` or set `testPlanPath` / `testPlanSheet` in manifest or `.coverage-validator.defaults.json`. Do **not** report "no attachment" when a comment reference exists — use status `referenced_not_local` and show filename + sheet + setup hint.
+
+Optional sheet override:
+
+```bash
+python scripts/fetch_jira_testplan.py {ISSUE-KEY} --from-jira-cache --sheet "Inc as full"
+```
+
+If Jira attachment download fails, retry with workspace fallback:
+
+```bash
+python scripts/fetch_jira_testplan.py {ISSUE-KEY} --attachment testplans/Domino Test Plan.xlsx --sheet "Inc as full"
+```
+
+Parse output: `testCases` (include `section`, `summary`, `mascot_links`, `steps`), `testPlanReferences`, `testPlanSummaryNote`, `status` (`ok` | `referenced_not_local` | `no_testplan`), `coverage.testplanCoveragePct`, `coverage.coverageDetail`, `localSetupHint`.
+
+**Jira attachment (Option C):** When `ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN` are set, download the Excel from the issue attachment first. Resolve the sheet from Jira comment text (e.g. *Inc as full* → Excel tab *Inc as Fulll*). Parse **high-level scenarios** from Domino sheets: **Section** + **Summary**, Given/When/Then steps, and **Mascot links** from QA/SIT mascot columns for the Evidence column.
+
+**Report wording:** In Coverage summary use **acceptance criteria** (not AC) and **Given When Then** (not GWT). Set `{{TESTPLAN_NOTE}}` from cache `testPlanSummaryNote` when present, e.g. `Downloaded Domino Test Plan.xlsx from Jira attachment comment sheet Inc as full → Excel tab Inc as Fulll · 5 passport/incremental-as-full scenarios for MSC-205625.` Build `{{TESTPLAN_ROWS}}` with `scripts/coverage_report_helpers.py` — Evidence column must list Mascot links from the parsed test plan.
+
+When `status` is `referenced_not_local`, set `{{TESTPLAN_COVERAGE_PCT}}` to **Pending**, populate `{{TESTPLAN_NOTE}}` with the referenced filename and sheet (not "no QMetry attachment"). When `status` is `no_testplan`, use **`NA`**.
+
+### Step 6: Map requirements to code, tests, test plan, and dev/QA ownership
 
 Read [references/dev-qa-test-scope.md](references/dev-qa-test-scope.md) and apply it to every requirement.
 
@@ -196,7 +239,21 @@ Cite evidence: file path, function/symbol, test name with `(unit)` or `(integrat
 
 Review changed production code for correctness vs the requirement (logic, error handling, config, API contract)—not just presence of a file.
 
-### Step 6: Compute coverage percentages
+**Test plan cross-check** (when test plan cache exists)
+
+For each requirement `R{n}` with mapped test case(s) `TC{x}`:
+
+| Field | Values |
+|-------|--------|
+| **Test plan status** | Covered / Partial / Missing / N/A |
+| **Test plan alignment** | Aligned / Partial / Gap / Unverified |
+
+- Compare test case **Then** steps against PR implementation and dev tests.
+- Flag **Gap** when test plan expects behavior absent from PR diff.
+- Flag **Partial** when code exists but dev tests missing for dev-owned logic covered by the test case.
+- List unmapped test cases and uncovered AC in `{{TESTPLAN_GAPS_LIST}}`.
+
+### Step 7: Compute coverage percentages
 
 **Dev code coverage %** (same formula as requirement → code mapping)
 
@@ -211,7 +268,7 @@ requirement_coverage_pct = round(100 * sum(score) / count(scored items), 1)
 
 **Requirements mapped**
 
-Count of Jira AC extracted and scored: `{{REQ_MAPPED_SUMMARY}}` e.g. `3/3 AC`. Detail: `{{REQ_MAPPED_DETAIL}}` e.g. `R1–R3`. Class `{{REQ_MAPPED_CLASS}}`: `metric-good` when all AC mapped, `metric-warn` if partial story scope.
+Count of Jira acceptance criteria extracted and scored: `{{REQ_MAPPED_SUMMARY}}` e.g. `3/3 acceptance criteria`. Detail: `{{REQ_MAPPED_DETAIL}}` e.g. `R1–R3`. Class `{{REQ_MAPPED_CLASS}}`: `metric-good` when all acceptance criteria mapped, `metric-warn` if partial story scope.
 
 **Open gaps**
 
@@ -254,9 +311,39 @@ metric_class(pct) =
 
 Apply `{{REQ_COVERAGE_CLASS}}` to **Dev code coverage** (required). Set `{{DEV_COVERAGE_CLASS}}` using the same tiers. Set `{{CI_LINE_CLASS}}` and `{{CI_BRANCH_CLASS}}` to `metric-na` when CI values are **`NA`**; use `metric-good` / `metric-warn` / `metric-fail` when CI percentages are available.
 
-**Coverage summary cards (7 total)** in three groups — **Implementation & tests:** Dev code coverage, Dev unit/integration test coverage, Requirements mapped. **QA & release risk:** QA scope remaining, Open gaps. **CI pipeline coverage:** CI line coverage, CI branch coverage. Do **not** include Test requirement coverage or PR traceability in the summary. Use restrained coloring: white cards, colored left border + value only (`metric-good` / `metric-warn` / `metric-fail` / `metric-na` / `metric-neutral`).
+**Coverage summary cards (8 total)** in three groups — **Implementation & tests:** Dev code coverage, Dev unit/integration test coverage, Requirements mapped. **QA & release risk:** Test plan acceptance criteria coverage, QA scope remaining, Open gaps. **CI pipeline coverage:** CI line coverage, CI branch coverage. Do **not** include Test requirement coverage or PR traceability in the summary. Use restrained coloring: white cards, colored left border + value only (`metric-good` / `metric-warn` / `metric-fail` / `metric-na` / `metric-neutral`).
 
-### Step 7: Build HTML report
+**Report terminology:** Never abbreviate **acceptance criteria** as AC or **Given When Then** as GWT in user-facing report text. Use `4/4 acceptance criteria` not `4/4 AC`; use `5/5 full Given When Then` not `5/5 full GWT`.
+
+**Test plan section** (section 4 in report) — placeholders:
+
+| Placeholder | Value |
+|-------------|-------|
+| `{{TESTPLAN_COVERAGE_PCT}}` | e.g. `100.0%` or `NA` |
+| `{{TESTPLAN_COVERAGE_CLASS}}` | metric-* tier class |
+| `{{TESTPLAN_COVERAGE_DETAIL}}` | completeness summary |
+| `{{TESTPLAN_NOTE}}` | note-box when no attachment/auth error; empty otherwise |
+| `{{TESTPLAN_ROWS}}` | `<tr>` — TC ID, Scenario (Section · Summary), Mapped Req, Given When Then, Alignment, Evidence (Mascot links) |
+| `{{TESTPLAN_GAPS_LIST}}` | `<li>` uncovered acceptance criteria, unmapped TCs, misalignments |
+
+**Test plan acceptance criteria coverage %**
+
+```
+testplan_score(R) = 1.0 if ≥1 mapped test case with full Given/When/Then
+                  = 0.5 if mapped but incomplete GWT or weak AC match
+                  = 0.0 if no mapped test case
+                  = excluded if N/A
+
+testplan_coverage_pct = round(100 * sum(testplan_score) / count(scored items), 1)
+```
+
+Use **`NA`** when no attachment and no local fallback. Populate `{{TESTPLAN_COVERAGE_DETAIL}}` from cache `coverage.coverageDetail`, e.g. `5 test cases · 5/5 full Given When Then · 3/4 acceptance criteria covered · Jira attachment`.
+
+Apply `{{TESTPLAN_COVERAGE_CLASS}}` using the same tiers as dev coverage.
+
+**Verdict** — factor test plan gaps: Fail when critical test–code contradictions or zero AC coverage with test plan present; Pass with gaps for partial alignment.
+
+### Step 8: Build HTML report
 
 Read [report-template.html](report-template.html) and produce a **complete, self-contained HTML file** by replacing all `{{PLACEHOLDER}}` tokens.
 
@@ -275,7 +362,7 @@ Read [report-template.html](report-template.html) and produce a **complete, self
 | `{{REQ_COVERAGE_PCT}}`, `{{DEV_COVERAGE_PCT}}` | e.g. `70.0%` or `Not assessable` |
 | `{{REQ_COVERAGE_CLASS}}`, `{{DEV_COVERAGE_CLASS}}` | `metric-good` (≥85%), `metric-warn` (70–84.9%), `metric-fail` (<70%), `metric-na` |
 | `{{REQ_COVERAGE_DETAIL}}`, `{{DEV_COVERAGE_DETAIL}}` | e.g. `3.5/5 scored`, `4/5 dev-owned — 2 unit, 2 integration` |
-| `{{REQ_MAPPED_SUMMARY}}`, `{{REQ_MAPPED_DETAIL}}`, `{{REQ_MAPPED_CLASS}}` | e.g. `3/3 AC`, `R1–R3`, `metric-good` |
+| `{{REQ_MAPPED_SUMMARY}}`, `{{REQ_MAPPED_DETAIL}}`, `{{REQ_MAPPED_CLASS}}` | e.g. `3/3 acceptance criteria`, `R1–R3`, `metric-good` |
 | `{{OPEN_GAPS_SUMMARY}}`, `{{OPEN_GAPS_DETAIL}}`, `{{OPEN_GAPS_CLASS}}` | e.g. `2 High · 2 Med`, brief note, `metric-warn` |
 | `{{QA_SCOPE_SUMMARY}}` | e.g. `2 items` — use `metric-neutral` card (no purple) |
 | `{{QA_HANDOFF_LIST}}` | `<li>` items — QA scenarios not covered by dev tests |
@@ -313,7 +400,7 @@ Escape user-provided text (`&`, `<`, `>`, `"`) in HTML body content. Use `<code>
 
 In chat, give a **brief summary** (verdict + dev code coverage %, dev unit/integration coverage %, QA handoff count) and the path to the HTML file — do not paste the full HTML unless the user asks.
 
-### Step 8: Write output
+### Step 9: Write output
 
 Skip file write when `--no-write` or `writeReport: false` in manifest/defaults (chat summary only).
 
@@ -351,6 +438,7 @@ Optional: add a Jira comment summary via `addCommentToJiraIssue` when `--post-ji
 - Every scored requirement must have **Owner**, **Dev tier**, **Dev test status**, and **QA scope** — no blank dev/QA columns.
 - Separate **dev code coverage**, **dev unit/integration test coverage**, and **CI line coverage** in prose and tables.
 - Explicitly list what dev unit/integration tests cover vs what QA must still verify.
+- When a test plan is attached, show AC coverage % and test-case ↔ requirement ↔ PR alignment.
 - Flag PRs that implement code without dev tests for dev-owned AC items.
 - Flag AC items implemented in code but contradicting the Jira description.
 - Redact secrets and tokens from evidence citations.
@@ -362,6 +450,7 @@ Optional: add a Jira comment summary via `addCommentToJiraIssue` when `--post-ji
 - Worked example: [examples.md](examples.md)
 - GitHub / CI coverage commands: [references/github-coverage.md](references/github-coverage.md)
 - Dev vs QA test scope rules: [references/dev-qa-test-scope.md](references/dev-qa-test-scope.md)
+- Jira test plan validation: [references/jira-testplan-validation.md](references/jira-testplan-validation.md)
 - Run modes, flags, cache, prefetch: [references/run-options.md](references/run-options.md)
 - Auto-approve Allow/Run prompts: [references/auto-approve-setup.md](references/auto-approve-setup.md)
 - Workspace defaults template: [validator.defaults.example.json](validator.defaults.example.json)

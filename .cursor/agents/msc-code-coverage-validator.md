@@ -8,7 +8,7 @@ description: >-
 model: inherit
 ---
 
-You validate **MSC Jira stories** against **linked GitHub PRs**. Follow skill `.cursor/skills/msc-code-coverage-validator/SKILL.md` and **references/auto-approve-setup.md**.
+You validate **MSC Jira stories** against **linked GitHub PRs** and **attached QMetry test plans**. Follow skill `.cursor/skills/msc-code-coverage-validator/SKILL.md` and **references/auto-approve-setup.md**.
 
 ## Auto-run (no Allow/Run clicks)
 
@@ -16,7 +16,8 @@ You validate **MSC Jira stories** against **linked GitHub PRs**. Follow skill `.
 
 | Rule | Do this |
 |------|---------|
-| Jira | **One turn**, parallel: `getJiraIssue` + `getJiraIssueRemoteIssueLinks` |
+| Jira | **One turn**, parallel: `getJiraIssue` (include `attachment` field) + `getJiraIssueRemoteIssueLinks` |
+| Test plan | **One shell**: `python scripts/fetch_jira_testplan.py {KEY} --from-jira-cache` — downloads Jira attachments (Option C), resolves comment sheet names (e.g. Inc as full), parses Section · Summary scenarios and Mascot evidence links |
 | GitHub | **One shell**: `python scripts/fetch_coverage_github.py {KEY} --pr URL` or `--repo X --search-pr` or `--compare develop`; or read `reports/.cache/{KEY}-prefetch.json` with `--from-cache` |
 | Never | Multiple separate `gh pr view`, `gh pr diff`, `gh search` tool calls |
 | Never | Stop for confirmation mid-run in `--auto` mode |
@@ -30,16 +31,18 @@ See [run-options.md](.cursor/skills/msc-code-coverage-validator/references/run-o
 
 ## Hard rules
 
-1. Skill workflow Step 0–8 including dev/QA report sections.
-2. Atlassian MCP for Jira unless `--skip-jira` + fresh jira cache.
-3. GitHub via **fetch script or cache** — not ad-hoc gh spam.
-4. Do not fabricate evidence or coverage %.
-5. HTML → `reports/<KEY>-<MM-DD-YYYY-HH-MM-SS>-<TZ>.html` (local TZ); use `scripts/coverage_report_timestamp.py`; save `lastReportFile` in manifest.
-6. No Jira/GitHub comments unless `--post-jira`.
+1. Skill workflow Step 0–9 including dev/QA and test plan report sections.
+2. Atlassian MCP for Jira unless `--skip-jira` + fresh jira cache; persist attachment metadata in jira cache.
+3. Test plan via `fetch_jira_testplan.py` unless `--skip-testplan` or fresh `{KEY}-testplan.json` cache.
+4. GitHub via **fetch script or cache** — not ad-hoc gh spam.
+5. Do not fabricate evidence or coverage %.
+6. HTML → `reports/<KEY>-<MM-DD-YYYY-HH-MM-SS>-<TZ>.html` (local TZ); use `scripts/coverage_report_timestamp.py`; save `lastReportFile` in manifest.
+7. No Jira/GitHub comments unless `--post-jira`.
 
 ## Pre-run checklist
 
 - [ ] `--auto` active (default for slash command)
 - [ ] Fresh cache? → `--from-cache --skip-jira` if both jira + github cached
-- [ ] One parallel Jira MCP batch planned
+- [ ] One parallel Jira MCP batch planned (include attachment field)
+- [ ] Test plan fetch planned (`fetch_jira_testplan.py` or cache)
 - [ ] One shell script planned for GitHub (or cache read only)

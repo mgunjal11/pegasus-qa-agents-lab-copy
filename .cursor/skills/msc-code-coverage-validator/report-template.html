@@ -142,6 +142,11 @@
       border-left: 3px solid #14b8a6;
       border-radius: 0 6px 6px 0;
     }
+    .section-testplan { border: 1px solid #f9a8d4; }
+    .section-testplan .section-head { background: linear-gradient(135deg, #9d174d 0%, #db2777 100%); }
+    .section-testplan .section-body { background: linear-gradient(180deg, #fdf2f8 0%, #fff 100%); }
+    .section-testplan table th { background: #fce7f3; color: #9d174d; }
+    .section-testplan tbody tr:nth-child(even) { background: #fdf2f8; }
     .section-trace { border: 1px solid #c4b5fd; }
     .section-trace .section-head { background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%); }
     .section-trace .section-body { background: linear-gradient(180deg, #faf5ff 0%, #fff 100%); padding: 0; }
@@ -338,7 +343,7 @@
               <div class="metric-card {{REQ_COVERAGE_CLASS}}">
                 <div class="label">Dev code coverage</div>
                 <div class="metric-value">{{REQ_COVERAGE_PCT}}</div>
-                <div class="note">{{REQ_COVERAGE_DETAIL}} — Jira AC → production code</div>
+                <div class="note">{{REQ_COVERAGE_DETAIL}} — Jira acceptance criteria → production code</div>
               </div>
               <div class="metric-card {{DEV_COVERAGE_CLASS}}">
                 <div class="label">Dev unit / integration test coverage</div>
@@ -354,7 +359,12 @@
           </div>
           <div>
             <div class="summary-group-title">QA &amp; release risk</div>
-            <div class="summary-grid summary-grid-2">
+            <div class="summary-grid">
+              <div class="metric-card {{TESTPLAN_COVERAGE_CLASS}}">
+                <div class="label">Test plan acceptance criteria coverage</div>
+                <div class="metric-value">{{TESTPLAN_COVERAGE_PCT}}</div>
+                <div class="note">{{TESTPLAN_COVERAGE_DETAIL}} — attached test plan</div>
+              </div>
               <div class="metric-card metric-neutral">
                 <div class="label">QA scope remaining</div>
                 <div class="metric-value">{{QA_SCOPE_SUMMARY}}</div>
@@ -401,8 +411,29 @@
       </div>
     </section>
 
+    <section class="report-section section-testplan">
+      <div class="section-head"><span class="section-num">3</span><h2>Attached test plan validation</h2></div>
+      <div class="section-body">
+        {{TESTPLAN_NOTE}}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>TC</th><th>Scenario</th><th>Mapped req</th><th>Given When Then</th><th>PR alignment</th><th>Evidence</th></tr>
+            </thead>
+            <tbody>
+              {{TESTPLAN_ROWS}}
+            </tbody>
+          </table>
+        </div>
+        <div class="review-panel review-gaps" style="margin-top:1rem;">
+          <h3>Test plan gaps</h3>
+          <ul>{{TESTPLAN_GAPS_LIST}}</ul>
+        </div>
+      </div>
+    </section>
+
     <section class="report-section section-ownership">
-      <div class="section-head"><span class="section-num">3</span><h2>Dev vs QA test ownership</h2></div>
+      <div class="section-head"><span class="section-num">4</span><h2>Dev vs QA test ownership</h2></div>
       <div class="section-body">
         <p class="section-lead">
           Dev-owned items should be proven by unit or integration tests in the PR. QA-owned items require functional, E2E, or manual verification outside the PR test suite.
@@ -421,7 +452,7 @@
     </section>
 
     <section class="report-section section-trace">
-      <div class="section-head"><span class="section-num">4</span><h2>Requirements traceability</h2></div>
+      <div class="section-head"><span class="section-num">5</span><h2>Requirements traceability</h2></div>
       <div class="section-body">
         <div class="table-wrap">
           <table>
@@ -437,7 +468,7 @@
     </section>
 
     <section class="report-section section-review">
-      <div class="section-head"><span class="section-num">5</span><h2>Implementation review</h2></div>
+      <div class="section-head"><span class="section-num">6</span><h2>Implementation review</h2></div>
       <div class="section-body">
         <div class="review-panel review-positive">
           <h3>✓ Correctly implemented</h3>
@@ -451,14 +482,14 @@
     </section>
 
     <section class="report-section section-assumptions">
-      <div class="section-head"><span class="section-num">6</span><h2>Assumptions and open questions</h2></div>
+      <div class="section-head"><span class="section-num">7</span><h2>Assumptions and open questions</h2></div>
       <div class="section-body">
         <ul>{{ASSUMPTIONS_LIST}}</ul>
       </div>
     </section>
 
     <section class="report-section section-actions">
-      <div class="section-head"><span class="section-num">7</span><h2>Recommended actions</h2></div>
+      <div class="section-head"><span class="section-num">8</span><h2>Recommended actions</h2></div>
       <div class="section-body">
         <ol>{{ACTIONS_LIST}}</ol>
       </div>

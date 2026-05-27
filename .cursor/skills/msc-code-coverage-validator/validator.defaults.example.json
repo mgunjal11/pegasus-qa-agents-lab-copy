@@ -7,5 +7,9 @@
   "cacheMaxAgeHours": 24,
   "postJiraComment": false,
   "timezone": "Asia/Kolkata",
-  "timezoneLabel": "IST"
+  "timezoneLabel": "IST",
+  "validateTestPlan": true,
+  "testPlanPath": "testplans/Domino Test Plan.xlsx",
+  "testPlanSheet": "Inc as full",
+  "testPlanFilename": "Domino Test Plan.xlsx"
 }
