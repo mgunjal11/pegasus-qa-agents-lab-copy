@@ -41,9 +41,10 @@ W = Inches(13.333)
 H = Inches(7.5)
 
 # Latest validator example — sync with reports/MSC-205625-*-IST.html
+REPORT_DEVELOPER = "Mayur Gunjal"
 LATEST_EXAMPLE = {
     "key": "MSC-205625",
-    "generated": "05-27-2026 19:59 IST",
+    "generated": "05-29-2026 12:43 IST",
     "verdict": "Pass with gaps",
     "summary_short": "PFT Clear passport dropped in incremental workflow (SIT)",
     "dev_code_pct": "100%",
@@ -53,9 +54,9 @@ LATEST_EXAMPLE = {
     "open_gaps": "2 Med",
     "ci_line_pct": "95.3%",
     "ci_branch_pct": "94.5%",
-    "pr_note": "PR #161 pick-genie · MERGED · CI passed",
+    "pr_note": "PR #161 pick-genie · MERGED · CI Passed",
     "testplan_note": "Domino Test Plan.xlsx · Inc as Fulll · 5/5 Given/When/Then",
-    "report_file": "MSC-205625-05-27-2026-19-59-49-IST.html",
+    "report_file": "MSC-205625-05-29-2026-12-43-49-IST.html",
 }
 
 
@@ -76,7 +77,7 @@ class Deck:
         line.fill.fore_color.rgb = LIGHT_GRAY
         line.line.fill.background()
         lb = slide.shapes.add_textbox(Inches(0.5), Inches(7.0), Inches(9), Inches(0.35))
-        lb.text_frame.text = "©LTM  |  Privileged and Confidential  |  MSC Code Coverage Validator"
+        lb.text_frame.text = f"©LTM  |  Privileged and Confidential  |  MSC Code Coverage Validator  |  Developed by {REPORT_DEVELOPER}"
         p = lb.text_frame.paragraphs[0]
         p.font.size = Pt(8)
         p.font.name = FONT
@@ -215,7 +216,10 @@ class Deck:
             left = Inches(0.85) + cw * i + Inches(0.12) * i
             self._kpi_card(s, left, Inches(4.85), cw, Inches(1.15), val, lbl, None, NAVY_LIGHT)
         foot = s.shapes.add_textbox(Inches(0.85), Inches(6.72), Inches(11), Inches(0.4))
-        foot.text_frame.text = "Pegasus QA Agents Lab · May 2026 · github.com/mgunjal11/pegasus-qa-agents-lab"
+        foot.text_frame.text = (
+            f"Pegasus QA Agents Lab · May 2026 · github.com/mgunjal11/pegasus-qa-agents-lab · "
+            f"Developed by {REPORT_DEVELOPER}"
+        )
         foot.text_frame.paragraphs[0].font.size = Pt(11)
         foot.text_frame.paragraphs[0].font.name = FONT
         foot.text_frame.paragraphs[0].font.color.rgb = DARK
@@ -236,7 +240,7 @@ class Deck:
             ("01", "Executive summary", "Value at a glance"),
             ("02", "The challenge", "Fragmented release signals"),
             ("03", "The solution", "Cursor subagent + workflow"),
-            ("04", "HTML report deep-dive", "8 sections · req chart · traceability"),
+            ("04", "HTML report deep-dive", "8 sections · info icons · traceability"),
             ("05", "Enablement", "Setup · scripts · permissions"),
             ("06", "Proven outcomes", "MSC case studies"),
         ]
@@ -422,6 +426,7 @@ class Deck:
                 "Dev vs QA ownership made explicit",
                 "Mascot + Given/When/Then test-plan validation",
                 "Audit-friendly downloadable artifact",
+                f"Developed by {REPORT_DEVELOPER}",
             ]),
         ]
         col_w = Inches(3.95)
@@ -504,7 +509,7 @@ class Deck:
             ("2", "Test plan", "Excel xlsx (Jira),\nGiven/When/Then, Mascot"),
             ("3", "GitHub", "PR diff,\nchecks, CI"),
             ("4", "Map", "R1…Rn\nscoring"),
-            ("5", "Report", "HTML + tooltips\n+ manifest"),
+            ("5", "Report", "HTML + tooltips\n+ footer credit"),
         ]
         sw = Inches(2.15)
         for i, (num, title, sub) in enumerate(steps):
@@ -539,8 +544,9 @@ class Deck:
         cb = s.shapes.add_textbox(Inches(0.75), Inches(4.4), Inches(11.8), Inches(0.9))
         cb.text_frame.text = (
             "Performance: reports/.cache/ stores Jira, test plan, and GitHub prefetch — "
-            "reuse with --from-cache --auto. Final HTML pass runs apply_report_ui_enhancements() "
-            "(info-icon tooltips, tooltip layout v3)."
+            "reuse with --from-cache --auto. Final HTML pass runs apply_report_ui_enhancements(): "
+            "info-icon tooltips on every section, tooltip layout v5 (Dev tests / CI status columns), "
+            f"and footer credit (Developed by {REPORT_DEVELOPER})."
         )
         cb.text_frame.paragraphs[0].font.size = Pt(12)
         cb.text_frame.paragraphs[0].font.color.rgb = BODY
@@ -579,7 +585,10 @@ class Deck:
             cy = t + Inches(0.68)
             self._arrow(s, cx, cy, hx, hy)
         leg = s.shapes.add_textbox(Inches(0.55), Inches(6.45), Inches(12), Inches(0.45))
-        leg.text_frame.text = "Skill: .cursor/skills/msc-code-coverage-validator/  ·  Agent: msc-code-coverage-validator  ·  Command: /msc-code-coverage-validator"
+        leg.text_frame.text = (
+            "Skill: .cursor/skills/msc-code-coverage-validator/  ·  Agent: msc-code-coverage-validator  ·  "
+            f"Command: /msc-code-coverage-validator  ·  Developed by {REPORT_DEVELOPER}"
+        )
         leg.text_frame.paragraphs[0].font.size = Pt(10)
         leg.text_frame.paragraphs[0].font.color.rgb = MUTED
         leg.text_frame.paragraphs[0].font.name = FONT
@@ -592,12 +601,12 @@ class Deck:
         self._slide_title(
             s,
             "HTML report — 8 sections",
-            "reports/{KEY}-{date}-{time}-{TZ}.html  ·  info-icon tooltips  ·  opens in any browser",
+            "reports/{KEY}-{date}-{time}-{TZ}.html  ·  hover i icons for context  ·  browser-ready",
         )
         sections = [
-            ("1", "Coverage summary", "8 metric cards"),
-            ("2", "Linked PR(s)", "CI · traceability"),
-            ("3", "Test plan", "Excel plan / Domino"),
+            ("1", "Coverage summary", "8 metric cards + i tooltips"),
+            ("2", "Linked PR(s)", "PR · Repo · State · Title · Dev tests · CI"),
+            ("3", "Test plan", "Excel attachment · GWT · Mascot"),
             ("4", "Dev vs QA", "Ownership split"),
             ("5", "Traceability", "Row-per-AC matrix"),
             ("6", "Impl. review", "Gaps · strengths"),
@@ -639,6 +648,72 @@ class Deck:
         ht.text_frame.paragraphs[0].font.bold = True
         ht.text_frame.paragraphs[0].font.color.rgb = WHITE
         ht.text_frame.paragraphs[0].font.name = FONT
+
+    def report_ui_slide(self):
+        """Report UX — info icons, tooltip layout v5, Linked PR columns, footer."""
+        s = self.blank()
+        s.background.fill.solid()
+        s.background.fill.fore_color.rgb = WHITE
+        self.footer(s)
+        self._slide_title(
+            s,
+            "Report UX — info icons & tooltips",
+            "apply_report_ui_enhancements() runs automatically before every HTML write",
+        )
+        # Left: where i icons appear
+        self._rect(s, Inches(0.55), Inches(1.35), Inches(6.0), Inches(0.42), NAVY, "Where the i icon appears", 12, True, WHITE, True)
+        ui_items = [
+            "Header verdict (Pass / Pass with gaps / Fail)",
+            "All 8 section titles + 3 summary group titles",
+            "All 8 Coverage summary metric cards",
+            "Linked PR(s) — 6 column headers (PR, Repo, State, Title, Dev tests, CI status)",
+            "Test plan + traceability table headers",
+            "Dev vs QA cards · Implementation review panels",
+        ]
+        for j, item in enumerate(ui_items):
+            bx = s.shapes.add_textbox(Inches(0.75), Inches(1.9) + Inches(0.48) * j, Inches(5.6), Inches(0.42))
+            bx.text_frame.text = f"i  {item}"
+            bx.text_frame.paragraphs[0].font.size = Pt(11)
+            bx.text_frame.paragraphs[0].font.color.rgb = BODY
+            bx.text_frame.paragraphs[0].font.name = FONT
+        # Right: tooltip v5 + footer
+        self._rect(s, Inches(6.85), Inches(1.35), Inches(5.9), Inches(0.42), CORAL, "Tooltip layout v5", 12, True, WHITE, True)
+        tips = [
+            "overflow: visible on sections, tables, and headers — no clipped text",
+            "Default columns: tooltip opens left from the icon",
+            "Last two table columns (Dev tests, CI status): anchor to <th> right edge",
+            "Section headings: tooltip aligns right of the icon",
+            "Pointer cursor (not ? help cursor) on hover",
+        ]
+        for j, tip in enumerate(tips):
+            bx = s.shapes.add_textbox(Inches(7.05), Inches(1.9) + Inches(0.48) * j, Inches(5.5), Inches(0.42))
+            bx.text_frame.text = f"• {tip}"
+            bx.text_frame.paragraphs[0].font.size = Pt(10)
+            bx.text_frame.paragraphs[0].font.color.rgb = BODY
+            bx.text_frame.paragraphs[0].font.name = FONT
+        # Linked PR table mock
+        self._rect(s, Inches(0.55), Inches(4.85), Inches(12.2), Inches(0.38), NAVY_LIGHT, "§2 Linked PR(s) — six columns", 11, True, WHITE)
+        pr_cols = ["PR", "Repo", "State", "Title", "Dev tests", "CI status"]
+        cw = Inches(12.2) / 6
+        for ci, col in enumerate(pr_cols):
+            left = Inches(0.55) + cw * ci
+            accent = SOFT_GOLD if col in ("Dev tests", "CI status") else LIGHT_GRAY
+            self._rect(s, left, Inches(5.23), cw - Inches(0.04), Inches(0.35), accent, f"{col} i", 9, True, NAVY)
+        ex = LATEST_EXAMPLE
+        row_txt = f"#161  ·  wbd-msc/pegasus-pick-genie  ·  MERGED  ·  passport fix  ·  TestDominoPassportRouting  ·  Passed"
+        self._rect(s, Inches(0.55), Inches(5.58), Inches(12.2), Inches(0.35), WHITE, row_txt, 9, False, BODY)
+        # Footer mock
+        ft = self._rect(s, Inches(0.55), Inches(6.15), Inches(12.2), Inches(0.45), LIGHT_GRAY, radius=True)
+        ft.line.fill.background()
+        fb = s.shapes.add_textbox(Inches(0.75), Inches(6.22), Inches(11.8), Inches(0.35))
+        fb.text_frame.text = (
+            f"Generated by msc-code-coverage-validator · Developed by {REPORT_DEVELOPER}  "
+            f"({ex['report_file']})"
+        )
+        fb.text_frame.paragraphs[0].font.size = Pt(10)
+        fb.text_frame.paragraphs[0].font.color.rgb = MUTED
+        fb.text_frame.paragraphs[0].font.name = FONT
+        fb.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
 
     def metrics_dashboard_slide(self):
         s = self.blank()
@@ -945,8 +1020,9 @@ class Deck:
         scripts.text_frame.word_wrap = True
         lines = [
             "Scripts (batched — no manual gh per run):",
-            "fetch_jira_testplan.py  ·  prefetch_coverage_inputs.py  ·  fetch_coverage_github.py",
-            "Cache: reports/.cache/{KEY}-jira.json | -testplan.json | -manifest.json",
+            "fetch_jira_testplan.py  ·  prefetch_coverage_inputs.py  ·  generate_coverage_validator_ppt.py",
+            "apply_report_ui_enhancements()  ·  Cache: reports/.cache/{KEY}-*.json",
+            f"sync_pegasus_qa_agents_lab.py → push to github.com/mgunjal11/pegasus-qa-agents-lab",
         ]
         for j, line in enumerate(lines):
             para = scripts.text_frame.paragraphs[0] if j == 0 else scripts.text_frame.add_paragraph()
@@ -970,7 +1046,7 @@ class Deck:
                 "75%",
                 "75%",
                 "Pass with gaps",
-                "PR #161 · CI 95.3% · 5/5 Given/When/Then",
+                "PR #161 · CI Passed · 5/5 GWT · R4 gap",
             ),
             ("MSC-204417", "Story · In QA", "100%", "83%", "12/12 Given/When/Then", "Pass with gaps", "Caption Monitoring · develop"),
             ("MSC-195138", "Story · FF Race", "—", "—", "66.7%", "Pass with gaps", "PRs #22 + #75 · 11/11 Given/When/Then"),
@@ -1023,7 +1099,7 @@ class Deck:
         t2.text_frame.paragraphs[0].font.name = FONT
         t2.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
         t3 = s.shapes.add_textbox(Inches(2), Inches(4.2), Inches(9.3), Inches(0.5))
-        t3.text_frame.text = "/msc-code-coverage-validator {YOUR-MSC-KEY}"
+        t3.text_frame.text = f"/msc-code-coverage-validator {{YOUR-MSC-KEY}}  ·  Developed by {REPORT_DEVELOPER}"
         t3.text_frame.paragraphs[0].font.size = Pt(14)
         t3.text_frame.paragraphs[0].font.name = "Consolas"
         t3.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xBF, 0xDB, 0xFE)
@@ -1044,8 +1120,9 @@ class Deck:
         self.personas_slide()
         self.workflow_slide()
         self.architecture_slide()
-        self.section_slide("03", "HTML report", "Eight sections · metrics dashboard · test plan & ownership")
+        self.section_slide("03", "HTML report", "Eight sections · info icons · metrics · traceability")
         self.report_sections_slide()
+        self.report_ui_slide()
         self.metrics_dashboard_slide()
         self.requirement_traceability_slide()
         self.testplan_slide()
