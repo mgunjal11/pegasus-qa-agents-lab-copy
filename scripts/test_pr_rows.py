@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """Tests for Linked PR(s) table helpers."""
-from coverage_report_helpers import ci_status_html, render_pr_row, render_pr_rows
+from coverage_report_helpers import (
+    ci_status_html,
+    inject_pr_table_header_tooltips,
+    render_pr_row,
+    render_pr_rows,
+    render_pr_table_header_row,
+)
 
 
 def test_ci_na_empty():
@@ -51,6 +57,27 @@ def test_render_pr_rows():
     )
     assert "#1" in html
     assert "badge-covered" in html
+
+
+def test_pr_table_header_has_info_icons():
+    header = render_pr_table_header_row()
+    assert header.count('class="metric-info-tip"') == 6
+    assert "Dev tests" in header
+    assert "CI status" in header
+
+
+def test_inject_pr_table_header_tooltips():
+    html = """
+    <style></style>
+    <section class="report-section section-pr">
+      <table><thead><tr><th>PR</th><th>Repo</th></tr></thead><tbody></tbody></table>
+    </section>
+    """
+    out = inject_pr_table_header_tooltips(html)
+    assert "th-label-row" in out
+    assert 'aria-label="About PR"' in out
+    twice = inject_pr_table_header_tooltips(out)
+    assert twice.count('class="metric-info-tip"') == out.count('class="metric-info-tip"')
 
 
 if __name__ == "__main__":

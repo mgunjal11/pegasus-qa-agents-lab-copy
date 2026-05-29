@@ -10,8 +10,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from coverage_report_helpers import (  # noqa: E402
+    apply_report_ui_enhancements,
+    ci_coverage_report_fields,
     load_testplan_cache,
-    render_pr_rows,
+    render_pr_rows_from_prefetch,
     render_testplan_rows,
 )
 from coverage_report_timestamp import report_paths  # noqa: E402
@@ -21,10 +23,15 @@ KEY = "MSC-205625"
 
 def patch_metric_note(html: str, label: str, value: str, note: str) -> str:
     """Replace metric-value and note inside a metric-card containing label text."""
+    label_block = (
+        rf'(?:<div class="label-row">\s*<div class="label">{re.escape(label)}</div>.*?</div>'
+        rf'|<div class="label">{re.escape(label)}</div>)'
+    )
     pattern = (
-        rf'(<div class="metric-card[^"]*">.*?<div class="label">{re.escape(label)}</div>\s*'
+        rf'(<div class="metric-card[^"]*">.*?{label_block}\s*'
         rf'<div class="metric-value">)[^<]*(</div>\s*<div class="note">)[^<]*(</div>)'
     )
+
     def repl(m: re.Match[str]) -> str:
         return f"{m.group(1)}{value}{m.group(2)}{note}{m.group(3)}"
 
@@ -99,22 +106,30 @@ def main() -> None:
         count=1,
     )
 
-    pr_rows = render_pr_rows(
-        [
-            {
-                "url": "https://github.com/wbd-msc/pegasus-pick-genie/pull/161",
-                "number": 161,
-                "repo": "wbd-msc/pegasus-pick-genie",
-                "state": "Merged",
-                "title": "Passport routing for incremental-as-full PFT Clear",
-                "dev_tests": "TestDominoPassportRouting, passport_manager unit tests",
-                "checks": None,
-            }
-        ]
+    pr_rows = render_pr_rows_from_prefetch(
+        KEY,
+        ROOT,
+        dev_tests_by_number={
+            161: "TestDominoPassportRouting, passport_manager unit tests",
+        },
+    )
+    ci = ci_coverage_report_fields(KEY, ROOT)
+    html = patch_metric_note(html, "CI line coverage", ci["lineCoverage"], ci["lineNote"])
+    html = patch_metric_note(
+        html,
+        "CI branch coverage",
+        ci["branchCoverage"],
+        ci["branchNote"],
     )
     html = re.sub(
-        r"<tr><th>PR</th><th>Author</th><th>State</th><th>CI</th></tr>",
-        "<tr><th>PR</th><th>Repo</th><th>State</th><th>Title</th><th>Dev tests</th><th>CI status</th></tr>",
+        r'(<div class="metric-card )metric-na(">\s*<div class="label">CI line coverage</div>)',
+        rf'\1{ci["lineClass"]}\2',
+        html,
+        count=1,
+    )
+    html = re.sub(
+        r'(<div class="metric-card )metric-na(">\s*<div class="label">CI branch coverage</div>)',
+        rf'\1{ci["branchClass"]}\2',
         html,
         count=1,
     )
@@ -125,6 +140,8 @@ def main() -> None:
         count=1,
         flags=re.DOTALL,
     )
+
+    html = apply_report_ui_enhancements(html)
 
     out.write_text(html, encoding="utf-8")
     manifest_path = ROOT / "reports" / ".cache" / f"{KEY}-manifest.json"

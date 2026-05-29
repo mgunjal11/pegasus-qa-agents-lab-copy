@@ -31,7 +31,7 @@ Subagents:
 | Agent | Purpose |
 |-------|---------|
 | **msc-testcase-writer** | QMetry test cases from Jira stories |
-| **msc-code-coverage-validator** | `/msc-code-coverage-validator KEY` — validates Jira AC + attached QMetry test plan vs linked PR; auto-run with permissions allowlist |
+| **msc-code-coverage-validator** | `/msc-code-coverage-validator KEY` — validates Jira AC + attached QMetry test plan vs linked PR; auto-run with permissions allowlist (developed by Mayur Gunjal) |
 
 Skill: `.cursor/skills/msc-code-coverage-validator/SKILL.md`
 

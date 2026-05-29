@@ -539,7 +539,8 @@ class Deck:
         cb = s.shapes.add_textbox(Inches(0.75), Inches(4.4), Inches(11.8), Inches(0.9))
         cb.text_frame.text = (
             "Performance: reports/.cache/ stores Jira, test plan, and GitHub prefetch — "
-            "reuse with --from-cache --auto. Final HTML pass runs apply_report_ui_enhancements() (info-icon tooltips, tooltip layout v3)."
+            "reuse with --from-cache --auto. Final HTML pass runs apply_report_ui_enhancements() "
+            "(info-icon tooltips, tooltip layout v3)."
         )
         cb.text_frame.paragraphs[0].font.size = Pt(12)
         cb.text_frame.paragraphs[0].font.color.rgb = BODY
@@ -709,10 +710,12 @@ class Deck:
             pr.line.fill.background()
         # sample table mock
         self._rect(s, Inches(6.8), Inches(5.0), Inches(5.95), Inches(0.4), NAVY, "Scenario", 10, True, WHITE)
-        for j, row in enumerate([
-            "TC1–TC5 · Inc as Fulll · 5/5 Given/When/Then",
-            "R4 · Edit ID SIT scenario · Gap",
-        ]):
+        for j, row in enumerate(
+            [
+                "TC1–TC5 · Inc as Fulll · 5/5 Given/When/Then",
+                "R4 · Edit ID SIT scenario · Gap",
+            ]
+        ):
             self._rect(s, Inches(6.8), Inches(5.4) + Inches(0.38) * j, Inches(5.95), Inches(0.35), LIGHT_GRAY if j == 0 else RED_BG, row, 9, False, BODY)
 
     def dev_qa_slide(self):
@@ -765,7 +768,6 @@ class Deck:
         mid.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
         mid.text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
 
-
     def _matrix_header(self, slide, left, top, width, text, fill=NAVY):
         self._rect(slide, left, top, width, Inches(0.42), fill, text, 10, True, WHITE)
 
@@ -776,16 +778,14 @@ class Deck:
         top,
         width,
         height,
-        lines,
+        lines: list[str],
         fill=WHITE,
-        title=None,
+        title: str | None = None,
         title_color=NAVY,
-        line_colors=None,
+        line_colors: list[RGBColor] | None = None,
     ):
         self._rect(slide, left, top, width, height, fill, radius=False)
-        box = slide.shapes.add_textbox(
-            left + Inches(0.08), top + Inches(0.06), width - Inches(0.16), height - Inches(0.1)
-        )
+        box = slide.shapes.add_textbox(left + Inches(0.08), top + Inches(0.06), width - Inches(0.16), height - Inches(0.1))
         tf = box.text_frame
         tf.word_wrap = True
         if title:
@@ -800,11 +800,11 @@ class Deck:
             para.text = line
             para.font.size = Pt(9)
             para.font.name = FONT
-            para.font.color.rgb = line_colors[i] if line_colors and i < len(line_colors) else BODY
+            para.font.color.rgb = (line_colors[i] if line_colors and i < len(line_colors) else BODY)
             para.space_after = Pt(2)
 
     def requirement_traceability_slide(self):
-        """MSC-205625 — Jira requirements vs PR code coverage vs Jira-attached Excel test plan."""
+        """MSC-205625 example — Jira requirements vs PR code coverage vs Jira-attached Excel test plan."""
         s = self.blank()
         s.background.fill.solid()
         s.background.fill.fore_color.rgb = WHITE
@@ -812,7 +812,7 @@ class Deck:
         self._slide_title(
             s,
             "Requirement traceability chart — Jira · Code · Test plan",
-            "MSC-205625 · Domino Test Plan.xlsx attached in Jira (Inc as Fulll sheet) · PR #161 pick-genie",
+            f"{LATEST_EXAMPLE['key']} · {LATEST_EXAMPLE['testplan_note']} · {LATEST_EXAMPLE['pr_note']}",
         )
         left = Inches(0.55)
         col_req = Inches(4.35)
@@ -821,9 +821,7 @@ class Deck:
         top = Inches(1.35)
         self._matrix_header(s, left, top, col_req, "Requirement (Jira story)")
         self._matrix_header(s, left + col_req + Inches(0.08), top, col_code, "Code coverage (linked PR)")
-        self._matrix_header(
-            s, left + col_req + col_code + Inches(0.16), top, col_plan, "Test plan (Jira Excel attachment)"
-        )
+        self._matrix_header(s, left + col_req + col_code + Inches(0.16), top, col_plan, "Test plan (Jira Excel attachment)")
         rows = [
             (
                 "R1",
@@ -869,12 +867,18 @@ class Deck:
         row_h = Inches(1.05)
         for ri, (rid, req_text, code_lines, code_colors, code_bg, plan_lines, plan_colors, plan_bg) in enumerate(rows):
             y = top + Inches(0.48) + row_h * ri
+            req_title = f"{rid}"
             req_body = req_text if len(req_text) <= 95 else req_text[:92] + "…"
+            self._matrix_cell(s, left, y, col_req, row_h, [req_body], fill=LIGHT_GRAY if ri % 2 else WHITE, title=req_title)
             self._matrix_cell(
-                s, left, y, col_req, row_h, [req_body], fill=LIGHT_GRAY if ri % 2 else WHITE, title=rid
-            )
-            self._matrix_cell(
-                s, left + col_req + Inches(0.08), y, col_code, row_h, code_lines, fill=code_bg, line_colors=code_colors
+                s,
+                left + col_req + Inches(0.08),
+                y,
+                col_code,
+                row_h,
+                code_lines,
+                fill=code_bg,
+                line_colors=code_colors,
             )
             self._matrix_cell(
                 s,
@@ -889,8 +893,8 @@ class Deck:
         note = s.shapes.add_textbox(Inches(0.55), Inches(6.15), Inches(12.2), Inches(0.55))
         note.text_frame.word_wrap = True
         note.text_frame.text = (
-            "Left: acceptance criteria from Jira description · Middle: production code + dev unit/integration "
-            "tests from PR diff · Right: scenarios parsed from the Excel test plan file attached to the Jira ticket."
+            "Left: acceptance criteria extracted from Jira description · Middle: production code + dev unit/integration tests from PR diff · "
+            "Right: scenarios parsed from the Excel test plan file attached to the Jira ticket (not a separate tool — the workbook in Jira attachments)."
         )
         note.text_frame.paragraphs[0].font.size = Pt(10)
         note.text_frame.paragraphs[0].font.color.rgb = MUTED
@@ -959,7 +963,15 @@ class Deck:
         self.footer(s)
         self._slide_title(s, "Proven MSC outcomes", "Real validator runs — Pegasus MSC project")
         cases = [
-            ("MSC-205625", "Bug · Ready for Release", "100%", "75%", "75%", "Pass with gaps", "PR #161 · CI 95.3% · 5/5 Given/When/Then"),
+            (
+                "MSC-205625",
+                "Bug · Ready for Release",
+                "100%",
+                "75%",
+                "75%",
+                "Pass with gaps",
+                "PR #161 · CI 95.3% · 5/5 Given/When/Then",
+            ),
             ("MSC-204417", "Story · In QA", "100%", "83%", "12/12 Given/When/Then", "Pass with gaps", "Caption Monitoring · develop"),
             ("MSC-195138", "Story · FF Race", "—", "—", "66.7%", "Pass with gaps", "PRs #22 + #75 · 11/11 Given/When/Then"),
         ]

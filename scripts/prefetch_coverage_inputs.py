@@ -26,6 +26,16 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+SCRIPTS = Path(__file__).resolve().parent
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+
+from ci_coverage import (  # noqa: E402
+    extract_ci_coverage,
+    fetch_check_run_sonar_summary,
+    fetch_sonarqube_comment,
+)
+
 PR_URL_RE = re.compile(
     r"https://github\.com/(?P<org>[^/]+)/(?P<repo>[^/]+)/pull/(?P<number>\d+)"
 )
@@ -43,7 +53,7 @@ def gh_json(args: list[str]) -> Any:
     return json.loads(result.stdout)
 
 
-def gh_text(args: list[str]) -> str:
+def gh_text(args: list[str], *, accept_stdout_on_error: bool = False) -> str:
     result = subprocess.run(
         ["gh", *args],
         capture_output=True,
@@ -51,6 +61,9 @@ def gh_text(args: list[str]) -> str:
         check=False,
     )
     if result.returncode != 0:
+        # gh pr checks exits non-zero when any check is pending/failing but still prints rows.
+        if accept_stdout_on_error and result.stdout.strip():
+            return result.stdout
         raise RuntimeError(result.stderr.strip() or f"gh failed: {' '.join(args)}")
     return result.stdout
 
@@ -95,7 +108,7 @@ def fetch_codecov_comment(org: str, repo: str, number: int) -> str | None:
                 '.[] | select(.user.login | test("codecov"; "i")) | .body',
             ]
         )
-    except RuntimeError:
+    except (RuntimeError, json.JSONDecodeError):
         return None
     if isinstance(comments, list) and comments:
         return comments[0]
@@ -121,8 +134,23 @@ def fetch_pr(org: str, repo: str, number: int, url: str) -> dict[str, Any]:
     diff_names = gh_text(
         ["pr", "diff", str(number), "--repo", full_repo, "--name-only"]
     ).strip()
-    checks = gh_text(["pr", "checks", str(number), "--repo", full_repo])
+    checks = gh_text(
+        ["pr", "checks", str(number), "--repo", full_repo],
+        accept_stdout_on_error=True,
+    )
     codecov = fetch_codecov_comment(org, repo, number)
+    sonar = fetch_sonarqube_comment(org, repo, number)
+    head_sha = (view.get("headRefOid") or "") if isinstance(view, dict) else ""
+    sonar_check = None
+    if head_sha:
+        sonar_check = fetch_check_run_sonar_summary(org, repo, head_sha)
+    ci_coverage = extract_ci_coverage(
+        codecov_comment=codecov,
+        sonar_comment=sonar,
+        sonar_check_summary=sonar_check,
+        checks_text=checks,
+        repo=full_repo,
+    )
     return {
         "url": url,
         "org": org,
@@ -133,6 +161,8 @@ def fetch_pr(org: str, repo: str, number: int, url: str) -> dict[str, Any]:
         "diffNames": diff_names.splitlines() if diff_names else [],
         "checks": checks,
         "codecovComment": codecov,
+        "sonarComment": sonar,
+        "ciCoverage": ci_coverage,
     }
 
 
