@@ -351,6 +351,46 @@ def map_testcases_to_requirements(
         )
 
 
+def build_ladr_traceability(
+    cases: list[Any],
+    ladr_requirements: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    """Map each LADR requirement (L1…Ln) to test case IDs for report traceability."""
+    if not ladr_requirements:
+        return []
+
+    tc_by_req: dict[str, list[str]] = {r["id"]: [] for r in ladr_requirements if r.get("id")}
+    for tc in cases:
+        if isinstance(tc, dict):
+            tc_id = str(tc.get("id") or tc.get("summary") or "")
+            mapped = tc.get("mapped_requirements") or []
+        else:
+            tc_id = str(getattr(tc, "id", None) or getattr(tc, "summary", "") or "")
+            mapped = getattr(tc, "mapped_requirements", []) or []
+        for rid in mapped:
+            if rid.startswith("L") and rid in tc_by_req and tc_id:
+                if tc_id not in tc_by_req[rid]:
+                    tc_by_req[rid].append(tc_id)
+
+    rows: list[dict[str, Any]] = []
+    for req in ladr_requirements:
+        rid = req.get("id") or ""
+        if not rid.startswith("L"):
+            continue
+        test_ids = tc_by_req.get(rid) or []
+        rows.append(
+            {
+                "id": rid,
+                "text": req.get("text") or "",
+                "task": req.get("task"),
+                "status": req.get("status"),
+                "testCaseIds": test_ids,
+                "mapped": bool(test_ids),
+            }
+        )
+    return rows
+
+
 def compute_testplan_coverage(
     cases: list[Any],
     requirements: list[dict[str, str]],

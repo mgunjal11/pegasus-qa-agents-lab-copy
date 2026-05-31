@@ -34,6 +34,7 @@ from jira_env import (
     load_dotenv,
 )
 from confluence_requirements import (
+    build_ladr_traceability,
     compute_testplan_coverage,
     fetch_and_cache_confluence_for_issue,
     format_testplan_coverage_detail,
@@ -1136,6 +1137,7 @@ def main() -> int:
     jira_att = next((m for m in attachment_meta if m.get("source") == "jira_attachment"), None)
     source_hint = "Jira attachment" if jira_att else ("local file" if files else "")
     coverage["coverageDetail"] = format_testplan_coverage_detail(coverage, source_hint)
+    ladr_traceability = build_ladr_traceability(all_cases, ladr_requirements) if ladr_requirements else []
     scenario_filter = None
     if issue_key and all_cases:
         hay = " ".join(
@@ -1166,6 +1168,7 @@ def main() -> int:
         "requirements": requirements,
         "jiraRequirements": jira_requirements,
         "ladrRequirements": ladr_requirements,
+        "ladrTraceability": ladr_traceability,
         "confluence": {
             "status": confluence_payload.get("status"),
             "pages": [

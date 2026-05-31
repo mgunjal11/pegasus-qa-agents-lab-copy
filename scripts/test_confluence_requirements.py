@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from confluence_requirements import (  # noqa: E402
+    build_ladr_traceability,
     compute_testplan_coverage,
     map_testcases_to_requirements,
     merge_requirement_sets,
@@ -68,6 +69,10 @@ def test_map_caption_monitoring_scenarios():
     cov = compute_testplan_coverage(cases, reqs, jira_requirements=jira, ladr_requirements=ladr)
     assert cov["jiraRequirementsCovered"] >= 2
     assert cov["testplanCoveragePct"] != 0
+
+    trace = build_ladr_traceability(cases, ladr)
+    assert trace
+    assert any(r["id"] == "L1" and r["mapped"] for r in trace)
 
 
 if __name__ == "__main__":

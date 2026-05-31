@@ -9,8 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from coverage_report_helpers import (  # noqa: E402
     apply_report_ui_enhancements,
+    build_testplan_report_fields,
     load_testplan_cache,
-    render_testplan_rows,
 )
 from coverage_report_timestamp import report_paths  # noqa: E402
 
@@ -56,45 +56,14 @@ replacements = {
 
 tp = load_testplan_cache("MSC-204417", ROOT)
 cov = tp.get("coverage") or {}
-tp_pct = cov.get("testplanCoveragePct")
-if tp_pct is None:
-    replacements["{{TESTPLAN_COVERAGE_PCT}}"] = "NA"
-    replacements["{{TESTPLAN_COVERAGE_CLASS}}"] = "metric-na"
-else:
-    replacements["{{TESTPLAN_COVERAGE_PCT}}"] = f"{tp_pct}%"
-    replacements["{{TESTPLAN_COVERAGE_CLASS}}"] = (
-        "metric-good" if tp_pct >= 85 else "metric-warn" if tp_pct >= 70 else "metric-fail"
+replacements.update(build_testplan_report_fields("MSC-204417", ROOT))
+if not replacements.get("{{TESTPLAN_GAPS_LIST}}"):
+    replacements["{{TESTPLAN_GAPS_LIST}}"] = (
+        '<li class="medium">Review test plan ↔ PR alignment for Monitor E2E scenarios</li>'
     )
-replacements["{{TESTPLAN_COVERAGE_DETAIL}}"] = cov.get(
-    "coverageDetail", "No test plan"
-)
-note = tp.get("testPlanSummaryNote") or ""
-replacements["{{TESTPLAN_NOTE}}"] = (
-    f'<div class="note-box">{note}</div>' if note else ""
-)
-replacements["{{TESTPLAN_ROWS}}"] = render_testplan_rows(tp.get("testCases") or [])
-uncovered = cov.get("uncoveredRequirements") or []
-uncovered_ladr = cov.get("uncoveredLadrRequirements") or []
-uncovered_jira = cov.get("uncoveredJiraRequirements") or uncovered
-gaps = []
-for r in uncovered_jira:
-    gaps.append(
-        f'<li class="medium"><strong>{r}</strong> — no mapped test case for Jira acceptance criterion</li>'
-    )
-for r in uncovered_ladr:
-    gaps.append(
-        f'<li class="medium"><strong>{r}</strong> — no mapped test case for LADR ESS scenario (e.g. STATUS_ERROR 9000)</li>'
-    )
-if not gaps and not uncovered:
-    gaps.append('<li class="medium">Review test plan ↔ PR alignment for Monitor E2E scenarios</li>')
 tc_count = cov.get("testCaseCount") or 0
 gwt_complete = cov.get("completeGwtCount") or 0
 incomplete_gwt = tc_count - gwt_complete
-if incomplete_gwt:
-    gaps.append(
-        f'<li class="medium">{incomplete_gwt} test case(s) missing full Given/When/Then in step text</li>'
-    )
-replacements["{{TESTPLAN_GAPS_LIST}}"] = "".join(gaps)
 
 tc_n = cov.get("testCaseCount", 12)
 gwt_n = cov.get("completeGwtCount", 0)

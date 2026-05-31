@@ -435,7 +435,7 @@ class Deck:
         pains = [
             "Duplicate QA/dev effort",
             "Missed E2E handoffs",
-            "LADR not tied to test plan",
+            "No LADR ↔ test plan traceability",
             "Weak AC ↔ evidence mapping",
         ]
         for i, p in enumerate(pains):
@@ -465,8 +465,8 @@ class Deck:
             ("Unified validator", GOLD, "Solution", [
                 "/msc-dev-code-and-qa-test-coverage-validator {KEY}",
                 "One batch: Jira + Confluence LADR (if linked) + PR(s) + Excel test plan",
-                "Maps Jira AC + Confluence LADR requirements → code → dev tests → QA scope",
-                "HTML report + Pass / Pass with gaps / Fail",
+                "Maps Jira AC + LADR L1…Ln → test cases → code → dev tests",
+                "HTML report + LADR traceability table + Pass / Pass with gaps / Fail",
             ]),
             ("Leadership evidence", NAVY, "Benefits", [
                 "8 quantified metric cards",
@@ -811,6 +811,7 @@ class Deck:
         self._slide_title(s, "§3 Test plan validation — Jira Excel + LADR alignment", "Confluence LADR requirements when linked · Excel attachment · Given/When/Then · Mascot")
         feats = [
             ("Confluence LADR (from Jira)", "If story comments or description reference LADR or wiki URLs, agent fetches Confluence via MCP or fetch_confluence_requirements.py", "LADR requirements L1…Ln · cache {KEY}-confluence.json"),
+            ("LADR ↔ test plan traceability", "Each L1…Ln requirement tied to Excel test case IDs in report §3", "13/14 LADR mapped · MSC-204417"),
             ("Domino Excel test plan (Jira attachment)", "Jira attachment or local testplans/", "fetch_jira_testplan.py"),
             ("Given / When / Then", "Content-based Given/When/Then scoring (not column-name only)", "12/12 GWT · MSC-204417"),
             ("LADR + Jira AC mapping", "Semantic match of test cases to Jira AC and Confluence LADR requirements", "94.1% · MSC-204417"),
@@ -887,7 +888,8 @@ class Deck:
         merge_items = [
             "Jira AC → R1, R2, R3…",
             "Confluence LADR → L1…Ln",
-            "Test cases map to both (semantic match)",
+            "Test cases map to R* and L* (semantic match)",
+            "Report §3: LADR ↔ test case traceability table",
             "Test plan AC coverage % uses combined set",
         ]
         for j, t in enumerate(merge_items):
@@ -916,7 +918,7 @@ class Deck:
             "Wiki URL or LADR comment on Jira",
             "Confluence page body → requirement list",
             "Merged with Jira AC + Excel test plan",
-            "Gap list for unmapped L* / R* items",
+            "LADR ↔ test case table + gap list for unmapped L*",
         ]
         cw = Inches(12.2) / 4
         for ci, cap in enumerate(caps):

@@ -53,6 +53,139 @@ def pr_alignment_for_tc(mapped: list[str]) -> str:
     return f'<span class="badge badge-implemented">Aligns</span> {esc(reqs)}'
 
 
+def ladr_coverage_badge(mapped: bool) -> str:
+    if mapped:
+        return '<span class="badge badge-covered">Covered</span>'
+    return '<span class="badge badge-missing">Gap</span>'
+
+
+def render_ladr_traceability_rows(traceability: list[dict[str, Any]]) -> str:
+    if not traceability:
+        return '<tr><td colspan="4">—</td></tr>'
+    rows = []
+    for row in traceability:
+        tc_ids = row.get("testCaseIds") or []
+        tc_cell = esc(", ".join(tc_ids)) if tc_ids else "—"
+        rows.append(
+            f"<tr>"
+            f"<td>{esc(row.get('id', ''))}</td>"
+            f"<td>{esc(row.get('text', ''))}</td>"
+            f"<td>{tc_cell}</td>"
+            f"<td>{ladr_coverage_badge(bool(row.get('mapped')))}</td>"
+            f"</tr>"
+        )
+    return "\n".join(rows)
+
+
+def render_ladr_traceability_block(testplan_cache: dict[str, Any]) -> str:
+    """HTML subsection tying Confluence LADR requirements to Excel test cases."""
+    traceability = testplan_cache.get("ladrTraceability") or []
+    ladr_reqs = testplan_cache.get("ladrRequirements") or []
+    if not traceability and ladr_reqs:
+        from confluence_requirements import build_ladr_traceability
+
+        traceability = build_ladr_traceability(
+            testplan_cache.get("testCases") or [],
+            ladr_reqs,
+        )
+    if not traceability:
+        return ""
+
+    cov = testplan_cache.get("coverage") or {}
+    ladr_total = cov.get("ladrRequirementCount") or len(traceability)
+    ladr_covered = cov.get("ladrRequirementsCovered") or sum(1 for r in traceability if r.get("mapped"))
+    confluence = testplan_cache.get("confluence") or {}
+    pages = confluence.get("pages") or []
+    page_links = []
+    for page in pages:
+        url = page.get("webUrl") or ""
+        title = page.get("title") or page.get("pageId") or "Confluence"
+        if url:
+            page_links.append(f'<a href="{esc(url)}" target="_blank">{esc(title)}</a>')
+    source_line = " · ".join(page_links) if page_links else "Confluence LADR (linked from Jira)"
+    lead = (
+        f"{ladr_covered}/{ladr_total} LADR requirements mapped to test cases in the attached Excel plan. "
+        f"Source: {source_line}."
+    )
+    return (
+        '<div class="review-panel review-info ladr-trace-block" style="margin-bottom:1rem;">'
+        "<h3>LADR ↔ test plan traceability</h3>"
+        f'<p class="section-lead">{lead}</p>'
+        '<div class="table-wrap">'
+        '<table class="ladr-trace-table">'
+        "<thead>"
+        "<tr><th>LADR ID</th><th>Requirement</th><th>Test case(s)</th><th>Status</th></tr>"
+        "</thead>"
+        "<tbody>"
+        f"{render_ladr_traceability_rows(traceability)}"
+        "</tbody>"
+        "</table>"
+        "</div>"
+        "</div>"
+    )
+
+
+def build_testplan_gaps_html(
+    coverage: dict[str, Any],
+    *,
+    extra_gaps: list[str] | None = None,
+) -> str:
+    """Build {{TESTPLAN_GAPS_LIST}} HTML from coverage cache."""
+    uncovered_ladr = coverage.get("uncoveredLadrRequirements") or []
+    uncovered_jira = coverage.get("uncoveredJiraRequirements") or coverage.get("uncoveredRequirements") or []
+    gaps: list[str] = list(extra_gaps or [])
+    for r in uncovered_jira:
+        if r.startswith("L"):
+            continue
+        gaps.append(
+            f'<li class="medium"><strong>{esc(r)}</strong> — no mapped test case for Jira acceptance criterion</li>'
+        )
+    for r in uncovered_ladr:
+        gaps.append(
+            f'<li class="medium"><strong>{esc(r)}</strong> — no mapped test case for Confluence LADR requirement</li>'
+        )
+    tc_count = coverage.get("testCaseCount") or 0
+    gwt_complete = coverage.get("completeGwtCount") or 0
+    incomplete_gwt = tc_count - gwt_complete
+    if incomplete_gwt:
+        gaps.append(
+            f'<li class="medium">{incomplete_gwt} test case(s) missing full Given/When/Then in step text</li>'
+        )
+    return "".join(gaps)
+
+
+def testplan_coverage_class(pct: Any) -> str:
+    if pct is None or pct == "NA" or pct == "Pending":
+        return "metric-na"
+    try:
+        val = float(pct)
+    except (TypeError, ValueError):
+        return "metric-na"
+    if val >= 85:
+        return "metric-good"
+    if val >= 70:
+        return "metric-warn"
+    return "metric-fail"
+
+
+def build_testplan_report_fields(issue_key: str, root: Path | None = None) -> dict[str, str]:
+    """Build TESTPLAN_* and LADR traceability placeholders from test plan cache."""
+    tp = load_testplan_cache(issue_key, root)
+    cov = tp.get("coverage") or {}
+    tp_pct = cov.get("testplanCoveragePct")
+    fields: dict[str, str] = {
+        "{{TESTPLAN_COVERAGE_PCT}}": "NA" if tp_pct is None else f"{tp_pct}%",
+        "{{TESTPLAN_COVERAGE_CLASS}}": testplan_coverage_class(tp_pct),
+        "{{TESTPLAN_COVERAGE_DETAIL}}": cov.get("coverageDetail") or "No test plan",
+        "{{TESTPLAN_ROWS}}": render_testplan_rows(tp.get("testCases") or []),
+        "{{LADR_TRACEABILITY_BLOCK}}": render_ladr_traceability_block(tp),
+        "{{TESTPLAN_GAPS_LIST}}": build_testplan_gaps_html(cov),
+    }
+    note = tp.get("testPlanSummaryNote") or ""
+    fields["{{TESTPLAN_NOTE}}"] = f'<div class="note-box">{esc(note)}</div>' if note else ""
+    return fields
+
+
 def render_testplan_rows(test_cases: list[dict[str, Any]]) -> str:
     rows = []
     for tc in test_cases:
@@ -478,8 +611,8 @@ SECTION_HEADER_INFO: dict[str, str] = {
         "evidence from the PR diff."
     ),
     "Attached test plan validation": (
-        "QMetry test plan from Jira mapped to acceptance criteria and checked for "
-        "alignment with PR implementation."
+        "QMetry test plan from Jira mapped to Jira acceptance criteria and Confluence LADR "
+        "requirements (when linked), with LADR ↔ test case traceability and PR alignment checks."
     ),
     "Dev vs QA test ownership": (
         "Which requirements are proven by dev unit/integration tests in the PR versus "
@@ -518,10 +651,17 @@ SUMMARY_GROUP_INFO: dict[str, str] = {
 TESTPLAN_TABLE_COLUMN_INFO: dict[str, str] = {
     "TC": "Test case ID from the attached QMetry test plan.",
     "Scenario": "Section and summary describing the test scenario.",
-    "Mapped req": "Jira acceptance criteria (R1, R2, …) mapped to this test case.",
+    "Mapped req": "Jira acceptance criteria (R1, R2, …) and Confluence LADR items (L1, L2, …) mapped to this test case.",
     "Given When Then": "Test steps from the QMetry plan in Given/When/Then form.",
     "PR alignment": "Whether the linked PR implementation aligns with this test case.",
     "Evidence": "Mascot or other execution evidence links from the test plan.",
+}
+
+LADR_TRACE_TABLE_COLUMN_INFO: dict[str, str] = {
+    "LADR ID": "Confluence LADR requirement identifier (L1, L2, …) parsed from the linked design doc.",
+    "Requirement": "LADR ESS milestone or status-code text from Confluence.",
+    "Test case(s)": "Excel test plan case IDs that semantically cover this LADR requirement.",
+    "Status": "Covered when at least one test case maps to this LADR item; Gap when none.",
 }
 
 TRACE_TABLE_COLUMN_INFO: dict[str, str] = {
@@ -545,8 +685,12 @@ OWNERSHIP_LABEL_INFO: dict[str, str] = {
 
 REVIEW_PANEL_INFO: dict[str, str] = {
     "Test plan gaps": (
-        "Acceptance criteria not covered by the test plan or misalignments between "
-        "test cases and PR behavior."
+        "Uncovered Jira acceptance criteria or Confluence LADR requirements with no mapped "
+        "test case, plus Given/When/Then or PR alignment issues."
+    ),
+    "LADR ↔ test plan traceability": (
+        "Each Confluence LADR requirement (L1…Ln) tied to test case IDs from the Excel "
+        "attachment — shows which design scenarios QA validates."
     ),
     "✓ Correctly implemented": (
         "Requirements and behaviors that match the Jira story and are supported by PR evidence."
@@ -681,8 +825,22 @@ def inject_pr_table_header_tooltips(html: str) -> str:
 def inject_testplan_table_header_tooltips(html: str) -> str:
     if "section-testplan" not in html:
         return html
-    return _replace_section_thead(
+    html = _replace_section_thead(
         html, "section-testplan", render_table_header_row(TESTPLAN_TABLE_COLUMN_INFO)
+    )
+    if "ladr-trace-table" not in html:
+        return html
+    pattern = (
+        r'(<table class="ladr-trace-table">\s*<thead>\s*)'
+        r"<tr>.*?</tr>"
+        r"(\s*</thead>)"
+    )
+    return re.sub(
+        pattern,
+        rf"\1{render_table_header_row(LADR_TRACE_TABLE_COLUMN_INFO)}\2",
+        html,
+        count=1,
+        flags=re.DOTALL,
     )
 
 
