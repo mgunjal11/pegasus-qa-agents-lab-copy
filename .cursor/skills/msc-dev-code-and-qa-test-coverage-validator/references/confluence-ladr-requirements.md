@@ -79,6 +79,7 @@ Use **`NA`** only when `status` is `no_testplan`. Do not report **0%** when test
 - `{{TESTPLAN_COVERAGE_PCT}}` — combined Jira + LADR percentage
 - `{{TESTPLAN_COVERAGE_DETAIL}}` — separate LADR and Jira counts when available
 - `{{LADR_TRACEABILITY_BLOCK}}` — §3 table: each L1…Ln → mapped Excel test case ID(s); **Gap** when no test case covers that LADR item
+- Evidence column uses **`render_testplan_evidence()`** — Mascot links first; else Edit/Caption Group/Pegasus/Job IDs from **SIT Jobs** and similar Excel columns (`testplan_evidence.py`)
 - `{{TESTPLAN_GAPS_LIST}}` — list uncovered `L*` / `R*` IDs (e.g. missing STATUS_ERROR 9000 scenario)
 
 Build report test-plan placeholders in one call:

@@ -471,7 +471,7 @@ class Deck:
             ("Leadership evidence", NAVY, "Benefits", [
                 "8 quantified metric cards",
                 "Dev vs QA ownership made explicit",
-                "Mascot + Given/When/Then test-plan validation",
+                "Mascot + Given/When/Then + SIT Jobs ID evidence",
                 "Audit-friendly downloadable artifact",
                 f"Developed by {REPORT_DEVELOPER}",
             ]),
@@ -522,7 +522,7 @@ class Deck:
             ("QA Lead", "Pre-release readiness", "In QA / Ready for Release stories", "QA scope %, test plan gaps", SOFT_BLUE, NAVY),
             ("Developer", "Merge confidence", "Dev-owned AC + unit tests", "Code %, dev test evidence", SOFT_GOLD, GOLD_DARK),
             ("Release Mgr", "Go/no-go snapshot", "Verdict + open gaps", "8 cards, recommended actions", SOFT_CORAL, CORAL),
-            ("Test Designer", "Plan alignment", "Excel plan vs Jira AC", "Given/When/Then quality, Mascot links", GREEN_BG, GREEN),
+            ("Test Designer", "Plan alignment", "Excel plan vs Jira AC + LADR", "GWT quality · Mascot or SIT Jobs IDs", GREEN_BG, GREEN),
         ]
         for i, (role, when, focus, metric, bg, accent) in enumerate(personas):
             left = Inches(0.55) + Inches(3.12) * i
@@ -815,7 +815,7 @@ class Deck:
             ("Domino Excel test plan (Jira attachment)", "Jira attachment or local testplans/", "fetch_jira_testplan.py"),
             ("Given / When / Then", "Content-based Given/When/Then scoring (not column-name only)", "12/12 GWT · MSC-204417"),
             ("LADR + Jira AC mapping", "Semantic match of test cases to Jira AC and Confluence LADR requirements", "94.1% · MSC-204417"),
-            ("Evidence (Mascot or IDs)", "Mascot fulfillment URLs when present; else Edit ID, Job ID, Media Request, or UUID from plan or mapped Jira AC", "Mascot links · MSC-205625"),
+            ("Evidence (Mascot or IDs)", "Mascot URLs when present; else Edit ID, Caption Group ID, Pegasus ID from SIT Jobs / Comments columns (MSC-204417 Caption Monitoring)", "Edit ID · SIT Jobs · MSC-204417"),
         ]
         for i, (title, desc, proof) in enumerate(feats):
             top = Inches(1.25) + Inches(0.88) * i
