@@ -42,7 +42,7 @@ from confluence_requirements import (
     map_testcases_to_requirements,
     merge_requirement_sets,
 )
-from testplan_evidence import extract_testcase_evidence_ids
+from testplan_evidence import extract_testcase_evidence_ids, row_evidence_text
 from testplan_gwt import (
     gwt_key_from_marker,
     has_complete_gwt,
@@ -134,6 +134,7 @@ class TestCase:
     source_sheet: str = ""
     section: str = ""
     comment: str = ""
+    evidence_text: str = ""
     mascot_links: list[dict[str, str]] = field(default_factory=list)
     evidence_ids: list[dict[str, str]] = field(default_factory=list)
 
@@ -703,6 +704,8 @@ def parse_evidence_rows(
             regression="",
             source_file=source,
             source_sheet=sheet,
+            comment=col("comment") if "comment" in cols else "",
+            evidence_text=row_evidence_text(header, padded),
             mascot_links=extract_mascot_links(header, padded),
         )
         _ingest_step_columns(tc, header, padded, cols)
@@ -823,6 +826,7 @@ def parse_domino_rows(
                 source_sheet=sheet,
                 section=cell(padded, section_idx),
                 comment=cell(padded, comment_idx),
+                evidence_text=row_evidence_text(header, padded),
                 mascot_links=extract_mascot_links(header, padded),
             )
             if step_raw:

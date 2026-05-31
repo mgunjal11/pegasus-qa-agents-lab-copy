@@ -60,8 +60,33 @@ def test_render_ids_when_no_mascot():
     assert "badge-not-verified" not in html
 
 
+def test_sit_jobs_column_evidence_text():
+    from testplan_evidence import extract_testcase_evidence_ids, row_evidence_text
+
+    header = ["Summary", "Step Summary", "SIT Jobs", "Comments"]
+    row = [
+        "Manifestation availability",
+        "Given an edit is created",
+        "Edit id:  6ef01765-d63f-4f75-8281-6ad6a5594229\ncaptionGroupID:  3922db5c-e27e-4aba-b2ab-b04b51df71b4",
+        "",
+    ]
+    evidence = row_evidence_text(header, row)
+    tc = {
+        "id": "TC3",
+        "summary": "Manifestation availability",
+        "steps": {"given": "Given an edit is created"},
+        "evidence_text": evidence,
+        "mascot_links": [],
+    }
+    ids = extract_testcase_evidence_ids(tc)
+    values = {i["value"] for i in ids}
+    assert "6ef01765-d63f-4f75-8281-6ad6a5594229" in values
+    assert "3922db5c-e27e-4aba-b2ab-b04b51df71b4" in values
+
+
 if __name__ == "__main__":
     test_extract_edit_and_media_request_from_jira_ac()
     test_render_prefers_mascot_over_ids()
     test_render_ids_when_no_mascot()
+    test_sit_jobs_column_evidence_text()
     print("ok")

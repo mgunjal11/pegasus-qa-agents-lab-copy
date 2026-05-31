@@ -32,6 +32,17 @@ LABELED_ID_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"(?:manifestation\s*id)\s*[:=\-]?\s*(" + UUID_RE.pattern + r")", re.I), "Manifestation ID"),
     (re.compile(r"(?:asset\s*id)\s*[:=\-]?\s*(" + UUID_RE.pattern + r")", re.I), "Asset ID"),
     (re.compile(r"(?:work\s*order\s*id)\s*[:=\-]?\s*(" + UUID_RE.pattern + r")", re.I), "Work Order ID"),
+    (
+        re.compile(
+            r"(?:caption\s*group\s*id|captiongroupid)\s*[:=\-]?\s*(" + UUID_RE.pattern + r")",
+            re.I,
+        ),
+        "Caption Group ID",
+    ),
+    (
+        re.compile(r"(?:pegasus\s*id|pegasusid)\s*[:=\-]?\s*(" + UUID_RE.pattern + r")", re.I),
+        "Pegasus ID",
+    ),
 )
 
 
@@ -70,11 +81,67 @@ def extract_bare_uuids(text: str, *, exclude_mascot_urls: bool = True) -> list[d
     return items
 
 
+EVIDENCE_TEXT_COLUMN_HINTS: tuple[str, ...] = (
+    "sit jobs",
+    "qa jobs",
+    "sit job",
+    "qa job",
+    "edit id",
+    "job id",
+    "request id",
+    "media request",
+    "test data",
+    "evidence",
+    "comments",
+    "comment",
+    "mascot",
+    "execution",
+    "sit status",
+    "qa status",
+)
+
+
+def evidence_column_indices(header: list[str]) -> list[int]:
+    """Column indexes that may hold Edit/Job/UUID evidence (e.g. SIT Jobs on Caption Monitoring)."""
+    indices: list[int] = []
+    seen: set[int] = set()
+    for idx, name in enumerate(header):
+        lower = re.sub(r"\s+", " ", (name or "").strip().lower())
+        if not lower:
+            continue
+        if any(hint in lower for hint in EVIDENCE_TEXT_COLUMN_HINTS):
+            if idx not in seen:
+                seen.add(idx)
+                indices.append(idx)
+    return indices
+
+
+def row_evidence_text(header: list[str], row: list[str], extra_indices: list[int] | None = None) -> str:
+    """Join evidence-bearing cells from a spreadsheet row for ID extraction."""
+    indices = list(extra_indices or evidence_column_indices(header))
+    comment_idx = next((i for i, h in enumerate(header) if h.strip().lower() == "comment"), None)
+    comments_idx = next((i for i, h in enumerate(header) if h.strip().lower() == "comments"), None)
+    for idx in (comment_idx, comments_idx):
+        if idx is not None and idx not in indices:
+            indices.append(idx)
+    parts: list[str] = []
+    for idx in indices:
+        if idx >= len(row):
+            continue
+        val = str(row[idx] or "").strip()
+        if not val:
+            continue
+        col = (header[idx] if idx < len(header) else "").strip()
+        parts.append(val if not col or val.lower().startswith(col.lower()) else f"{col}: {val}")
+    return "\n".join(parts)
+
+
 def testcase_haystack(tc: Any) -> str:
     if isinstance(tc, dict):
         parts = [
             tc.get("summary") or "",
             tc.get("comment") or "",
+            tc.get("evidence_text") or "",
             tc.get("section") or "",
             tc.get("story") or "",
         ]
@@ -84,6 +151,7 @@ def testcase_haystack(tc: Any) -> str:
     parts = [
         getattr(tc, "summary", "") or "",
         getattr(tc, "comment", "") or "",
+        getattr(tc, "evidence_text", "") or "",
         getattr(tc, "section", "") or "",
         getattr(tc, "story", "") or "",
     ]
