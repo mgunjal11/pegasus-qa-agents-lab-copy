@@ -11,7 +11,7 @@ A centralized lab for **AI-driven QA agents** on the WBD Media Supply Chain (MSC
 | # | Agent | What it does | How to invoke |
 |---|--------|--------------|---------------|
 | 1 | **msc-testcase-writer** | Reads Jira user stories → QMetry FF2.0 test cases (Excel, Given/When/Then) | `@msc-testcase-writer MSC-204417` |
-| 2 | **msc-dev-code-and-qa-test-coverage-validator** | Validates Jira acceptance criteria vs GitHub PR, dev tests, attached QMetry test plan; HTML report with dev vs QA handoff | `/msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
+| 2 | **msc-dev-code-and-qa-test-coverage-validator** | Jira AC + Confluence LADR + Excel test plan vs GitHub PR; LADR ↔ test case traceability; Evidence = Mascot or SIT Jobs IDs; HTML report | `/msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
 | 3 | **msc-jira-bug** | Drafts MSC Bug tickets; creates only after your approval | `@msc-jira-bug` + describe the defect |
 
 **Coverage validator guide deck:** `python scripts/generate_coverage_validator_ppt.py` → `docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx`
