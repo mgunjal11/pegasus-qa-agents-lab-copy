@@ -46,7 +46,10 @@ def main() -> None:
     out, generated, tz_label = report_paths(KEY, root=ROOT)
     tp = load_testplan_cache(KEY, ROOT)
     cov = tp.get("coverage") or {}
-    rows = render_testplan_rows(tp.get("testCases") or [])
+    rows = render_testplan_rows(
+        tp.get("testCases") or [],
+        tp.get("jiraRequirements") or tp.get("requirements") or [],
+    )
     note = tp.get("testPlanSummaryNote") or ""
     tp_pct = cov.get("testplanCoveragePct")
     gwt_n = cov.get("completeGwtCount", 0)

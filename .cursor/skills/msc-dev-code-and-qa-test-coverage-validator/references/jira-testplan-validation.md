@@ -119,7 +119,7 @@ For each mapped pair (`R{n}` ↔ `TC{x}`):
 
 **Test plan completeness** — e.g. `12 test cases · 12/12 full Given When Then · 13/14 LADR scenarios covered · 3/3 Jira acceptance criteria covered` or `Referenced: Domino Test Plan.xlsx · Inc as full · 0 parsed (local file missing)`.
 
-**Attachment fields parsed:** `section`, `summary` (high-level scenario), Given/When/Then steps (from **any** step column — `Step Summary`, `Test Steps`, etc.; split combined blobs via `testplan_gwt.py`), `mascot_links` (QA/SIT Mascot link columns and hyperlinks), Story. **Given When Then completeness** counts test cases with all three markers in step **content** (including common typos e.g. `Than:` → `Then`), not whether columns are named Given/When/Then. Report Evidence column uses `render_mascot_links`. Report note from `testPlanSummaryNote`.
+**Attachment fields parsed:** `section`, `summary` (high-level scenario), Given/When/Then steps (from **any** step column — `Step Summary`, `Test Steps`, etc.; split combined blobs via `testplan_gwt.py`), `mascot_links` (QA/SIT Mascot link columns and hyperlinks), `evidence_ids` (Edit ID, Job ID, Media Request, Request ID, or bare UUID when Mascot absent — also from mapped Jira AC text), Story. **Given When Then completeness** counts test cases with all three markers in step **content** (including common typos e.g. `Than:` → `Then`), not whether columns are named Given/When/Then. Report Evidence column uses `render_testplan_evidence()` (Mascot first, then IDs). Report note from `testPlanSummaryNote`.
 
 ## Report placeholders
 

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from testplan_gwt import steps_for_display
+from testplan_evidence import extract_testcase_evidence_ids, has_mascot_links
 
 REPORT_AGENT_NAME = "msc-dev-code-and-qa-test-coverage-validator"
 REPORT_DEVELOPER = "Mayur Gunjal"
@@ -21,7 +22,7 @@ def esc(text: str) -> str:
 
 def render_mascot_links(links: list[dict[str, str]]) -> str:
     if not links:
-        return '<span class="badge badge-not-verified">No Mascot links in test plan</span>'
+        return ""
     parts = []
     for link in links:
         label = esc(link.get("label") or "Mascot")
@@ -29,7 +30,35 @@ def render_mascot_links(links: list[dict[str, str]]) -> str:
         if not url:
             continue
         parts.append(f'<a href="{url}" target="_blank">{label}</a>')
-    return "<br>".join(parts) if parts else '<span class="badge badge-not-verified">No Mascot links</span>'
+    return "<br>".join(parts) if parts else ""
+
+
+def render_evidence_ids(evidence_ids: list[dict[str, str]]) -> str:
+    if not evidence_ids:
+        return ""
+    parts = []
+    for item in evidence_ids:
+        label = item.get("label") or "ID"
+        value = item.get("value") or ""
+        if not value:
+            continue
+        parts.append(f"<code>{esc(label)}: {esc(value)}</code>")
+    return "<br>".join(parts) if parts else ""
+
+
+def render_testplan_evidence(
+    tc: dict[str, Any],
+    jira_requirements: list[dict[str, str]] | None = None,
+) -> str:
+    """Evidence column: Mascot links when present; else Edit/Job/Request UUIDs from plan or Jira AC."""
+    mascot_html = render_mascot_links(tc.get("mascot_links") or [])
+    if mascot_html:
+        return mascot_html
+    evidence_ids = tc.get("evidence_ids") or extract_testcase_evidence_ids(tc, jira_requirements)
+    id_html = render_evidence_ids(evidence_ids)
+    if id_html:
+        return id_html
+    return '<span class="badge badge-not-verified">No Mascot links or IDs in test plan</span>'
 
 
 def render_gwt_steps(steps: dict[str, str]) -> str:
@@ -172,12 +201,13 @@ def build_testplan_report_fields(issue_key: str, root: Path | None = None) -> di
     """Build TESTPLAN_* and LADR traceability placeholders from test plan cache."""
     tp = load_testplan_cache(issue_key, root)
     cov = tp.get("coverage") or {}
+    jira_reqs = tp.get("jiraRequirements") or tp.get("requirements") or []
     tp_pct = cov.get("testplanCoveragePct")
     fields: dict[str, str] = {
         "{{TESTPLAN_COVERAGE_PCT}}": "NA" if tp_pct is None else f"{tp_pct}%",
         "{{TESTPLAN_COVERAGE_CLASS}}": testplan_coverage_class(tp_pct),
         "{{TESTPLAN_COVERAGE_DETAIL}}": cov.get("coverageDetail") or "No test plan",
-        "{{TESTPLAN_ROWS}}": render_testplan_rows(tp.get("testCases") or []),
+        "{{TESTPLAN_ROWS}}": render_testplan_rows(tp.get("testCases") or [], jira_reqs),
         "{{LADR_TRACEABILITY_BLOCK}}": render_ladr_traceability_block(tp),
         "{{TESTPLAN_GAPS_LIST}}": build_testplan_gaps_html(cov),
     }
@@ -186,7 +216,10 @@ def build_testplan_report_fields(issue_key: str, root: Path | None = None) -> di
     return fields
 
 
-def render_testplan_rows(test_cases: list[dict[str, Any]]) -> str:
+def render_testplan_rows(
+    test_cases: list[dict[str, Any]],
+    jira_requirements: list[dict[str, str]] | None = None,
+) -> str:
     rows = []
     for tc in test_cases:
         steps = tc.get("steps") or {}
@@ -200,7 +233,7 @@ def render_testplan_rows(test_cases: list[dict[str, Any]]) -> str:
             f"<td>{esc(', '.join(tc.get('mapped_requirements') or []) or '—')}</td>"
             f"<td>{render_gwt_steps(steps)}</td>"
             f"<td>{pr_alignment_for_tc(tc.get('mapped_requirements') or [])}</td>"
-            f"<td>{render_mascot_links(tc.get('mascot_links') or [])}</td>"
+            f"<td>{render_testplan_evidence(tc, jira_requirements)}</td>"
             f"</tr>"
         )
     return "\n".join(rows) if rows else '<tr><td colspan="6">—</td></tr>'
@@ -654,7 +687,7 @@ TESTPLAN_TABLE_COLUMN_INFO: dict[str, str] = {
     "Mapped req": "Jira acceptance criteria (R1, R2, …) and Confluence LADR items (L1, L2, …) mapped to this test case.",
     "Given When Then": "Test steps from the QMetry plan in Given/When/Then form.",
     "PR alignment": "Whether the linked PR implementation aligns with this test case.",
-    "Evidence": "Mascot or other execution evidence links from the test plan.",
+    "Evidence": "Mascot fulfillment links when present; otherwise Edit ID, Job ID, Media Request, or other UUIDs from the test plan or mapped Jira acceptance criteria.",
 }
 
 LADR_TRACE_TABLE_COLUMN_INFO: dict[str, str] = {

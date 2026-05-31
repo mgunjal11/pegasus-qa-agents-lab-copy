@@ -20,7 +20,7 @@ You validate **MSC Jira stories** against **linked GitHub PRs** and **attached E
 |------|---------|
 | Jira | **One turn**, parallel: `getJiraIssue` (include `attachment` field) + `getJiraIssueRemoteIssueLinks` + `getConfluencePage` when LADR/wiki links in comments |
 | Confluence / LADR | **One shell**: `python scripts/fetch_confluence_requirements.py {KEY} --from-jira-cache` — ESS milestones + status codes; merged into test plan coverage |
-| Test plan | **One shell**: `python scripts/fetch_jira_testplan.py {KEY} --from-jira-cache` — auto-loads Confluence cache, semantic map to Jira AC + LADR scenarios |
+| Test plan | **One shell**: `python scripts/fetch_jira_testplan.py {KEY} --from-jira-cache` — auto-loads Confluence cache, semantic map to Jira AC + LADR scenarios; Evidence = Mascot links or Edit/Job/Request UUIDs |
 | Report UI | **Before write**: `apply_report_ui_enhancements(html)` from `coverage_report_helpers.py` — info-icon tooltips, tooltip layout **v5**, footer attribution (Developed by Mayur Gunjal) |
 | GitHub | **One shell**: `python scripts/fetch_coverage_github.py {KEY} --pr URL` or `--repo X --search-pr` or `--compare develop`; or read `reports/.cache/{KEY}-prefetch.json` with `--from-cache` |
 | Never | Multiple separate `gh pr view`, `gh pr diff`, `gh search` tool calls |

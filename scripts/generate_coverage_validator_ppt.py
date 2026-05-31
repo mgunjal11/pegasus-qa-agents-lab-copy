@@ -409,7 +409,7 @@ class Deck:
         silos = [
             ("J", "Jira", "Acceptance criteria,\nstory status, attachments", SOFT_BLUE, NAVY),
             ("GH", "GitHub", "PR diffs, checks,\nunit/integration tests", SOFT_GOLD, GOLD_DARK),
-            ("XL", "Excel test plan", "Jira attachment ·\nGiven/When/Then · Mascot", SOFT_CORAL, CORAL),
+            ("XL", "Excel test plan", "Jira attachment ·\nGiven/When/Then · Mascot or IDs", SOFT_CORAL, CORAL),
             ("CF", "Confluence LADR", "Design requirements\nwhen linked from Jira", RGBColor(0xCC, 0xFB, 0xF1), TEAL),
         ]
         col_w = Inches(2.95)
@@ -654,7 +654,7 @@ class Deck:
         sections = [
             ("1", "Coverage summary", "8 metric cards + i tooltips"),
             ("2", "Linked PR(s)", "PR · Repo · State · Title · Dev tests · CI"),
-            ("3", "Test plan", "Excel attachment · GWT · Mascot"),
+            ("3", "Test plan", "Excel attachment · GWT · Mascot or IDs"),
             ("4", "Dev vs QA", "Ownership split"),
             ("5", "Traceability", "Row-per-AC matrix"),
             ("6", "Impl. review", "Gaps · strengths"),
@@ -808,14 +808,14 @@ class Deck:
         s.background.fill.solid()
         s.background.fill.fore_color.rgb = WHITE
         self.footer(s)
-        self._slide_title(s, "§3 Test plan validation — Jira Excel + LADR alignment", "Confluence LADR requirements when linked · Excel attachment · Given/When/Then · Mascot")
+        self._slide_title(s, "§3 Test plan validation — Jira Excel + LADR alignment", "Confluence LADR requirements when linked · Excel attachment · Given/When/Then · Evidence")
         feats = [
             ("Confluence LADR (from Jira)", "If story comments or description reference LADR or wiki URLs, agent fetches Confluence via MCP or fetch_confluence_requirements.py", "LADR requirements L1…Ln · cache {KEY}-confluence.json"),
             ("LADR ↔ test plan traceability", "Each L1…Ln requirement tied to Excel test case IDs in report §3", "13/14 LADR mapped · MSC-204417"),
             ("Domino Excel test plan (Jira attachment)", "Jira attachment or local testplans/", "fetch_jira_testplan.py"),
             ("Given / When / Then", "Content-based Given/When/Then scoring (not column-name only)", "12/12 GWT · MSC-204417"),
             ("LADR + Jira AC mapping", "Semantic match of test cases to Jira AC and Confluence LADR requirements", "94.1% · MSC-204417"),
-            ("Mascot hyperlinks", "Evidence column URLs rendered in report", "Monitor E2E traceability"),
+            ("Evidence (Mascot or IDs)", "Mascot fulfillment URLs when present; else Edit ID, Job ID, Media Request, or UUID from plan or mapped Jira AC", "Mascot links · MSC-205625"),
         ]
         for i, (title, desc, proof) in enumerate(feats):
             top = Inches(1.25) + Inches(0.88) * i

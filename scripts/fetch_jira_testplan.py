@@ -42,6 +42,7 @@ from confluence_requirements import (
     map_testcases_to_requirements,
     merge_requirement_sets,
 )
+from testplan_evidence import extract_testcase_evidence_ids
 from testplan_gwt import (
     gwt_key_from_marker,
     has_complete_gwt,
@@ -134,6 +135,7 @@ class TestCase:
     section: str = ""
     comment: str = ""
     mascot_links: list[dict[str, str]] = field(default_factory=list)
+    evidence_ids: list[dict[str, str]] = field(default_factory=list)
 
 
 def _xlsx_cell_text(cell: Any) -> str:
@@ -1108,6 +1110,8 @@ def main() -> int:
         tc.steps = normalize_steps(tc.steps)
     if requirements and all_cases:
         map_testcases_to_requirements(all_cases, requirements)
+    for tc in all_cases:
+        tc.evidence_ids = extract_testcase_evidence_ids(tc, jira_requirements)
 
     coverage = compute_testplan_coverage(
         all_cases,

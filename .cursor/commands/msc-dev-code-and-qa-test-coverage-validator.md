@@ -8,7 +8,7 @@ Validate the Jira issue in `$ARGUMENTS` against linked GitHub PR(s) and attached
 2. **Step 0** — merge inline flags → manifest → `.coverage-validator.defaults.json`.
 3. **Jira** — one parallel MCP batch: `getJiraIssue` (include `attachment` field) + `getJiraIssueRemoteIssueLinks` + `getConfluencePage` when LADR/wiki links present (single turn). Persist attachment metadata in `reports/.cache/{KEY}-jira.json`.
 4. **Confluence / LADR** — one shell: `python scripts/fetch_confluence_requirements.py {KEY} --from-jira-cache` (ESS milestones; cache `{KEY}-confluence.json`).
-5. **Test plan** — one shell: `python scripts/fetch_jira_testplan.py {KEY} --from-jira-cache` (semantic map to Jira AC + LADR; Mascot links in Evidence); skip with `--skip-testplan` or fresh cache.
+5. **Test plan** — one shell: `python scripts/fetch_jira_testplan.py {KEY} --from-jira-cache` (semantic map to Jira AC + LADR; Evidence = Mascot links or Edit/Job/Request UUIDs); skip with `--skip-testplan` or fresh cache.
 6. **GitHub** — one shell only: `python scripts/prefetch_coverage_inputs.py {KEY} --pr {URL}` or `python scripts/fetch_coverage_github.py {KEY} --repo {repo}`; if cache is fresh use `--from-cache` and skip gh.
 7. **Never** issue multiple separate `gh` calls when a script or cache can be used.
 8. Follow skill `.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/SKILL.md` completely (dev/QA sections, test plan validation, HTML report).
