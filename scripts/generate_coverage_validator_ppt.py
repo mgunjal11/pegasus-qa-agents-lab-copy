@@ -335,7 +335,7 @@ class Deck:
         self.footer(s)
         self._slide_title(s, "Executive summary", "One automated readiness view before every MSC release sign-off")
         cards = [
-            ("Problem", "Jira, GitHub, and attached Excel test plans live in silos — release reviews lack a single evidence trail.", CORAL, WHITE),
+            ("Problem", "Jira, GitHub, Excel test plans, and Confluence LADR (when linked) live in silos — release reviews lack one evidence trail.", CORAL, WHITE),
             ("Solution", "Cursor subagent correlates Jira AC + Confluence LADR requirements → code → dev tests → QA plan → verdict.", NAVY, WHITE),
             ("Outcome", "Leadership opens a timestamped HTML report with 8 quantified metrics and clear QA handoff.", TEAL, WHITE),
         ]
@@ -362,7 +362,7 @@ class Deck:
         quote.line.fill.background()
         qt = s.shapes.add_textbox(Inches(0.75), Inches(5.78), Inches(11.8), Inches(0.6))
         qt.text_frame.text = (
-            '"We no longer ask five people whether the PR, unit tests, and Jira test plan align — '
+            '"We no longer ask five people whether the PR, unit tests, Jira test plan, and LADR design doc align — '
             'the validator answers that in one report." — MSC QA lead workflow'
         )
         qt.text_frame.paragraphs[0].font.size = Pt(12)
@@ -405,24 +405,27 @@ class Deck:
         s.background.fill.solid()
         s.background.fill.fore_color.rgb = WHITE
         self.footer(s)
-        self._slide_title(s, "The challenge — three silos, zero single view", "Manual traceability before release is slow, inconsistent, and error-prone")
+        self._slide_title(s, "The challenge — four silos, zero single view", "Manual traceability before release is slow, inconsistent, and error-prone")
         silos = [
             ("J", "Jira", "Acceptance criteria,\nstory status, attachments", SOFT_BLUE, NAVY),
             ("GH", "GitHub", "PR diffs, checks,\nunit/integration tests", SOFT_GOLD, GOLD_DARK),
-            ("XL", "Excel test plan", "Jira attachment ·\nGiven/When/Then · Mascot links", SOFT_CORAL, CORAL),
+            ("XL", "Excel test plan", "Jira attachment ·\nGiven/When/Then · Mascot", SOFT_CORAL, CORAL),
+            ("CF", "Confluence LADR", "Design requirements\nwhen linked from Jira", RGBColor(0xCC, 0xFB, 0xF1), TEAL),
         ]
+        col_w = Inches(2.95)
+        gap = Inches(0.15)
         for i, (icon, name, desc, bg, ic) in enumerate(silos):
-            left = Inches(0.65) + Inches(4.15) * i
-            self._rect(s, left, Inches(1.45), Inches(3.85), Inches(3.2), bg, radius=True)
-            self._icon_circle(s, left + Inches(1.45), Inches(1.75), Inches(0.95), icon, ic)
-            nm = s.shapes.add_textbox(left, Inches(2.85), Inches(3.85), Inches(0.4))
+            left = Inches(0.55) + (col_w + gap) * i
+            self._rect(s, left, Inches(1.45), col_w, Inches(3.2), bg, radius=True)
+            self._icon_circle(s, left + Inches(1.0), Inches(1.75), Inches(0.95), icon, ic)
+            nm = s.shapes.add_textbox(left, Inches(2.85), col_w, Inches(0.4))
             nm.text_frame.text = name
             nm.text_frame.paragraphs[0].font.size = Pt(18)
             nm.text_frame.paragraphs[0].font.bold = True
             nm.text_frame.paragraphs[0].font.color.rgb = DARK
             nm.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
             nm.text_frame.paragraphs[0].font.name = FONT
-            ds = s.shapes.add_textbox(left + Inches(0.2), Inches(3.35), Inches(3.45), Inches(1.0))
+            ds = s.shapes.add_textbox(left + Inches(0.12), Inches(3.35), col_w - Inches(0.24), Inches(1.0))
             ds.text_frame.text = desc
             ds.text_frame.paragraphs[0].font.size = Pt(11)
             ds.text_frame.paragraphs[0].font.color.rgb = BODY
@@ -432,8 +435,8 @@ class Deck:
         pains = [
             "Duplicate QA/dev effort",
             "Missed E2E handoffs",
-            "Tribal release knowledge",
-            "Weak test-plan ↔ AC mapping",
+            "LADR not tied to test plan",
+            "Weak AC ↔ evidence mapping",
         ]
         for i, p in enumerate(pains):
             left = Inches(0.65) + Inches(3.12) * i
@@ -441,7 +444,7 @@ class Deck:
             chip.line.color.rgb = RED
         self._rect(s, Inches(0.55), Inches(5.75), Inches(12.2), Inches(0.75), NAVY, radius=True).line.fill.background()
         sol = s.shapes.add_textbox(Inches(0.75), Inches(5.9), Inches(11.8), Inches(0.5))
-        sol.text_frame.text = "→  MSC Dev Code and QA Test Coverage Validator unifies all three into one HTML readiness report with numbered recommended actions"
+        sol.text_frame.text = "→  MSC Dev Code and QA Test Coverage Validator unifies all four silos into one HTML readiness report with numbered recommended actions"
         sol.text_frame.paragraphs[0].font.size = Pt(13)
         sol.text_frame.paragraphs[0].font.bold = True
         sol.text_frame.paragraphs[0].font.color.rgb = WHITE
@@ -455,7 +458,7 @@ class Deck:
         self._slide_title(s, "Idea Generation — Cursor AI subagent", "Completed · Pegasus QA Agents Lab · Gen AI transformation journey")
         cols = [
             ("Fragmented readiness", NAVY, "Problem Statement", [
-                "AC in Jira, code in GitHub, test plans in Jira Excel attachments — no single view",
+                "AC in Jira, code in GitHub, Excel test plans, and Confluence LADR — four silos, no single view",
                 "Release reviews depend on tribal knowledge",
                 "Manual traceability is slow before sign-off",
             ]),
@@ -1328,7 +1331,7 @@ class Deck:
         self.title_slide()
         self.agenda_slide()
         self.executive_summary()
-        self.section_slide("01", "The challenge", "Why fragmented Jira · GitHub · Excel test plans blocks confident releases")
+        self.section_slide("01", "The challenge", "Why fragmented Jira · GitHub · Excel test plans · Confluence LADR blocks confident releases")
         self.challenge_slide()
         self.idea_generation_slide()
         self.section_slide("02", "The solution", "Cursor subagent · automated workflow · solution architecture")
