@@ -1,7 +1,7 @@
 ---
 name: msc-dev-code-and-qa-test-coverage-validator
 description: >-
-  MSC Jira-to-PR implementation validator for WBD Streaming. Auto-run friendly:
+  MSC Jira-to-PR and QMetry test plan validator for WBD Streaming. Auto-run friendly:
   use permissions allowlist, --auto mode, single-shell GitHub fetch, and parallel
   Jira MCP. Differentiates dev unit/integration from QA scope. Use via
   /msc-dev-code-and-qa-test-coverage-validator MSC-1234.

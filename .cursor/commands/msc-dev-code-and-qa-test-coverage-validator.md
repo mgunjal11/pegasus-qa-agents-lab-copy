@@ -1,4 +1,4 @@
-# MSC code coverage validator
+# MSC dev code and QA test coverage validator
 
 Validate the Jira issue in `$ARGUMENTS` against linked GitHub PR(s) and attached Excel test plan (Jira attachment).
 

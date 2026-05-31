@@ -15,7 +15,7 @@ description: >-
   --repo, --skip-testplan, and manifest files to avoid repeated manual fetches.
 ---
 
-# MSC code coverage validator
+# MSC dev code and QA test coverage validator
 
 Validate that GitHub PR(s) linked to an MSC Jira story implement the described requirements, that **attached QMetry test plans** cover the acceptance criteria, and quantify coverage at five levels, **separating dev test ownership from QA handoff**:
 
