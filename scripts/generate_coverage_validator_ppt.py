@@ -205,12 +205,12 @@ class Deck:
         t2.text_frame.paragraphs[0].font.name = FONT
         t2.text_frame.paragraphs[0].font.color.rgb = WHITE
         t3 = s.shapes.add_textbox(Inches(0.85), Inches(3.75), Inches(10), Inches(0.9))
-        t3.text_frame.text = "AI-driven release readiness · Jira + GitHub + Excel test plan attachment in one evidence report"
+        t3.text_frame.text = "AI-driven release readiness · Jira + Confluence LADR (when linked) + GitHub + Excel test plan in one report"
         t3.text_frame.paragraphs[0].font.size = Pt(16)
         t3.text_frame.paragraphs[0].font.name = FONT
         t3.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xBF, 0xDB, 0xFE)
         # KPI strip on title
-        metrics = [("3", "Systems unified"), ("8", "Coverage metrics"), ("2–5", "Minutes per run"), ("1", "HTML verdict")]
+        metrics = [("4", "Systems unified"), ("8", "Coverage metrics"), ("2–5", "Minutes per run"), ("1", "HTML verdict")]
         cw = Inches(2.85)
         for i, (val, lbl) in enumerate(metrics):
             left = Inches(0.85) + cw * i + Inches(0.12) * i
@@ -274,11 +274,17 @@ class Deck:
         cap.text_frame.paragraphs[0].font.bold = True
         cap.text_frame.paragraphs[0].font.color.rgb = GOLD
         cap.text_frame.paragraphs[0].font.name = FONT
-        stack = ["Jira story + AC", "Linked PR + CI", "Excel test plan (Jira attachment)", "HTML readiness report"]
+        stack = [
+            "Jira story + AC + LADR links",
+            "Confluence ESS requirements (when LADR present)",
+            "Linked PR + CI",
+            "Excel test plan (Jira attachment)",
+            "HTML readiness report",
+        ]
         for j, lbl in enumerate(stack):
-            y = Inches(2.0) + Inches(0.95) * j
-            self._rect(s, Inches(7.5), y, Inches(4.9), Inches(0.7), NAVY_LIGHT, lbl, 12, True, WHITE, True)
-            if j < 3:
+            y = Inches(1.85) + Inches(0.78) * j
+            self._rect(s, Inches(7.5), y, Inches(4.9), Inches(0.58), NAVY_LIGHT, lbl, 11, True, WHITE, True)
+            if j < len(stack) - 1:
                 arr = s.shapes.add_shape(MSO_SHAPE.DOWN_ARROW, Inches(9.6), y + Inches(0.72), Inches(0.35), Inches(0.22))
                 arr.fill.solid()
                 arr.fill.fore_color.rgb = GOLD
@@ -292,7 +298,7 @@ class Deck:
         self._slide_title(s, "Executive summary", "One automated readiness view before every MSC release sign-off")
         cards = [
             ("Problem", "Jira, GitHub, and attached Excel test plans live in silos — release reviews lack a single evidence trail.", CORAL, WHITE),
-            ("Solution", "Cursor subagent correlates AC → code → dev tests → QA plan → verdict in minutes.", NAVY, WHITE),
+            ("Solution", "Cursor subagent correlates Jira AC + Confluence LADR ESS scenarios → code → dev tests → QA plan → verdict.", NAVY, WHITE),
             ("Outcome", "Leadership opens a timestamped HTML report with 8 quantified metrics and clear QA handoff.", TEAL, WHITE),
         ]
         for i, (h, b, fill, tc) in enumerate(cards):
@@ -417,8 +423,8 @@ class Deck:
             ]),
             ("Unified validator", GOLD, "Solution", [
                 "/msc-dev-code-and-qa-test-coverage-validator {KEY}",
-                "One batch: Jira + PR(s) + Excel test plan attachment",
-                "Maps AC → code → dev tests → QA scope",
+                "One batch: Jira + Confluence LADR (if linked) + PR(s) + Excel test plan",
+                "Maps Jira AC + LADR ESS scenarios → code → dev tests → QA scope",
                 "HTML report + Pass / Pass with gaps / Fail",
             ]),
             ("Leadership evidence", NAVY, "Benefits", [
@@ -503,17 +509,18 @@ class Deck:
         s.background.fill.solid()
         s.background.fill.fore_color.rgb = WHITE
         self.footer(s)
-        self._slide_title(s, "Automated workflow", "End-to-end in ~2–5 minutes · single MCP batch + cached GitHub prefetch")
+        self._slide_title(s, "Automated workflow", "End-to-end in ~2–5 minutes · Jira MCP + Confluence LADR + cached GitHub prefetch")
         steps = [
-            ("1", "Jira", "Story, AC,\nattachments"),
-            ("2", "Test plan", "Excel xlsx (Jira),\nGiven/When/Then, Mascot"),
-            ("3", "GitHub", "PR diff,\nchecks, CI"),
-            ("4", "Map", "R1…Rn\nscoring"),
-            ("5", "Report", "HTML + tooltips\n+ footer credit"),
+            ("1", "Jira", "Story, AC,\nattachments, LADR\nwiki links"),
+            ("2", "Confluence", "getConfluencePage\nESS milestones\nL1…Ln"),
+            ("3", "Test plan", "Excel xlsx,\nGiven/When/Then,\nsemantic map"),
+            ("4", "GitHub", "PR diff,\nchecks, CI"),
+            ("5", "Map", "R1…Rn +\nLADR → TCs"),
+            ("6", "Report", "HTML + tooltips\n+ footer credit"),
         ]
-        sw = Inches(2.15)
+        sw = Inches(1.95)
         for i, (num, title, sub) in enumerate(steps):
-            left = Inches(0.45) + (sw + Inches(0.28)) * i
+            left = Inches(0.35) + (sw + Inches(0.18)) * i
             self._rect(s, left, Inches(1.55), sw, Inches(2.35), NAVY if i % 2 == 0 else NAVY_LIGHT, radius=True)
             nb = s.shapes.add_textbox(left + Inches(0.15), Inches(1.7), Inches(0.5), Inches(0.45))
             nb.text_frame.text = num
@@ -543,10 +550,9 @@ class Deck:
         self._rect(s, Inches(0.55), Inches(4.25), Inches(12.2), Inches(1.15), SOFT_GOLD, radius=True)
         cb = s.shapes.add_textbox(Inches(0.75), Inches(4.4), Inches(11.8), Inches(0.9))
         cb.text_frame.text = (
-            "Performance: reports/.cache/ stores Jira, test plan, and GitHub prefetch — "
-            "reuse with --from-cache --auto. Final HTML pass runs apply_report_ui_enhancements(): "
-            "info-icon tooltips on every section, tooltip layout v5 (Dev tests / CI status columns), "
-            f"and footer credit (Developed by {REPORT_DEVELOPER})."
+            "Performance: reports/.cache/ stores Jira, Confluence LADR, test plan, and GitHub prefetch — "
+            "reuse with --from-cache --auto. When Jira comments reference LADR or wiki URLs, "
+            "fetch_confluence_requirements.py (or getConfluencePage MCP) merges ESS milestones with Jira AC before test plan scoring."
         )
         cb.text_frame.paragraphs[0].font.size = Pt(12)
         cb.text_frame.paragraphs[0].font.color.rgb = BODY
@@ -566,9 +572,9 @@ class Deck:
         hub = self._rect(s, Inches(5.0), Inches(2.85), Inches(3.3), Inches(1.5), CORAL, "Coverage\nValidator", 14, True, WHITE, True)
         hub.line.fill.background()
         nodes = [
-            (Inches(0.7), Inches(2.5), "Jira MCP", "getJiraIssue\nremote links"),
+            (Inches(0.7), Inches(2.5), "Jira MCP", "getJiraIssue\nremote links\nLADR detection"),
             (Inches(10.2), Inches(2.5), "GitHub", "prefetch PR\nchecks · diff"),
-            (Inches(0.7), Inches(5.0), "Test plan", "fetch_jira_\ntestplan.py"),
+            (Inches(0.7), Inches(5.0), "Confluence", "getConfluencePage\nfetch_confluence_\nrequirements.py"),
             (Inches(10.2), Inches(5.0), "HTML report", "reports/\n{KEY}-…-IST.html"),
         ]
         for l, t, title, sub in nodes:
@@ -586,7 +592,8 @@ class Deck:
             self._arrow(s, cx, cy, hx, hy)
         leg = s.shapes.add_textbox(Inches(0.55), Inches(6.45), Inches(12), Inches(0.45))
         leg.text_frame.text = (
-            "Skill: .cursor/skills/msc-dev-code-and-qa-test-coverage-validator/  ·  Agent: msc-dev-code-and-qa-test-coverage-validator  ·  "
+            "Skill: .cursor/skills/msc-dev-code-and-qa-test-coverage-validator/  ·  "
+            "fetch_jira_testplan.py merges Confluence LADR + Excel attachment  ·  "
             f"Command: /msc-dev-code-and-qa-test-coverage-validator  ·  Developed by {REPORT_DEVELOPER}"
         )
         leg.text_frame.paragraphs[0].font.size = Pt(10)
@@ -760,15 +767,16 @@ class Deck:
         s.background.fill.solid()
         s.background.fill.fore_color.rgb = WHITE
         self.footer(s)
-        self._slide_title(s, "§3 Test plan validation — Jira Excel attachment", "Parses Jira attachments · Section · Summary · Given/When/Then · Mascot evidence")
+        self._slide_title(s, "§3 Test plan validation — Jira Excel + LADR alignment", "Confluence ESS requirements when LADR is linked · Excel attachment · Given/When/Then · Mascot")
         feats = [
+            ("Confluence / LADR (from Jira)", "If story comments or description reference LADR or wiki URLs, agent fetches Confluence via MCP or fetch_confluence_requirements.py", "ESS milestones L1…Ln · cache {KEY}-confluence.json"),
             ("Domino Excel test plan (Jira attachment)", "Jira attachment or local testplans/", "fetch_jira_testplan.py"),
-            ("Given / When / Then", "Content-based Given/When/Then scoring (not column-name only)", "5/5 full Given/When/Then example"),
+            ("Given / When / Then", "Content-based Given/When/Then scoring (not column-name only)", "12/12 full Given When Then (MSC-204417)"),
+            ("LADR + Jira AC mapping", "Semantic match: task + status (e.g. orderStatus Failure) → L* and R1…R3", "94.1% combined coverage example"),
             ("Mascot hyperlinks", "Evidence column URLs rendered in report", "Monitor E2E traceability"),
-            ("AC mapping", "Test cases → R1…Rn with gap list", "Uncovered AC highlighted"),
         ]
         for i, (title, desc, proof) in enumerate(feats):
-            top = Inches(1.4) + Inches(1.15) * i
+            top = Inches(1.25) + Inches(0.88) * i
             self._rect(s, Inches(0.55), top, Inches(0.08), Inches(0.95), CORAL)
             tt = s.shapes.add_textbox(Inches(0.75), top, Inches(5.5), Inches(0.35))
             tt.text_frame.text = title
@@ -784,14 +792,93 @@ class Deck:
             pr = self._rect(s, Inches(6.8), top + Inches(0.15), Inches(5.95), Inches(0.75), SOFT_BLUE, proof, 11, True, NAVY, True)
             pr.line.fill.background()
         # sample table mock
-        self._rect(s, Inches(6.8), Inches(5.0), Inches(5.95), Inches(0.4), NAVY, "Scenario", 10, True, WHITE)
+        self._rect(s, Inches(6.8), Inches(5.85), Inches(5.95), Inches(0.4), NAVY, "Scenario examples", 10, True, WHITE)
         for j, row in enumerate(
             [
-                "TC1–TC5 · Inc as Fulll · 5/5 Given/When/Then",
-                "R4 · Edit ID SIT scenario · Gap",
+                "MSC-204417 · Caption Monitoring · 13/14 LADR · 3/3 Jira AC",
+                "MSC-205625 · Inc as Fulll · 5/5 Given/When/Then",
             ]
         ):
-            self._rect(s, Inches(6.8), Inches(5.4) + Inches(0.38) * j, Inches(5.95), Inches(0.35), LIGHT_GRAY if j == 0 else RED_BG, row, 9, False, BODY)
+            self._rect(s, Inches(6.8), Inches(6.28) + Inches(0.38) * j, Inches(5.95), Inches(0.35), LIGHT_GRAY if j == 0 else SOFT_BLUE, row, 9, False, BODY)
+
+    def confluence_ladr_slide(self):
+        """When Jira references LADR, agent fetches Confluence for supplemental ESS requirements."""
+        s = self.blank()
+        s.background.fill.solid()
+        s.background.fill.fore_color.rgb = WHITE
+        self.footer(s)
+        self._slide_title(
+            s,
+            "Confluence LADR — supplemental requirements from Jira",
+            "When a LADR doc is linked on the story, the agent fetches Confluence and merges ESS milestones with Jira acceptance criteria",
+        )
+        # Trigger column
+        self._rect(s, Inches(0.55), Inches(1.35), Inches(3.85), Inches(0.42), NAVY, "Detected from Jira", 12, True, WHITE, True)
+        triggers = [
+            "Comment or description mentions LADR",
+            "Confluence wiki URL (atlassian.net/wiki/…/pages/{id})",
+            "Dev note with ESS status codes (8000 / 9000)",
+            "Test plan scenarios aligned to LADR milestones",
+        ]
+        for j, t in enumerate(triggers):
+            bx = s.shapes.add_textbox(Inches(0.75), Inches(1.9) + Inches(0.52) * j, Inches(3.5), Inches(0.45))
+            bx.text_frame.text = f"• {t}"
+            bx.text_frame.paragraphs[0].font.size = Pt(11)
+            bx.text_frame.paragraphs[0].font.color.rgb = BODY
+            bx.text_frame.paragraphs[0].font.name = FONT
+        # Fetch column
+        self._rect(s, Inches(4.65), Inches(1.35), Inches(3.85), Inches(0.42), CORAL, "Agent fetch (one batch)", 12, True, WHITE, True)
+        fetch_steps = [
+            "getConfluencePage (Atlassian MCP)",
+            "python scripts/fetch_confluence_requirements.py {KEY}",
+            "Parse ESS table: demandAcknowledgment, orderStatus, …",
+            "Write reports/.cache/{KEY}-confluence.json",
+        ]
+        for j, t in enumerate(fetch_steps):
+            bx = s.shapes.add_textbox(Inches(4.85), Inches(1.9) + Inches(0.52) * j, Inches(3.5), Inches(0.45))
+            bx.text_frame.text = f"{j + 1}. {t}"
+            bx.text_frame.paragraphs[0].font.size = Pt(10)
+            bx.text_frame.paragraphs[0].font.color.rgb = BODY
+            bx.text_frame.paragraphs[0].font.name = FONT
+        # Merge column
+        self._rect(s, Inches(8.75), Inches(1.35), Inches(4.0), Inches(0.42), TEAL, "Merged requirement model", 12, True, WHITE, True)
+        merge_items = [
+            "Jira AC → R1, R2, R3…",
+            "LADR ESS → L1…Ln (task + status)",
+            "Test cases map to both via semantic match",
+            "Coverage %: Jira AC + LADR scenarios",
+        ]
+        for j, t in enumerate(merge_items):
+            bx = s.shapes.add_textbox(Inches(8.95), Inches(1.9) + Inches(0.52) * j, Inches(3.6), Inches(0.45))
+            bx.text_frame.text = f"→ {t}"
+            bx.text_frame.paragraphs[0].font.size = Pt(10)
+            bx.text_frame.paragraphs[0].font.color.rgb = BODY
+            bx.text_frame.paragraphs[0].font.name = FONT
+        # Example callout
+        self._rect(s, Inches(0.55), Inches(4.15), Inches(12.2), Inches(1.55), SOFT_GOLD, radius=True)
+        ex = s.shapes.add_textbox(Inches(0.75), Inches(4.3), Inches(11.8), Inches(1.25))
+        ex.text_frame.word_wrap = True
+        ex.text_frame.text = (
+            "Example — MSC-204417 (Caption Monitoring): Jira comment references LADR status codes; "
+            "Promo Caption Monitoring.xlsx has 12 ESS scenarios (demandAcknowledgment Completed, orderStatus Failure, …). "
+            "Agent infers LADR ESS requirements and maps test cases → 3/3 Jira AC + 13/14 LADR (gap: STATUS_ERROR 9000 / L14). "
+            "Without Confluence merge, keyword-only mapping showed 0% — semantic LADR alignment fixes test plan coverage %."
+        )
+        ex.text_frame.paragraphs[0].font.size = Pt(11)
+        ex.text_frame.paragraphs[0].font.color.rgb = BODY
+        ex.text_frame.paragraphs[0].font.name = FONT
+        # ESS table mini
+        self._rect(s, Inches(0.55), Inches(5.85), Inches(12.2), Inches(0.38), NAVY_LIGHT, "LADR ESS milestones parsed into requirements", 10, True, WHITE)
+        milestones = [
+            "demandAcknowledgment · Completed / Failure",
+            "manifestationAvailability · Pending / Completed",
+            "orderStatus · Pending / Processing / Completed / Failure",
+            "registrationStatus · Pending / Completed / Failure",
+        ]
+        mw = Inches(12.2) / 4
+        for ci, m in enumerate(milestones):
+            left = Inches(0.55) + mw * ci
+            self._rect(s, left, Inches(6.28), mw - Inches(0.05), Inches(0.55), LIGHT_GRAY, m, 8, False, NAVY, True)
 
     def dev_qa_slide(self):
         s = self.blank()
@@ -1020,7 +1107,7 @@ class Deck:
         scripts.text_frame.word_wrap = True
         lines = [
             "Scripts (batched — no manual gh per run):",
-            "fetch_jira_testplan.py  ·  prefetch_coverage_inputs.py  ·  generate_coverage_validator_ppt.py",
+            "fetch_confluence_requirements.py  ·  fetch_jira_testplan.py  ·  prefetch_coverage_inputs.py",
             "apply_report_ui_enhancements()  ·  Cache: reports/.cache/{KEY}-*.json",
             f"sync_pegasus_qa_agents_lab.py → push to github.com/mgunjal11/pegasus-qa-agents-lab",
         ]
@@ -1048,7 +1135,7 @@ class Deck:
                 "Pass with gaps",
                 "PR #161 · CI Passed · 5/5 GWT · R4 gap",
             ),
-            ("MSC-204417", "Story · In QA", "100%", "83%", "12/12 Given/When/Then", "Pass with gaps", "Caption Monitoring · develop"),
+            ("MSC-204417", "Story · In QA", "100%", "83%", "94.1%", "Pass with gaps", "LADR ESS · 12 TC · develop"),
             ("MSC-195138", "Story · FF Race", "—", "—", "66.7%", "Pass with gaps", "PRs #22 + #75 · 11/11 Given/When/Then"),
         ]
         headers = ["Ticket", "Type", "Code", "Dev tests", "Plan AC", "Verdict", "Notes"]
@@ -1125,6 +1212,7 @@ class Deck:
         self.report_ui_slide()
         self.metrics_dashboard_slide()
         self.requirement_traceability_slide()
+        self.confluence_ladr_slide()
         self.testplan_slide()
         self.dev_qa_slide()
         self.section_slide("04", "Enablement", "One-time setup · scripts · cache · permissions")
