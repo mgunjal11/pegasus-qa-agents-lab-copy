@@ -1,5 +1,5 @@
 ---
-name: msc-code-coverage-validator
+name: msc-dev-code-and-qa-test-coverage-validator
 author: Mayur Gunjal
 description: >-
   Validates MSC Jira story implementation against linked GitHub PRs and attached
@@ -23,7 +23,7 @@ Validate that GitHub PR(s) linked to an MSC Jira story implement the described r
 |--------|---------|
 | **Dev code coverage %** | Share of Jira AC/requirements with matching production code (display label; was “Requirement coverage”) |
 | **Dev unit/integration test coverage %** | Share of **dev-owned** AC/requirements covered by unit and/or integration tests in the PR (shown in Coverage summary) |
-| **Test plan acceptance criteria coverage %** | Share of Jira acceptance criteria/requirements with ≥1 mapped test case in the attached test plan |
+| **Test plan acceptance criteria coverage %** | Share of Jira acceptance criteria plus linked LADR/Confluence ESS scenarios with ≥1 mapped test case in the attached test plan |
 | **Test requirement coverage %** | *(internal)* Share of AC with any automated test evidence — computed for traceability but **not shown** in Coverage summary |
 | **CI line coverage %** | Line/branch coverage from PR checks (Codecov, SonarQube, pytest-cov, etc.) when reported |
 
@@ -35,9 +35,9 @@ Pattern references: `plan-aware-review`, `pr-review`, and `plan-feature` from [m
 
 - **Atlassian MCP** authenticated for `wbdstreaming.atlassian.net`.
 - **`gh` CLI** installed and authenticated (`gh auth status`).
-- Read MCP tool schemas before calling `getJiraIssue`, `getJiraIssueRemoteIssueLinks`, or `searchJiraIssuesUsingJql`.
+- Read MCP tool schemas before calling `getJiraIssue`, `getJiraIssueRemoteIssueLinks`, `getConfluencePage`, or `searchJiraIssuesUsingJql`.
 - **Run options:** Read [references/run-options.md](references/run-options.md). Parse inline flags, manifest, and workspace defaults before fetching.
-- **Auto-approve:** Read [references/auto-approve-setup.md](references/auto-approve-setup.md). Run `python scripts/install_coverage_validator_permissions.py` once. Slash command `/msc-code-coverage-validator` defaults to `--auto --write`.
+- **Auto-approve:** Read [references/auto-approve-setup.md](references/auto-approve-setup.md). Run `python scripts/install_coverage_validator_permissions.py` once. Slash command `/msc-dev-code-and-qa-test-coverage-validator` defaults to `--auto --write`.
 
 ## Run options (Step 0 — always first)
 
@@ -54,7 +54,7 @@ Parse the user message and merge options from (highest priority wins):
 | **from-cache** (`--from-cache`) | Repeat run | Use fresh `reports/.cache/{KEY}-prefetch.json` and optional jira cache; skip gh if not stale |
 | **interactive** | Default when no flags | Ask once for missing PR URL/repo; confirm before write unless `--write` |
 
-**Default for `/msc-code-coverage-validator` slash command:** treat as **`--auto --write`** unless the user opts out.
+**Default for `/msc-dev-code-and-qa-test-coverage-validator` slash command:** treat as **`--auto --write`** unless the user opts out.
 
 **Minimize Allow/Run prompts (mandatory agent behavior):**
 
@@ -63,7 +63,7 @@ Parse the user message and merge options from (highest priority wins):
 3. **One shell turn** — `python scripts/fetch_coverage_github.py {KEY} ...` or read cache; never N separate `gh` invocations.
 4. **`--from-cache`** when `reports/.cache/{KEY}-prefetch.json` is fresh.
 
-**Cache paths:** `reports/.cache/{ISSUE-KEY}-prefetch.json`, `{ISSUE-KEY}-jira.json`, `{ISSUE-KEY}-testplan.json`, `{ISSUE-KEY}-manifest.json`
+**Cache paths:** `reports/.cache/{ISSUE-KEY}-prefetch.json`, `{ISSUE-KEY}-jira.json`, `{ISSUE-KEY}-testplan.json`, `{ISSUE-KEY}-confluence.json`, `{ISSUE-KEY}-manifest.json`
 
 **GitHub prefetch (recommended to avoid repeated gh approvals):**
 
@@ -72,7 +72,7 @@ python scripts/prefetch_coverage_inputs.py {ISSUE-KEY} --pr {PR_URL}
 python scripts/prefetch_coverage_inputs.py {ISSUE-KEY} --repo {org}/{repo} --search-pr
 ```
 
-Then run validation: `@msc-code-coverage-validator {ISSUE-KEY} --from-cache --auto`
+Then run validation: `@msc-dev-code-and-qa-test-coverage-validator {ISSUE-KEY} --from-cache --auto`
 
 **Batch fetches in auto mode:** Call `getJiraIssue` and `getJiraIssueRemoteIssueLinks` in parallel. Run all `gh` commands in one shell block or read prefetch cache. Save manifest after successful run for reuse.
 
@@ -83,6 +83,7 @@ Task Progress:
 - [ ] Step 0: Parse run options (flags, manifest, defaults)
 - [ ] Step 1: Resolve Jira issue key or URL
 - [ ] Step 2: Fetch Jira story and extract requirements
+- [ ] Step 2b: Fetch Confluence / LADR linked from Jira (unless `--skip-testplan`)
 - [ ] Step 3: Resolve linked GitHub PR(s)
 - [ ] Step 4: Fetch PR changes and CI status
 - [ ] Step 5: Fetch and parse attached QMetry test plan (unless `--skip-testplan`)
@@ -116,6 +117,22 @@ Otherwise:
 Number each item `R1`, `R2`, … List **assumptions** and **gaps** when AC is incomplete.
 
 In **`fetch-only`** mode, write cache to `reports/.cache/{KEY}-jira.json` (issue markdown, fields, remote links, extracted requirements) and stop unless GitHub prefetch is also requested.
+
+### Step 2b: Fetch Confluence / LADR requirements
+
+Read [references/confluence-ladr-requirements.md](references/confluence-ladr-requirements.md).
+
+When Jira comments or description mention **LADR** or link to Confluence (`atlassian.net/wiki/...`):
+
+1. **Prefer one shell turn:**
+   ```bash
+   python scripts/fetch_confluence_requirements.py {ISSUE-KEY} --from-jira-cache
+   ```
+2. **Or Atlassian MCP** (parallel with Jira when credentials missing): `getConfluencePage` with `cloudId: wbdstreaming.atlassian.net`, `pageId` from wiki URL, `contentFormat: markdown`. Persist body to `reports/.cache/{KEY}-confluence.json` via script or agent write.
+3. Parse **ESS milestones** (`demandAcknowledgment`, `manifestationAvailability`, `orderStatus`, `registrationStatus`) and status codes **8000** / **9000** as supplemental requirements `L1`…`Ln`.
+4. If no wiki URL is in Jira but comments reference LADR, infer the standard ESS table from comment text (script fallback).
+
+Merge LADR requirements with Jira `R1`…`Rn` before test plan mapping. Test plan fetch (`fetch_jira_testplan.py`) loads this cache automatically.
 
 ### Step 3: Resolve GitHub PR(s)
 
@@ -172,6 +189,7 @@ Read [references/jira-testplan-validation.md](references/jira-testplan-validatio
 **Otherwise** run once (same shell block as GitHub prefetch is OK):
 
 ```bash
+python scripts/fetch_confluence_requirements.py {ISSUE-KEY} --from-jira-cache
 python scripts/fetch_jira_testplan.py {ISSUE-KEY} --from-jira-cache
 ```
 
@@ -189,7 +207,7 @@ If Jira attachment download fails, retry with workspace fallback:
 python scripts/fetch_jira_testplan.py {ISSUE-KEY} --attachment testplans/Domino Test Plan.xlsx --sheet "Inc as full"
 ```
 
-Parse output: `testCases` (include `section`, `summary`, `mascot_links`, `steps`), `testPlanReferences`, `testPlanSummaryNote`, `status` (`ok` | `referenced_not_local` | `no_testplan`), `coverage.testplanCoveragePct`, `coverage.coverageDetail`, `localSetupHint`.
+Parse output: `testCases` (include `section`, `summary`, `mascot_links`, `steps`, `mapped_requirements`), `jiraRequirements`, `ladrRequirements`, `confluence`, `testPlanReferences`, `testPlanSummaryNote`, `status` (`ok` | `referenced_not_local` | `no_testplan`), `coverage.testplanCoveragePct`, `coverage.jiraRequirementsCovered`, `coverage.ladrRequirementsCovered`, `coverage.coverageDetail`, `localSetupHint`.
 
 **Jira attachment (Option C):** When `ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN` are set, download the Excel from the issue attachment first. Resolve the sheet from Jira comment text (e.g. *Inc as full* → Excel tab *Inc as Fulll*). Parse **high-level scenarios** from Domino sheets: **Section** + **Summary**, Given/When/Then steps, and **Mascot links** from QA/SIT mascot columns (including Excel hyperlinks where the cell shows `Mascot` but the target URL is `foundry.wbdapps.com/mascot/...`) for the Evidence column. Evidence-style sheets (e.g. *Scenarios*) must populate `mascot_links` on every test case — `fetch_jira_testplan.py` + `coverage_report_helpers.render_mascot_links`.
 
@@ -329,16 +347,18 @@ Apply `{{REQ_COVERAGE_CLASS}}` to **Dev code coverage** (required). Set `{{DEV_C
 
 **Test plan acceptance criteria coverage %**
 
-```
-testplan_score(R) = 1.0 if ≥1 mapped test case with full Given/When/Then
-                  = 0.5 if mapped but incomplete GWT or weak AC match
-                  = 0.0 if no mapped test case
-                  = excluded if N/A
+Scores against **Jira acceptance criteria plus LADR/Confluence ESS scenarios** when LADR is linked or referenced. Semantic mapping matches ESS `task` + `status` in test case Summary/Then steps (not only keyword overlap on Jira AC text).
 
-testplan_coverage_pct = round(100 * sum(testplan_score) / count(scored items), 1)
+```
+testplan_score(R or L) = 1.0 if ≥1 mapped test case with full Given/When/Then
+                         = 0.5 if mapped but incomplete GWT or weak match
+                         = 0.0 if no mapped test case
+                         = excluded if N/A
+
+testplan_coverage_pct = round(100 * sum(scores) / count(scored items), 1)
 ```
 
-Use **`NA`** when no attachment and no local fallback. Populate `{{TESTPLAN_COVERAGE_DETAIL}}` from cache `coverage.coverageDetail`, e.g. `5 test cases · 5/5 full Given When Then · 3/4 acceptance criteria covered · Jira attachment`.
+Use **`NA`** when no attachment and no local fallback. Populate `{{TESTPLAN_COVERAGE_DETAIL}}` from cache `coverage.coverageDetail`, e.g. `12 test cases · 12/12 full Given When Then · 13/14 LADR scenarios covered · 3/3 Jira acceptance criteria covered · Jira attachment`.
 
 Apply `{{TESTPLAN_COVERAGE_CLASS}}` using the same tiers as dev coverage.
 
@@ -401,7 +421,7 @@ The helper adds:
 - **Info-icon tooltips** (`i` badge) on verdict, section headings, Coverage summary metric labels, table column headers (Linked PR(s), test plan, traceability), Dev vs QA ownership labels, and review panel headings
 - **Linked PR table** — build body rows with `render_pr_rows()` / `render_pr_rows_from_prefetch()`; plain `<thead>` headers are upgraded automatically by `inject_pr_table_header_tooltips()`
 - **Tooltip layout fix v5** — `.container` and `.report-section` use `overflow: visible`. Table header tooltips: default columns anchor **left** from the icon; **last two columns** (`th:nth-last-child(-n+2)`, e.g. **Dev tests** and **CI status** in Linked PR(s)) anchor to the **right edge of the `<th>` cell** (not the narrow label row) so the full tooltip text (e.g. “Key unit or integration test classes… added or changed in the PR…”) is visible and not clipped
-- **Footer attribution** — `inject_report_footer()` adds `Generated by msc-code-coverage-validator · Developed by Mayur Gunjal` (constants `REPORT_AGENT_NAME`, `REPORT_DEVELOPER` in `coverage_report_helpers.py`)
+- **Footer attribution** — `inject_report_footer()` adds `Generated by msc-dev-code-and-qa-test-coverage-validator · Developed by Mayur Gunjal` (constants `REPORT_AGENT_NAME`, `REPORT_DEVELOPER` in `coverage_report_helpers.py`)
 
 Do **not** hand-roll tooltip CSS in generated reports; always call the helper once before write. Base template `report-template.html` uses `.report-section { overflow: visible; }` — do not revert to `overflow: hidden`.
 
@@ -468,7 +488,7 @@ Save run options to `reports/.cache/<ISSUE-KEY>-manifest.json` for reuse.
 
 Tell the user the full path so they can open it in a browser. Include the **reuse command**:
 
-`@msc-code-coverage-validator {KEY} --from-cache --auto`
+`@msc-dev-code-and-qa-test-coverage-validator {KEY} --from-cache --auto`
 
 Optional: also write `reports/<ISSUE-KEY>-<TIMESTAMP>.md` if the user asks for markdown.
 
@@ -493,6 +513,7 @@ Optional: add a Jira comment summary via `addCommentToJiraIssue` when `--post-ji
 - GitHub / CI coverage commands: [references/github-coverage.md](references/github-coverage.md)
 - Dev vs QA test scope rules: [references/dev-qa-test-scope.md](references/dev-qa-test-scope.md)
 - Jira test plan validation: [references/jira-testplan-validation.md](references/jira-testplan-validation.md)
+- Confluence / LADR requirements: [references/confluence-ladr-requirements.md](references/confluence-ladr-requirements.md)
 - Run modes, flags, cache, prefetch: [references/run-options.md](references/run-options.md)
 - Auto-approve Allow/Run prompts: [references/auto-approve-setup.md](references/auto-approve-setup.md)
 - Workspace defaults template: [validator.defaults.example.json](validator.defaults.example.json)

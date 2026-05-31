@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fetch and parse test plans for msc-code-coverage-validator.
+Fetch and parse test plans for msc-dev-code-and-qa-test-coverage-validator.
 
 Sources (priority order):
   1. --attachment local file(s)
@@ -32,6 +32,14 @@ from jira_env import (
     download_attachment,
     fetch_issue_attachments,
     load_dotenv,
+)
+from confluence_requirements import (
+    compute_testplan_coverage,
+    fetch_and_cache_confluence_for_issue,
+    format_testplan_coverage_detail,
+    load_confluence_cache,
+    map_testcases_to_requirements,
+    merge_requirement_sets,
 )
 from testplan_gwt import (
     gwt_key_from_marker,
@@ -180,22 +188,6 @@ def scenario_label(tc: TestCase) -> str:
     if tc.section and tc.summary:
         return f"{tc.section} · {tc.summary}"
     return tc.section or tc.summary or tc.id
-
-
-def format_testplan_coverage_detail(coverage: dict[str, Any], source_hint: str = "") -> str:
-    """Human-readable test plan completeness for report cards (no AC/GWT abbreviations)."""
-    tc_count = coverage.get("testCaseCount", 0)
-    gwt_complete = coverage.get("completeGwtCount", 0)
-    req_covered = coverage.get("requirementsCovered", 0)
-    req_total = coverage.get("requirementCount", 0)
-    parts = [
-        f"{tc_count} test cases",
-        f"{gwt_complete}/{tc_count} full Given When Then" if tc_count else "0 Given When Then",
-        f"{req_covered}/{req_total} acceptance criteria covered" if req_total else "0 acceptance criteria covered",
-    ]
-    if source_hint:
-        parts.append(source_hint)
-    return " · ".join(parts)
 
 
 def format_testplan_summary_note(
@@ -935,56 +927,6 @@ def extract_requirements(jira_cache: Path | None) -> list[dict[str, str]]:
     return out
 
 
-def map_testcases_to_requirements(cases: list[TestCase], requirements: list[dict[str, str]]) -> None:
-    for tc in cases:
-        mapped: list[str] = []
-        haystack = " ".join([tc.summary, tc.story, " ".join(tc.steps.values())]).lower()
-        for req in requirements:
-            rid = req["id"]
-            if rid.lower() in haystack or REQ_ID_RE.search(tc.summary or ""):
-                num = rid[1:]
-                if re.search(rf"\bR{num}\b", tc.summary or "", re.IGNORECASE):
-                    mapped.append(rid)
-                    continue
-            tokens = [t for t in re.split(r"\W+", req["text"].lower()) if len(t) > 4]
-            if tokens and sum(1 for t in tokens if t in haystack) >= max(2, len(tokens) // 3):
-                mapped.append(rid)
-        if not mapped and len(requirements) == 1:
-            mapped.append(requirements[0]["id"])
-        tc.mapped_requirements = sorted(set(mapped), key=lambda x: int(x[1:]) if x[1:].isdigit() else 0)
-
-
-def compute_testplan_coverage(cases: list[TestCase], requirements: list[dict[str, str]]) -> dict[str, Any]:
-    req_ids = [r["id"] for r in requirements]
-    covered_reqs: set[str] = set()
-    for tc in cases:
-        covered_reqs.update(tc.mapped_requirements)
-
-    scored = [r for r in req_ids if r]
-    if not scored:
-        pct: float | str = "NA"
-    else:
-        pct = round(100 * len(covered_reqs & set(scored)) / len(scored), 1)
-
-    complete_gwt = sum(1 for tc in cases if has_complete_gwt(tc.steps))
-    return {
-        "testplanCoveragePct": pct,
-        "requirementCount": len(scored),
-        "requirementsCovered": len(covered_reqs & set(scored)),
-        "testCaseCount": len(cases),
-        "completeGwtCount": complete_gwt,
-        "uncoveredRequirements": [r for r in scored if r not in covered_reqs],
-        "coverageDetail": format_testplan_coverage_detail(
-            {
-                "testCaseCount": len(cases),
-                "completeGwtCount": complete_gwt,
-                "requirementsCovered": len(covered_reqs & set(scored)),
-                "requirementCount": len(scored),
-            }
-        ),
-    }
-
-
 def resolve_testplan_files(
     issue_key: str,
     from_jira_cache: bool,
@@ -1150,13 +1092,28 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             parse_errors.append(f"{path.name} [{sheet or 'default'}]: {exc}")
 
-    requirements = extract_requirements(jira_cache if jira_cache.exists() else None)
+    jira_requirements = extract_requirements(jira_cache if jira_cache.exists() else None)
+    jira_data = load_json(jira_cache) if jira_cache.exists() else {}
+    confluence_payload = load_confluence_cache(issue_key)
+    if not confluence_payload.get("ladrRequirements") and jira_data:
+        try:
+            confluence_payload = fetch_and_cache_confluence_for_issue(issue_key, jira_data, site=args.site)
+        except RuntimeError:
+            confluence_payload = load_confluence_cache(issue_key)
+    ladr_requirements = confluence_payload.get("ladrRequirements") or []
+    requirements = merge_requirement_sets(jira_requirements, ladr_requirements)
+
     for tc in all_cases:
         tc.steps = normalize_steps(tc.steps)
     if requirements and all_cases:
         map_testcases_to_requirements(all_cases, requirements)
 
-    coverage = compute_testplan_coverage(all_cases, requirements)
+    coverage = compute_testplan_coverage(
+        all_cases,
+        requirements,
+        jira_requirements=jira_requirements,
+        ladr_requirements=ladr_requirements,
+    )
 
     if all_cases:
         status = "ok"
@@ -1207,6 +1164,20 @@ def main() -> int:
         "filesParsed": [{"file": p.name, "sheet": s} for p, s in files],
         "sheetsUsed": sheets_used,
         "requirements": requirements,
+        "jiraRequirements": jira_requirements,
+        "ladrRequirements": ladr_requirements,
+        "confluence": {
+            "status": confluence_payload.get("status"),
+            "pages": [
+                {
+                    "title": p.get("title"),
+                    "webUrl": p.get("webUrl"),
+                    "pageId": p.get("id") or p.get("pageId"),
+                    "error": p.get("error"),
+                }
+                for p in (confluence_payload.get("pages") or [])
+            ],
+        },
         "testCases": [asdict(tc) for tc in all_cases],
         "coverage": coverage,
         "testPlanSummaryNote": summary_note,

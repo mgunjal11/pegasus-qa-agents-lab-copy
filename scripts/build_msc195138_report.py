@@ -16,7 +16,7 @@ from coverage_report_helpers import (  # noqa: E402
 from coverage_report_timestamp import report_paths  # noqa: E402
 
 KEY = "MSC-195138"
-template = (ROOT / ".cursor/skills/msc-code-coverage-validator/report-template.html").read_text(
+template = (ROOT / ".cursor/skills/msc-dev-code-and-qa-test-coverage-validator/report-template.html").read_text(
     encoding="utf-8"
 )
 

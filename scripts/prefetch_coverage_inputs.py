@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Prefetch GitHub PR data for msc-code-coverage-validator.
+Prefetch GitHub PR data for msc-dev-code-and-qa-test-coverage-validator.
 
 Run once in terminal to avoid repeated gh tool approvals during agent analysis:
 
@@ -280,7 +280,7 @@ def main() -> int:
         print(f"Manifest: {manifest_path.resolve()}", file=sys.stderr)
 
     print(
-        f"Prefetched {len(prs)} PR(s). Run: @msc-code-coverage-validator {issue_key} --from-cache --auto",
+        f"Prefetched {len(prs)} PR(s). Run: @msc-dev-code-and-qa-test-coverage-validator {issue_key} --from-cache --auto",
         file=sys.stderr,
     )
     return 0

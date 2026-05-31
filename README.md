@@ -11,10 +11,10 @@ A centralized lab for **AI-driven QA agents** on the WBD Media Supply Chain (MSC
 | # | Agent | What it does | How to invoke |
 |---|--------|--------------|---------------|
 | 1 | **msc-testcase-writer** | Reads Jira user stories → QMetry FF2.0 test cases (Excel, Given/When/Then) | `@msc-testcase-writer MSC-204417` |
-| 2 | **msc-code-coverage-validator** | Validates Jira acceptance criteria vs GitHub PR, dev tests, attached QMetry test plan; HTML report with dev vs QA handoff | `/msc-code-coverage-validator MSC-204417` |
+| 2 | **msc-dev-code-and-qa-test-coverage-validator** | Validates Jira acceptance criteria vs GitHub PR, dev tests, attached QMetry test plan; HTML report with dev vs QA handoff | `/msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
 | 3 | **msc-jira-bug** | Drafts MSC Bug tickets; creates only after your approval | `@msc-jira-bug` + describe the defect |
 
-**Coverage validator guide deck:** `python scripts/generate_coverage_validator_ppt.py` → `docs/MSC-Code-Coverage-Validator-Guide.pptx`
+**Coverage validator guide deck:** `python scripts/generate_coverage_validator_ppt.py` → `docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx`
 
 ---
 
@@ -58,7 +58,7 @@ Required for PR diff, CI checks, and Codecov/Sonar metrics. Not needed for testc
 
 ### 5. Auto-run permissions (coverage validator — recommended)
 
-The slash command `/msc-code-coverage-validator` runs end-to-end (`--auto --write`). To avoid repeated **Allow** / **Run** prompts:
+The slash command `/msc-dev-code-and-qa-test-coverage-validator` runs end-to-end (`--auto --write`). To avoid repeated **Allow** / **Run** prompts:
 
 ```bash
 python scripts/install_coverage_validator_permissions.py
@@ -66,7 +66,7 @@ python scripts/install_coverage_validator_permissions.py
 
 Then in Cursor: **Settings → Agents → Auto-Run → Allowlist** (not “Ask every time”).
 
-Details: [.cursor/skills/msc-code-coverage-validator/references/auto-approve-setup.md](.cursor/skills/msc-code-coverage-validator/references/auto-approve-setup.md)
+Details: [.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/references/auto-approve-setup.md](.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/references/auto-approve-setup.md)
 
 ### 6. Jira API credentials (test plan download — recommended)
 
@@ -83,7 +83,7 @@ Create a token at [Atlassian API tokens](https://id.atlassian.com/manage-profile
 ### 7. Workspace defaults (optional)
 
 ```bash
-cp .cursor/skills/msc-code-coverage-validator/validator.defaults.example.json .coverage-validator.defaults.json
+cp .cursor/skills/msc-dev-code-and-qa-test-coverage-validator/validator.defaults.example.json .coverage-validator.defaults.json
 ```
 
 Set `repo` (e.g. `wbd-msc/pegasus-ess`), `timezone` / `timezoneLabel`, and test plan paths. This file is gitignored.
@@ -119,7 +119,7 @@ See [testplans/README.md](testplans/README.md).
 |--------|------|
 | HTML report | `reports/{ISSUE-KEY}-{MM-DD-YYYY-HH-MM-SS}-{TZ}.html` |
 | Cache (reuse runs) | `reports/.cache/{ISSUE-KEY}-*.json` |
-| Guide PPT | `docs/MSC-Code-Coverage-Validator-Guide.pptx` |
+| Guide PPT | `docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx` |
 
 Reports use **your laptop local timezone** (e.g. `IST`, `EST`) in the filename and header.
 
@@ -144,7 +144,7 @@ The HTML report includes three groups:
 - CI line coverage %
 - CI branch coverage %
 
-Full workflow: [.cursor/skills/msc-code-coverage-validator/SKILL.md](.cursor/skills/msc-code-coverage-validator/SKILL.md)
+Full workflow: [.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/SKILL.md](.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/SKILL.md)
 
 ---
 
@@ -153,7 +153,7 @@ Full workflow: [.cursor/skills/msc-code-coverage-validator/SKILL.md](.cursor/ski
 ```text
 @msc-testcase-writer MSC-204417
 
-/msc-code-coverage-validator MSC-204417
+/msc-dev-code-and-qa-test-coverage-validator MSC-204417
 
 @msc-jira-bug Caption status not updating in Monitor after ESS V2 deploy — staging
 ```
@@ -161,7 +161,7 @@ Full workflow: [.cursor/skills/msc-code-coverage-validator/SKILL.md](.cursor/ski
 Reuse cached Jira/GitHub data (faster, fewer prompts):
 
 ```text
-/msc-code-coverage-validator MSC-204417 --from-cache --auto
+/msc-dev-code-and-qa-test-coverage-validator MSC-204417 --from-cache --auto
 ```
 
 Warm cache only:
@@ -177,8 +177,8 @@ python scripts/fetch_jira_testplan.py MSC-204417 --from-jira-cache
 
 ```
 .cursor/
-  agents/              # msc-testcase-writer, msc-code-coverage-validator, msc-jira-bug
-  commands/            # Slash commands (/msc-code-coverage-validator, …)
+  agents/              # msc-testcase-writer, msc-dev-code-and-qa-test-coverage-validator, msc-jira-bug
+  commands/            # Slash commands (/msc-dev-code-and-qa-test-coverage-validator, …)
   skills/              # Detailed workflows per agent
   permissions.json     # Project MCP + terminal allowlist
   permissions.example.json
@@ -220,7 +220,7 @@ docs/                  # Generated PPT and guides
 
 | Symptom | Fix |
 |---------|-----|
-| `/msc-code-coverage-validator` not found | Open this repo in Cursor (not another folder) |
+| `/msc-dev-code-and-qa-test-coverage-validator` not found | Open this repo in Cursor (not another folder) |
 | Many Allow/Run prompts | Run `install_coverage_validator_permissions.py`; set Auto-Run → **Allowlist** |
 | Test plan shows **Pending** / `referenced_not_local` | Add Excel under `testplans/` or set `testPlanPath` in `.coverage-validator.defaults.json` |
 | Cannot download Jira attachment | Set `ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN` in `.env` |

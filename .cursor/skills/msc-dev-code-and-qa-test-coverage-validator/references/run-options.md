@@ -1,4 +1,4 @@
-# Run options — msc-code-coverage-validator
+# Run options — msc-dev-code-and-qa-test-coverage-validator
 
 Use these options to avoid repeated manual prompts (MCP Allow/Run clicks, PR URL re-entry, repo guessing).
 
@@ -9,12 +9,12 @@ Use these options to avoid repeated manual prompts (MCP Allow/Run clicks, PR URL
 python scripts/prefetch_coverage_inputs.py MSC-209376 --pr https://github.com/wbd-msc/my-repo/pull/42
 
 # Full validation using cache + auto mode
-@msc-code-coverage-validator MSC-209376 --from-cache --auto
+@msc-dev-code-and-qa-test-coverage-validator MSC-209376 --from-cache --auto
 ```
 
 ```bash
 # Or pass everything inline (agent fetches Jira via MCP once, GitHub via prefetch or gh batch)
-@msc-code-coverage-validator MSC-209376 --pr https://github.com/wbd-msc/my-repo/pull/42 --repo wbd-msc/my-repo --auto --write
+@msc-dev-code-and-qa-test-coverage-validator MSC-209376 --pr https://github.com/wbd-msc/my-repo/pull/42 --repo wbd-msc/my-repo --auto --write
 ```
 
 ## Modes
@@ -82,7 +82,7 @@ For repeat runs on the same story, save a manifest:
 }
 ```
 
-Run: `@msc-code-coverage-validator --manifest reports/.cache/MSC-209376-manifest.json`
+Run: `@msc-dev-code-and-qa-test-coverage-validator --manifest reports/.cache/MSC-209376-manifest.json`
 
 After a successful run the agent may write the manifest to `reports/.cache/{ISSUE-KEY}-manifest.json` for next time.
 

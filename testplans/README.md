@@ -8,7 +8,7 @@ Jira comment: *"Refer Inc as full sheet for Test plan and evidence"* → `Domino
 
 1. Copy the workbook to `testplans/Domino Test Plan.xlsx`
 2. Optionally set `testPlanPath` / `testPlanSheet` in `.coverage-validator.defaults.json`
-3. Re-run `/msc-code-coverage-validator {KEY}`
+3. Re-run `/msc-dev-code-and-qa-test-coverage-validator {KEY}`
 
 ## Jira attachment
 

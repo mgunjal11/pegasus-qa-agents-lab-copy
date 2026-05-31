@@ -92,12 +92,15 @@ Rows filtered to the current issue key when a Story/Jira column or row text cont
 
 ## Mapping test cases → requirements
 
-For each `TC{n}` map to Jira requirements `R1`…`Rn`:
+For each `TC{n}` map to Jira requirements `R1`…`Rn` **and** LADR ESS scenarios `L1`…`Ln` when Confluence/LADR is referenced:
 
-1. **Explicit ID** — Summary or steps mention `R1`, `R2`, etc.
-2. **Keyword overlap** — significant tokens from requirement text appear in Summary/steps.
-3. **Story column** — test case Story = issue key.
-4. **Gap** — no mapped requirement → flag as **Unmapped test case**.
+1. **LADR ESS task + status** — match milestone names (`demandAcknowledgment`, `orderStatus`, …) and status (Completed, Pending, Failure, …) in Summary/Then steps → `L*`
+2. **Jira AC inference** — ESS scenarios imply R1 (V2 ESS), R2 (status propagation), R3 (failure / 8000 / 9000)
+3. **Explicit ID** — Summary or steps mention `R1`, `L3`, etc.
+4. **Keyword overlap** — significant tokens from Jira requirement text appear in Summary/steps.
+5. **Gap** — no mapped requirement → flag as **Unmapped test case**.
+
+See [confluence-ladr-requirements.md](confluence-ladr-requirements.md) for fetch and cache paths.
 
 ## Cross-check: test plan vs PR
 
@@ -112,9 +115,9 @@ For each mapped pair (`R{n}` ↔ `TC{x}`):
 
 ## Metrics
 
-**Test plan acceptance criteria coverage %** — use **`NA`** only when `status` is `no_testplan`. When `referenced_not_local`, show reference in note and use **`Pending`** or partial detail until local file is added.
+**Test plan acceptance criteria coverage %** — scores **Jira AC + LADR scenarios** when LADR is present. Use **`NA`** only when `status` is `no_testplan`. When `referenced_not_local`, show reference in note and use **`Pending`** or partial detail until local file is added.
 
-**Test plan completeness** — e.g. `5 test cases · 5/5 full Given When Then · 3/4 acceptance criteria covered` or `Referenced: Domino Test Plan.xlsx · Inc as full · 0 parsed (local file missing)`.
+**Test plan completeness** — e.g. `12 test cases · 12/12 full Given When Then · 13/14 LADR scenarios covered · 3/3 Jira acceptance criteria covered` or `Referenced: Domino Test Plan.xlsx · Inc as full · 0 parsed (local file missing)`.
 
 **Attachment fields parsed:** `section`, `summary` (high-level scenario), Given/When/Then steps (from **any** step column — `Step Summary`, `Test Steps`, etc.; split combined blobs via `testplan_gwt.py`), `mascot_links` (QA/SIT Mascot link columns and hyperlinks), Story. **Given When Then completeness** counts test cases with all three markers in step **content** (including common typos e.g. `Than:` → `Then`), not whether columns are named Given/When/Then. Report Evidence column uses `render_mascot_links`. Report note from `testPlanSummaryNote`.
 
