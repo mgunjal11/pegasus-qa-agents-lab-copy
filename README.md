@@ -102,7 +102,7 @@ See [testplans/README.md](testplans/README.md).
 
 ## Agent setup comparison
 
-| Requirement | testcase-writer | jira-bug | code-coverage-validator |
+| Requirement | testcase-writer | jira-bug | msc-dev-code-and-qa-test-coverage-validator |
 |-------------|-----------------|----------|-------------------------|
 | Atlassian MCP | Yes | Yes | Yes |
 | `gh` CLI | No | No | **Yes** |

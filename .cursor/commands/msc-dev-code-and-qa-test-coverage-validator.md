@@ -1,5 +1,7 @@
 # MSC dev code and QA test coverage validator
 
+> **Not** `/msc-code-coverage-validator` (deprecated name). Use this command only.
+
 Validate the Jira issue in `$ARGUMENTS` against linked GitHub PR(s) and attached Excel test plan (Jira attachment).
 
 ## Required behavior (no manual Allow/Run stops)

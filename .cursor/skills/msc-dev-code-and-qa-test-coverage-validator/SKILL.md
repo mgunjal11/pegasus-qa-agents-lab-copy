@@ -17,6 +17,8 @@ description: >-
 
 # MSC dev code and QA test coverage validator
 
+> **Renamed** from `msc-code-coverage-validator` / `/msc-code-coverage-validator`. Do not use the old name in docs, commands, or agent invocations.
+
 Validate that GitHub PR(s) linked to an MSC Jira story implement the described requirements, that **attached QMetry test plans** cover the acceptance criteria, and quantify coverage at five levels, **separating dev test ownership from QA handoff**:
 
 | Metric | Meaning |
