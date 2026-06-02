@@ -63,7 +63,7 @@ Parse the user message and merge options from (highest priority wins):
 3. **One shell turn** — `python scripts/fetch_coverage_github.py {KEY} ...` or read cache; never N separate `gh` invocations.
 4. **`--from-cache`** when `reports/.cache/{KEY}-prefetch.json` is fresh.
 
-**Cache paths:** `reports/.cache/{ISSUE-KEY}-prefetch.json`, `{ISSUE-KEY}-jira.json`, `{ISSUE-KEY}-testplan.json`, `{ISSUE-KEY}-confluence.json`, `{ISSUE-KEY}-manifest.json`
+**Cache paths:** `reports/.cache/{ISSUE-KEY}-prefetch.json`, `{ISSUE-KEY}-jira.json`, `{ISSUE-KEY}-testplan.json`, `{ISSUE-KEY}-confluence.json`, `{ISSUE-KEY}-mapping.json`, `{ISSUE-KEY}-manifest.json`
 
 **GitHub prefetch (recommended to avoid repeated gh approvals):**
 
@@ -75,6 +75,24 @@ python scripts/prefetch_coverage_inputs.py {ISSUE-KEY} --repo {org}/{repo} --sea
 Then run validation: `@msc-dev-code-and-qa-test-coverage-validator {ISSUE-KEY} --from-cache --auto`
 
 **Batch fetches in auto mode:** Call `getJiraIssue` and `getJiraIssueRemoteIssueLinks` in parallel. Run all `gh` commands in one shell block or read prefetch cache. Save manifest after successful run for reuse.
+
+## Slash command pipeline (`/msc-dev-code-and-qa-test-coverage-validator`)
+
+When invoked via slash command with issue key in `$ARGUMENTS`, run **end-to-end** with **`--auto --write`** (no confirmation). Match `.cursor/commands/msc-dev-code-and-qa-test-coverage-validator.md`:
+
+| # | Step |
+|---|------|
+| 0 | Parse flags → manifest → `.coverage-validator.defaults.json` |
+| 1 | Resolve `{KEY}` |
+| 2 | **Parallel MCP:** `getJiraIssue` (`attachment`, `comment`, `issuelinks`) + `getJiraIssueRemoteIssueLinks` (+ `getConfluencePage` when wiki links); write `{KEY}-jira.json` with `pageId` on remote/confluence links |
+| 3 | `fetch_confluence_requirements.py {KEY} --from-jira-cache` |
+| 4 | `fetch_jira_testplan.py {KEY} --from-jira-cache` |
+| 5 | **One shell:** `prefetch_coverage_inputs.py {KEY} --pr URL …` (multiple `--pr`) or `--from-cache`; branch-only: `fetch_coverage_github.py {KEY} --repo org/repo --compare develop` |
+| 6 | `map_requirements_to_diff.py {KEY}` |
+| 7 | `build_coverage_report.py {KEY}` [`--analysis` optional] |
+| 8 | Manifest `lastReportFile` (builder writes timestamped HTML) |
+
+Never issue multiple separate `gh` invocations; use prefetch cache or one prefetch script call.
 
 ## Workflow
 
@@ -129,8 +147,9 @@ When Jira comments or description mention **LADR** or link to Confluence (`atlas
    python scripts/fetch_confluence_requirements.py {ISSUE-KEY} --from-jira-cache
    ```
 2. **Or Atlassian MCP** (parallel with Jira when credentials missing): `getConfluencePage` with `cloudId: wbdstreaming.atlassian.net`, `pageId` from wiki URL, `contentFormat: markdown`. Persist body to `reports/.cache/{KEY}-confluence.json` via script or agent write.
-3. Parse **ESS milestones** (`demandAcknowledgment`, `manifestationAvailability`, `orderStatus`, `registrationStatus`) and status codes **8000** / **9000** as supplemental requirements `L1`…`Ln`.
-4. If no wiki URL is in Jira but comments reference LADR, infer the standard ESS table from comment text (script fallback).
+3. Parse **ESS milestones** only when Confluence body has real ESS context (`\bess\b` word boundary or explicit `demandAcknowledgment` / `orderStatus` tasks) — **not** substrings inside unrelated words (e.g. “address”).
+4. For **passport / pick-genie design pages** (no ESS table), use **`parse_passport_confluence_requirements()`** — scenario rows such as MVP Full, Incremental to Full on PICK, MDU to Full in Pack as `L1`…`Ln`.
+5. If no wiki URL is in Jira but comments reference LADR ESS, infer the standard ESS table from comment text (script fallback).
 
 Merge LADR requirements with Jira `R1`…`Rn` before test plan mapping. Test plan fetch (`fetch_jira_testplan.py`) loads this cache automatically.
 
@@ -150,7 +169,15 @@ Resolution order (stop when URLs found unless validating all):
 
 If no PR is found: in **`auto`** mode, fail with what was checked; in **interactive** mode, ask once for PR URL or repo.
 
-If multiple PRs apply, validate each separately then produce a rolled-up summary.
+If multiple PRs apply, pass **each URL** in one prefetch call: `prefetch_coverage_inputs.py {KEY} --pr {URL1} --pr {URL2}`.
+
+**No linked PR (branch-only implementation):** When Jira has no PR but manifest/defaults specify `repo` + `compareBranch` (e.g. `develop`):
+
+```bash
+python scripts/fetch_coverage_github.py {KEY} --repo wbd-msc/pegasus-ess --compare develop
+```
+
+Prefetch cache stores `branchCompare` (`files`, `commits`, `ahead_by`). `map_requirements_to_diff.py` scores requirements from branch file list + commit messages when `prs` is empty. Report uses `build_branch_compare_pr_note()` and `render_branch_compare_pr_rows()`; CI cards show **NA** with note `No PR for {KEY}; {head} branch only`.
 
 ### Step 4: Fetch PR changes and CI
 
@@ -214,6 +241,20 @@ Parse output: `testCases` (include `section`, `summary`, `mascot_links`, `eviden
 **Report wording:** In Coverage summary use **acceptance criteria** (not AC) and **Given When Then** (not GWT). **GWT completeness is content-based** — detect `Given` / `When` / `Then` inside any step column (`Step Summary`, `Test Steps`, etc.) via `scripts/testplan_gwt.py` (optional colons; common typos like `Than:` normalized to `Then`); do not require QMetry column names. Set `{{TESTPLAN_NOTE}}` from cache `testPlanSummaryNote` when present. Build test plan placeholders with **`scripts/coverage_report_helpers.build_testplan_report_fields()`** — includes `{{TESTPLAN_ROWS}}` (Evidence via `render_testplan_evidence()`), `{{LADR_TRACEABILITY_BLOCK}}`, and `{{TESTPLAN_GAPS_LIST}}`. Always call **`apply_report_ui_enhancements(html)`** before write.
 
 When `status` is `referenced_not_local`, set `{{TESTPLAN_COVERAGE_PCT}}` to **Pending**, populate `{{TESTPLAN_NOTE}}` with the referenced filename and sheet (not "no QMetry attachment"). When `status` is `no_testplan`, use **`NA`**.
+
+### Step 5b: Map requirements to PR diff (automated)
+
+After prefetch and test plan caches exist:
+
+```bash
+python scripts/map_requirements_to_diff.py {ISSUE-KEY}
+```
+
+Writes `reports/.cache/{ISSUE-KEY}-mapping.json` with per-requirement `codeStatus`, `devTestStatus`, `matchedFiles`, `confidence`, **suggestedTestCases** for partial keyword overlap, and per-PR **`devTests`** (comma-separated pytest module names from `diffNames`, e.g. `test_passport_manager.py`).
+
+When **`prs` is empty** but **`branchCompare.files`** exists, mapping uses branch file paths, commit messages, and domain hints (caption/passport/status codes) for scoring.
+
+Use mapping scores as the baseline for **Dev code coverage %** and **Dev unit/integration test coverage %** in the report. Agent may override with narrative when diff evidence is clearer than token overlap, or via **`--analysis` JSON** (`reqCoveragePct`, `devCoveragePct`, `reqCoverageDetail`, `devCoverageDetail`).
 
 ### Step 6: Map requirements to code, tests, test plan, and dev/QA ownership
 
@@ -316,6 +357,8 @@ Use the best available source, in order:
 3. CI log artifact mentioning `coverage:` or `TOTAL` from pytest-cov/jest/nyc
 4. If unavailable: use display value **`NA`** (not `—` or “Not available”) and note **`No PR for {ISSUE-KEY}; {reason}`** (e.g. `develop branch only`) in `{{CI_LINE_NOTE}}` / `{{CI_BRANCH_NOTE}}`.
 
+**Generic builder:** `build_coverage_report.py` calls **`ci_coverage_report_fields(issue_key)`** in `coverage_report_helpers.py`, which merges `ciCoverage` from each PR in `{KEY}-prefetch.json` (Sonar/Codecov/pytest-cov) and maps to template placeholders **`{{CI_LINE_COVERAGE}}`**, **`{{CI_BRANCH_COVERAGE}}`**, **`{{CI_LINE_NOTE}}`**, **`{{CI_BRANCH_NOTE}}`**, **`{{CI_LINE_CLASS}}`**, **`{{CI_BRANCH_CLASS}}`**. Re-extracts from cached `sonarComment` / `codecovComment` / `checks` when `ciCoverage` is empty. Do not hand-set legacy keys `lineCoverage` / `branchCoverage` on the replacements dict.
+
 When both line and branch coverage exist, report both as percentages; use **line** as the primary CI metric in the summary table.
 
 **Coverage summary card CSS classes** — compute for each percentage metric:
@@ -363,9 +406,29 @@ Use **`NA`** when no attachment and no local fallback. Populate `{{TESTPLAN_COVE
 
 Apply `{{TESTPLAN_COVERAGE_CLASS}}` using the same tiers as dev coverage.
 
-**Verdict** — factor test plan gaps: Fail when critical test–code contradictions or zero AC coverage with test plan present; Pass with gaps for partial alignment.
+**Verdict** — factor test plan gaps and open-gap severity:
+
+- **Fail** when `gap_summary` contains **one or more High gaps** — match `[1-9]\d* High`, **not** the substring `High` inside `0 High · N Med` (builder uses this regex in `_verdict()`).
+- **Fail** when dev code coverage < 50%.
+- **Pass with gaps** when test plan < 85% or dev code < 100%, or only Medium gaps.
+- **Pass** when requirements, dev tests, and test plan alignment are satisfactory.
 
 ### Step 8: Build HTML report
+
+**Preferred (generic builder):**
+
+```bash
+python scripts/map_requirements_to_diff.py {ISSUE-KEY}
+python scripts/build_coverage_report.py {ISSUE-KEY}
+```
+
+Optional narrative overrides: `python scripts/build_coverage_report.py {ISSUE-KEY} --analysis reports/.cache/{ISSUE-KEY}-analysis.json`
+
+Analysis JSON keys (optional): `verdict`, `verdictClass`, `verdictRationale`, `reqCoveragePct`, `reqCoverageDetail`, `devCoveragePct`, `devCoverageDetail`, `qaScopeSummary`, `openGapsSummary`, `openGapsClass`, `openGapsDetail`, `gapsList`, `devCoveredList`, `qaHandoffList`, `correctlyImplementedList`, `assumptionsList`, `actionsList`, `requirementRows`, `prNote`, `storyTitle`.
+
+The builder fills: Jira readiness block, quick links, release score, split test plan metrics, **Linked PR rows** (file counts + **auto Dev tests** from prefetch/mapping), **branch-compare rows** when no PRs, **CI pipeline cards** via `ci_coverage_report_fields()` (re-extracts Sonar/Codecov/pytest-cov; `finalize_ci_coverage()` for branch display), auto traceability rows from mapping cache (unless `requirementRows` in analysis), unmapped TCs, suggested mappings. **`{{PR_NOTE}}`** from analysis or `build_branch_compare_pr_note()`. Always runs `apply_report_ui_enhancements()` before write (idempotent if called twice).
+
+**Manual / agent-refined:** Read [report-template.html](report-template.html) and replace all `{{PLACEHOLDER}}` tokens. New placeholders: `{{CACHE_META}}`, `{{QUICK_LINKS}}`, `{{JIRA_READINESS_BLOCK}}`, `{{RELEASE_SCORE_BLOCK}}`, `{{TESTPLAN_SPLIT_METRICS}}`, `{{UNMAPPED_TC_BLOCK}}`, `{{SUGGESTED_MAPPING_BLOCK}}`.
 
 Read [report-template.html](report-template.html) and produce a **complete, self-contained HTML file** by replacing all `{{PLACEHOLDER}}` tokens.
 
@@ -395,7 +458,7 @@ Read [report-template.html](report-template.html) and produce a **complete, self
 | `{{PR_NOTE}}` | Optional `<div class="note-box">…</div>` when no PR linked; empty string if PR exists |
 | `{{PR_ROWS}}` | HTML `<tr>` rows for section 2 — use `coverage_report_helpers.render_pr_rows()` |
 
-**Section 2 Linked PR(s)** — six columns:
+**Section 2 Linked PR(s)** — seven columns:
 
 | Column | Content |
 |--------|---------|
@@ -403,13 +466,21 @@ Read [report-template.html](report-template.html) and produce a **complete, self
 | Repo | `org/repo` |
 | State | open / MERGED / CLOSED from `gh pr view` |
 | Title | PR title from `gh pr view --json title` |
-| Dev tests | Test names from PR diff (helper wraps in `<code>`) |
+| Files | `{n} files ({m} test)` from `diffNames` in prefetch |
+| Dev tests | Pytest modules from PR diff — **auto** via `format_dev_tests_summary()` / `{KEY}-mapping.json` `prs[].devTests`; shows `—` when no `test_*.py` / `*_test.py` in diff |
 | CI status | `gh pr checks` — **N/A** when empty or prefetch failed |
 
 ```python
 from coverage_report_helpers import render_pr_rows, render_pr_rows_from_prefetch
-rows = render_pr_rows_from_prefetch("MSC-205625", dev_tests_by_number={161: "TestDomino..."})
+
+# Default — Dev tests filled from caches (no manual dict required):
+rows = render_pr_rows_from_prefetch("MSC-205625")
+
+# Optional override for richer labels after agent review:
+rows = render_pr_rows_from_prefetch("MSC-205625", dev_tests_by_number={161: "TestDominoPassportRouting, passport_manager unit tests"})
 ```
+
+`build_coverage_report.py` sets `{{PR_ROWS}}` using `render_pr_rows_from_prefetch()` without overrides unless you pass `dev_tests_by_number` into `build_report()`.
 
 Never put PR title or dev tests in the CI status column.
 
@@ -417,12 +488,21 @@ Never put PR title or dev tests in the CI status column.
 
 After replacing all placeholders, pass the HTML through **`coverage_report_helpers.apply_report_ui_enhancements(html)`** — idempotent; upgrades legacy tooltip CSS (v1–v4) to **v5**.
 
-The helper adds:
+The helper adds (idempotent — safe to call on template or post-builder HTML):
 
-- **Info-icon tooltips** (`i` badge) on verdict, section headings, Coverage summary metric labels, table column headers (Linked PR(s), test plan, traceability), Dev vs QA ownership labels, and review panel headings
-- **Linked PR table** — build body rows with `render_pr_rows()` / `render_pr_rows_from_prefetch()`; plain `<thead>` headers are upgraded automatically by `inject_pr_table_header_tooltips()`
-- **Tooltip layout fix v5** — `.container` and `.report-section` use `overflow: visible`. Table header tooltips: default columns anchor **left** from the icon; **last two columns** (`th:nth-last-child(-n+2)`, e.g. **Dev tests** and **CI status** in Linked PR(s)) anchor to the **right edge of the `<th>` cell** (not the narrow label row) so the full tooltip text (e.g. “Key unit or integration test classes… added or changed in the PR…”) is visible and not clipped
-- **Footer attribution** — `inject_report_footer()` adds `Generated by msc-dev-code-and-qa-test-coverage-validator · Developed by Mayur Gunjal` (constants `REPORT_AGENT_NAME`, `REPORT_DEVELOPER` in `coverage_report_helpers.py`)
+- **Info-icon tooltips** (`i` badge) on:
+  - Report title (h1), meta fields (Jira, Status, Type, Generated), cache freshness, quick links
+  - Jira input readiness panel + each checklist item (AC, PR, test plan, Confluence)
+  - Verdict banner, all §1–§8 section h2 headings, summary group titles
+  - All Coverage summary metric labels (including **Release readiness score** and CI line/branch)
+  - Test plan note-box, Jira/LADR split metrics, §4 ownership section lead
+  - Table column headers: Linked PR(s) (7 cols), test plan, LADR trace, requirements traceability
+  - Dev vs QA ownership cards, review panels (gaps, unmapped TCs, suggested mappings, correctly implemented)
+- **Linked PR table** — body via `render_pr_rows()` / `render_pr_rows_from_prefetch()`; plain `<thead>` upgraded by `inject_pr_table_header_tooltips()`
+- **Tooltip layout fix v5** — `.container` and `.report-section` use `overflow: visible`. Table header tooltips: default columns anchor **left** from the icon; **last two columns** (`th:nth-last-child(-n+2)`, e.g. **Dev tests** and **CI status** in Linked PR(s)) anchor to the **right edge of the `<th>` cell** so long tooltip text is not clipped
+- **Footer attribution** — `Generated by msc-dev-code-and-qa-test-coverage-validator · Developed by Mayur Gunjal` (`REPORT_AGENT_NAME`, `REPORT_DEVELOPER` in `coverage_report_helpers.py`)
+
+Tooltip copy lives in `SUMMARY_METRIC_INFO`, `PR_TABLE_COLUMN_INFO`, `SECTION_HEADER_INFO`, `META_FIELD_INFO`, `READINESS_*_INFO`, etc. in `scripts/coverage_report_helpers.py` — extend those dicts when adding new UI labels; do not duplicate tooltip HTML in reports.
 
 Do **not** hand-roll tooltip CSS in generated reports; always call the helper once before write. Base template `report-template.html` uses `.report-section { overflow: visible; }` — do not revert to `overflow: hidden`.
 

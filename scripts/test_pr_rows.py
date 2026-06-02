@@ -33,7 +33,7 @@ def test_render_six_columns():
         dev_tests="TestDominoPassportRouting, passport_manager unit tests",
         checks=None,
     )
-    assert row.count("<td>") == 6
+    assert row.count("<td>") == 7
     assert "pegasus-pick-genie" in row
     assert "Passport routing" in row
     assert "TestDominoPassportRouting" in row

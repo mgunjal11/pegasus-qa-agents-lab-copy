@@ -11,9 +11,11 @@ This markdown file is an optional reference for structure only.
 
 ### Linked PR(s)
 
-| PR | Repo | State | Title | Dev tests | CI status |
-|----|------|-------|-------|-----------|------------|
-| [#{number}]({pr_url}) | {org}/{repo} | {state} | {title} | {dev_tests} | Passed / Failed / N/A |
+| PR | Repo | State | Title | Files | Dev tests | CI status |
+|----|------|-------|-------|-------|-----------|------------|
+| [#{number}]({pr_url}) | {org}/{repo} | {state} | {title} | {n} files ({m} test) | {dev_tests} | Passed / Failed / N/A |
+
+`{dev_tests}` — auto from PR diff pytest modules (`format_dev_tests_summary`); optional agent override via `dev_tests_by_number`.
 
 ### Coverage summary
 

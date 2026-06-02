@@ -10,11 +10,22 @@ from coverage_report_helpers import (
 MINIMAL_REPORT = """
 <style></style>
 <header>
+  <h1>Coverage validation: MSC-000000 — Example story</h1>
+  <div class="meta">
+    <strong>Jira:</strong> <a href="#">MSC-000000</a> &nbsp;|&nbsp;
+    <strong>Status:</strong> Open &nbsp;|&nbsp;
+    <strong>Type:</strong> Story &nbsp;|&nbsp;
+    <strong>Generated:</strong> 2026-01-01
+  </div>
+  <div class="cache-meta">GitHub cache 2026-01-01</div>
+  <div class="quick-links"><a href="#">Jira</a></div>
+  <div class="jira-readiness-block"><h3>Jira input readiness</h3><ul><li><strong>Acceptance criteria</strong> — ok</li></ul></div>
   <div class="verdict verdict-pass-gaps">Pass with gaps — example rationale.</div>
 </header>
 <section class="report-section section-summary">
   <div class="section-head"><span class="section-num">1</span><h2>Coverage summary</h2></div>
   <div class="section-body">
+    <div class="release-score-row"><div class="metric-card"><div class="label">Release readiness score</div></div></div>
     <div class="summary-group-title">Implementation &amp; tests</div>
     <div class="label">Dev code coverage</div>
   </div>
@@ -23,10 +34,14 @@ MINIMAL_REPORT = """
   <table><thead><tr><th>PR</th></tr></thead><tbody></tbody></table>
 </section>
 <section class="report-section section-testplan">
+  <div class="note-box">Test plan from Jira attachment.</div>
   <table><thead><tr><th>TC</th><th>Scenario</th></tr></thead><tbody></tbody></table>
+  <div class="testplan-split-metrics"><span class="split-metric">Jira acceptance criteria: <strong>1/2</strong></span></div>
   <div class="review-panel review-gaps"><h3>Test plan gaps</h3></div>
+  <div class="review-panel"><h3>Unmapped test cases</h3></div>
 </section>
 <section class="report-section section-ownership">
+  <p class="section-lead">Dev-owned items should be proven by unit or integration tests in the PR.</p>
   <div class="label">QA handoff</div>
 </section>
 <section class="report-section section-trace">
@@ -47,6 +62,16 @@ MINIMAL_REPORT = """
 def test_apply_report_ui_enhancements_covers_all_sections():
     out = apply_report_ui_enhancements(MINIMAL_REPORT)
     assert 'aria-label="About verdict"' in out
+    assert 'aria-label="About Report title"' in out
+    assert 'aria-label="About Jira"' in out
+    assert 'aria-label="About Cache freshness"' in out
+    assert 'aria-label="About Quick links"' in out
+    assert "About Jira input readiness" in out
+    assert "About Acceptance criteria" in out
+    assert "About Release readiness score" in out
+    assert "About Test plan source" in out
+    assert "About Dev vs QA ownership" in out
+    assert "About Unmapped test cases" in out
     assert "About Coverage summary" in out
     assert "About Linked PR(s)" not in out or "section-pr" in out
     assert "group-title-row" in out
@@ -64,7 +89,7 @@ def test_apply_report_ui_enhancements_covers_all_sections():
 def test_table_column_counts():
     out = apply_report_ui_enhancements(MINIMAL_REPORT)
     assert out.count("About TC") >= 1
-    assert len(TESTPLAN_TABLE_COLUMN_INFO) == 6
+    assert len(TESTPLAN_TABLE_COLUMN_INFO) == 7
     assert len(TRACE_TABLE_COLUMN_INFO) == 7
 
 

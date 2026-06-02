@@ -41,12 +41,14 @@ PR_URL_RE = re.compile(
 )
 
 
+_GH_SUBPROCESS = {"capture_output": True, "text": True, "encoding": "utf-8", "errors": "replace"}
+
+
 def gh_json(args: list[str]) -> Any:
     result = subprocess.run(
         ["gh", *args],
-        capture_output=True,
-        text=True,
         check=False,
+        **_GH_SUBPROCESS,
     )
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or f"gh failed: {' '.join(args)}")
@@ -56,9 +58,8 @@ def gh_json(args: list[str]) -> Any:
 def gh_text(args: list[str], *, accept_stdout_on_error: bool = False) -> str:
     result = subprocess.run(
         ["gh", *args],
-        capture_output=True,
-        text=True,
         check=False,
+        **_GH_SUBPROCESS,
     )
     if result.returncode != 0:
         # gh pr checks exits non-zero when any check is pending/failing but still prints rows.

@@ -20,6 +20,10 @@ CONFLUENCE_SHORT_URL_RE = re.compile(
     r"https://(?:[a-z0-9-]+\.)?atlassian\.net/wiki/x/([A-Za-z0-9]+)",
     re.IGNORECASE,
 )
+CONFLUENCE_VIEWPAGE_RE = re.compile(
+    r"pageId=(\d+)",
+    re.IGNORECASE,
+)
 LADR_URL_HINT_RE = re.compile(r"\bLADR\b", re.IGNORECASE)
 
 ESS_TASKS = (
@@ -87,7 +91,7 @@ def extract_confluence_urls(texts: list[str]) -> list[dict[str, str]]:
     found: list[dict[str, str]] = []
     seen: set[str] = set()
 
-    def add(url: str, context: str = "") -> None:
+    def add(url: str, context: str = "", title: str = "") -> None:
         url = url.rstrip(").,]")
         page_match = CONFLUENCE_PAGE_URL_RE.search(url)
         if page_match:
@@ -95,7 +99,15 @@ def extract_confluence_urls(texts: list[str]) -> list[dict[str, str]]:
             key = f"page:{page_id}"
             if key not in seen:
                 seen.add(key)
-                found.append({"url": url, "pageId": page_id, "context": context})
+                found.append({"url": url, "pageId": page_id, "context": context, "title": title})
+            return
+        view_match = CONFLUENCE_VIEWPAGE_RE.search(url)
+        if view_match and "atlassian.net/wiki" in url.lower():
+            page_id = view_match.group(1)
+            key = f"page:{page_id}"
+            if key not in seen:
+                seen.add(key)
+                found.append({"url": url, "pageId": page_id, "context": context, "title": title})
             return
         short_match = CONFLUENCE_SHORT_URL_RE.search(url)
         if short_match:
@@ -103,7 +115,7 @@ def extract_confluence_urls(texts: list[str]) -> list[dict[str, str]]:
             key = f"tiny:{tiny}"
             if key not in seen:
                 seen.add(key)
-                found.append({"url": url, "pageId": tiny, "context": context})
+                found.append({"url": url, "pageId": tiny, "context": context, "title": title})
 
     for text in texts:
         if not text:
@@ -118,6 +130,65 @@ def extract_confluence_urls(texts: list[str]) -> list[dict[str, str]]:
 
     found.sort(key=lambda r: (0 if "ladr" in (r.get("context") or "").lower() else 1, r["url"]))
     return found
+
+
+def extract_confluence_from_jira_links(jira_data: dict[str, Any]) -> list[dict[str, str]]:
+    """Collect Confluence page refs from Jira remote links and confluenceLinks (not only description text)."""
+    found: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def add_ref(url: str, page_id: str | None = None, title: str = "") -> None:
+        if not url and not page_id:
+            return
+        pid = page_id or ""
+        if not pid and url:
+            m = CONFLUENCE_PAGE_URL_RE.search(url) or CONFLUENCE_VIEWPAGE_RE.search(url)
+            if m:
+                pid = m.group(1)
+        if not pid:
+            return
+        key = f"page:{pid}"
+        if key in seen:
+            return
+        seen.add(key)
+        full_url = url or f"https://wbdstreaming.atlassian.net/wiki/pages/viewpage.action?pageId={pid}"
+        ctx = title or "remote link"
+        found.append({"url": full_url, "pageId": pid, "context": ctx, "title": title})
+
+    for link in jira_data.get("remoteLinks") or []:
+        if not isinstance(link, dict):
+            continue
+        url = link.get("url") or (link.get("object") or {}).get("url") or ""
+        title = link.get("title") or (link.get("object") or {}).get("title") or ""
+        page_id = link.get("pageId")
+        if url or page_id:
+            add_ref(str(url), str(page_id) if page_id else None, str(title))
+
+    for link in jira_data.get("confluenceLinks") or []:
+        if not isinstance(link, dict):
+            continue
+        add_ref(
+            str(link.get("url") or ""),
+            str(link.get("pageId")) if link.get("pageId") else None,
+            str(link.get("title") or ""),
+        )
+
+    return found
+
+
+def merge_confluence_url_lists(*lists: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Deduplicate Confluence URL refs by pageId."""
+    merged: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for items in lists:
+        for ref in items:
+            pid = ref.get("pageId") or ""
+            key = f"page:{pid}"
+            if not pid or key in seen:
+                continue
+            seen.add(key)
+            merged.append(ref)
+    return merged
 
 
 def collect_jira_texts(jira_data: dict[str, Any]) -> list[str]:
@@ -176,13 +247,50 @@ def fetch_confluence_page_body(page_id: str, site: str = "wbdstreaming.atlassian
     }
 
 
+def parse_passport_confluence_requirements(
+    body_text: str, source: str = "ladr"
+) -> list[dict[str, str]]:
+    """Parse passport workflow scenarios from Confluence design pages (non-ESS LADR)."""
+    lower = body_text.lower()
+    if "passport" not in lower:
+        return []
+    if re.search(r"\bdemandacknowledgment\b", lower):
+        return []
+
+    scenario_markers = (
+        ("mvp full", "MVP Full — passport always gets attached"),
+        (
+            "incremental to full on pick",
+            "Incremental to Full on PICK — passport must attach when pick evaluates full",
+        ),
+        ("mdu to full in pack", "MDU to Full in Pack — passport must attach in pack"),
+        ("incremental", "Incremental — passport attached when stamp change audit present"),
+        ("mdu in pick", "MDU in Pick — passport not attached (expected)"),
+    )
+    reqs: list[dict[str, str]] = []
+    for marker, text in scenario_markers:
+        if marker in lower:
+            reqs.append(
+                {
+                    "id": f"L{len(reqs) + 1}",
+                    "text": text,
+                    "source": source,
+                    "kind": "passport_scenario",
+                }
+            )
+    return reqs
+
+
 def parse_ladr_ess_requirements(body_text: str, source: str = "ladr") -> list[dict[str, str]]:
     """
     Parse ESS milestone rows from LADR Confluence body.
     Yields L1…Ln requirements aligned to Caption Monitoring test scenarios.
     """
     lower = body_text.lower()
-    if "ess" not in lower and not any(t.lower() in lower for t in ESS_TASKS):
+    has_ess_context = bool(re.search(r"\bess\b", lower)) or any(
+        re.search(rf"\b{re.escape(t.lower())}\b", lower) for t in ESS_TASKS
+    )
+    if not has_ess_context:
         return []
 
     milestone_statuses: dict[str, tuple[str, ...]] = {
@@ -297,6 +405,19 @@ def map_testcases_to_requirements(
 
         # LADR milestone requirements
         for req in ladr_reqs:
+            if req.get("kind") == "passport_scenario":
+                txt = _normalize(req.get("text", ""))
+                if "mvp full" in txt and ("mvp" in norm or "full package" in norm):
+                    mapped.add(req["id"])
+                elif "incremental to full" in txt and "incremental" in norm and "full" in norm:
+                    mapped.add(req["id"])
+                elif "mdu to full" in txt and "mdu" in norm and "full" in norm:
+                    mapped.add(req["id"])
+                elif "mdu in pick" in txt and "mdu" in norm and "pick" in norm:
+                    mapped.add(req["id"])
+                elif txt.startswith("incremental") and "incremental" in norm:
+                    mapped.add(req["id"])
+                continue
             req_task = req.get("task")
             req_status = req.get("status")
             if req_task and req_status:
@@ -493,7 +614,10 @@ def fetch_and_cache_confluence_for_issue(
         jira_data = json.loads(jira_path.read_text(encoding="utf-8")) if jira_path.exists() else {}
 
     texts = collect_jira_texts(jira_data)
-    urls = extract_confluence_urls(texts)
+    urls = merge_confluence_url_lists(
+        extract_confluence_urls(texts),
+        extract_confluence_from_jira_links(jira_data),
+    )
     pages: list[dict[str, Any]] = []
     all_ladr: list[dict[str, str]] = []
 
@@ -501,7 +625,10 @@ def fetch_and_cache_confluence_for_issue(
         page_id = ref["pageId"]
         try:
             page = fetch_confluence_page_body(page_id, site=site)
-            ladr_reqs = parse_ladr_ess_requirements(page.get("bodyText") or "", source="ladr")
+            body = page.get("bodyText") or ""
+            ladr_reqs = parse_ladr_ess_requirements(body, source="ladr")
+            if not ladr_reqs:
+                ladr_reqs = parse_passport_confluence_requirements(body, source="ladr")
             page["ladrRequirements"] = ladr_reqs
             pages.append(page)
             all_ladr.extend(ladr_reqs)

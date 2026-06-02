@@ -319,7 +319,14 @@
     li.medium { color: var(--muted); }
     code { background: #f1f5f9; padding: 0.12rem 0.35rem; border-radius: 3px; font-size: 0.82rem; color: #334155; }
 
-    footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 2rem; }
+
+    .cache-meta { font-size: 0.82rem; color: var(--muted); margin-top: 0.5rem; }
+    .quick-links { margin-top: 0.5rem; font-size: 0.88rem; }
+    .jira-readiness-block { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    .testplan-split-metrics { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.75rem; }
+    .release-score-row { margin-bottom: 1rem; }
+    .conf-badge { font-size: 0.75rem; color: var(--muted); }
+    footer { text-align: center;} color: var(--muted); font-size: 0.75rem; margin-top: 2rem; }
   </style>
 </head>
 <body>
@@ -332,12 +339,16 @@
         <strong>Type:</strong> {{ISSUE_TYPE}} &nbsp;|&nbsp;
         <strong>Generated:</strong> {{GENERATED_DATE}}
       </div>
+      <div class="cache-meta">{{CACHE_META}}</div>
+      {{QUICK_LINKS}}
+      {{JIRA_READINESS_BLOCK}}
       <div class="verdict verdict-{{VERDICT_CLASS}}">{{VERDICT}} — {{VERDICT_RATIONALE}}</div>
     </header>
 
     <section class="report-section section-summary">
       <div class="section-head"><span class="section-num">1</span><h2>Coverage summary</h2></div>
       <div class="section-body">
+        <div class="release-score-row">{{RELEASE_SCORE_BLOCK}}</div>
         <div class="summary-groups">
           <div>
             <div class="summary-group-title">Implementation &amp; tests</div>
@@ -366,6 +377,7 @@
                 <div class="label">Test plan acceptance criteria coverage</div>
                 <div class="metric-value">{{TESTPLAN_COVERAGE_PCT}}</div>
                 <div class="note">{{TESTPLAN_COVERAGE_DETAIL}} — attached test plan</div>
+                {{TESTPLAN_SPLIT_METRICS}}
               </div>
               <div class="metric-card metric-neutral">
                 <div class="label">QA scope remaining</div>
@@ -404,7 +416,7 @@
         {{PR_NOTE}}
         <table>
           <thead>
-            <tr><th>PR</th><th>Repo</th><th>State</th><th>Title</th><th>Dev tests</th><th>CI status</th></tr>
+            <tr><th>PR</th><th>Repo</th><th>State</th><th>Title</th><th>Files</th><th>Dev tests</th><th>CI status</th></tr>
           </thead>
           <tbody>
             {{PR_ROWS}}
@@ -420,7 +432,7 @@
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>TC</th><th>Scenario</th><th>Mapped req</th><th>Given When Then</th><th>PR alignment</th><th>Evidence</th></tr>
+              <tr><th>TC</th><th>Scenario</th><th>Mapped req</th><th>GWT</th><th>Given When Then</th><th>PR alignment</th><th>Evidence</th></tr>
             </thead>
             <tbody>
               {{TESTPLAN_ROWS}}
@@ -428,6 +440,8 @@
           </table>
         </div>
         {{LADR_TRACEABILITY_BLOCK}}
+        {{UNMAPPED_TC_BLOCK}}
+        {{SUGGESTED_MAPPING_BLOCK}}
         <div class="review-panel review-gaps" style="margin-top:1rem;">
           <h3>Test plan gaps</h3>
           <ul>{{TESTPLAN_GAPS_LIST}}</ul>

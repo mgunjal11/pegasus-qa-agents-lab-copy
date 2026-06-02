@@ -16,6 +16,9 @@ PERMS = {
         "python scripts/prefetch_coverage_inputs.py",
         "python scripts/fetch_coverage_github.py",
         "python scripts/fetch_jira_testplan.py",
+        "python scripts/fetch_confluence_requirements.py",
+        "python scripts/map_requirements_to_diff.py",
+        "python scripts/build_coverage_report.py",
         "mkdir",
     ],
 }

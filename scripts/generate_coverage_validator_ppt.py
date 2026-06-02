@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Generate MSC Dev Code and QA Test Coverage Validator deck — WBD QBR brand + executive presentation visuals."""
 
+import re
 from pathlib import Path
 
 from pptx import Presentation
@@ -40,29 +41,48 @@ FONT = "Calibri"
 W = Inches(13.333)
 H = Inches(7.5)
 
-# Latest report snapshots — sync with reports/{KEY}-*-IST.html
+# Latest report snapshots — refreshed from reports/{KEY}-*-IST.html at build time
 REPORT_DEVELOPER = "Mayur Gunjal"
 REPORT_MATRIX = {
-    "MSC-205625": {
-        "type": "Bug · Ready for Release",
-        "generated": "05-29-2026 12:43 IST",
+    "MSC-212571": {
+        "type": "Story · In QA",
+        "generated": "06-02-2026 14:53 IST",
         "verdict": "Pass with gaps",
         "dev_code_pct": "100%",
-        "dev_tests_pct": "75%",
-        "req_mapped": "4/4 AC",
-        "testplan_ac_pct": "75%",
-        "qa_remaining": "1 item",
-        "open_gaps": "2 Med",
+        "dev_tests_pct": "5.6%",
+        "req_mapped": "6/9 AC",
+        "testplan_ac_pct": "66.7%",
+        "qa_remaining": "28 scenarios",
+        "open_gaps": "0 High · 11 Med",
+        "ci_line_pct": "99.2%",
+        "ci_branch_pct": "99.2%",
+        "pr_note": "PR #99 partner-config OPEN · #148 transmogrifier MERGED",
+        "testplan_note": "DirecTV Scenarios · 28/28 GWT",
+        "ladr_note": "Confluence DirecTV spec",
+        "report_file": "MSC-212571-06-02-2026-14-53-07-IST.html",
+        "summary_short": "QA Testing DirecTV features",
+    },
+    "MSC-205625": {
+        "type": "Bug · Ready for Release",
+        "generated": "06-02-2026 14:50 IST",
+        "verdict": "Pass with gaps",
+        "dev_code_pct": "87.5%",
+        "dev_tests_pct": "83.3%",
+        "req_mapped": "7/9 AC",
+        "testplan_ac_pct": "77.8%",
+        "qa_remaining": "5 scenarios",
+        "open_gaps": "0 High · 1 Med",
         "ci_line_pct": "95.3%",
         "ci_branch_pct": "94.5%",
-        "pr_note": "PR #161 pick-genie · MERGED · CI Passed",
-        "testplan_note": "Domino · Inc as Fulll · 5/5 GWT · 3/4 AC",
-        "ladr_note": "—",
-        "report_file": "MSC-205625-05-29-2026-12-43-49-IST.html",
+        "pr_note": "PR #161 pick-genie · #195 encode-monitor MERGED",
+        "testplan_note": "Domino Inc as full · 5/5 GWT",
+        "ladr_note": "Passport wiki LADR (5 scenarios)",
+        "report_file": "MSC-205625-06-02-2026-14-50-05-IST.html",
+        "summary_short": "PFT Clear passport incremental-as-full (SIT)",
     },
     "MSC-204417": {
         "type": "Story · In QA",
-        "generated": "05-31-2026 10:19 IST",
+        "generated": "06-02-2026 14:43 IST",
         "verdict": "Pass with gaps",
         "dev_code_pct": "100%",
         "dev_tests_pct": "83.3%",
@@ -72,14 +92,15 @@ REPORT_MATRIX = {
         "open_gaps": "2 High · 2 Med",
         "ci_line_pct": "NA",
         "ci_branch_pct": "NA",
-        "pr_note": "No PR · develop branch",
+        "pr_note": "No PR · develop branch (pegasus-ess)",
         "testplan_note": "Caption Monitoring · 12/12 GWT",
-        "ladr_note": "Confluence LADR requirements",
-        "report_file": "MSC-204417-05-31-2026-10-19-28-IST.html",
+        "ladr_note": "ESS + caption LADR",
+        "report_file": "MSC-204417-06-02-2026-14-43-39-IST.html",
+        "summary_short": "V2 caption messaging for Monitor",
     },
     "MSC-195138": {
         "type": "Story · Done",
-        "generated": "05-27-2026 17:57 IST",
+        "generated": "06-02-2026 14:39 IST",
         "verdict": "Pass with gaps",
         "dev_code_pct": "83.3%",
         "dev_tests_pct": "83.3%",
@@ -87,15 +108,106 @@ REPORT_MATRIX = {
         "testplan_ac_pct": "66.7%",
         "qa_remaining": "3 items",
         "open_gaps": "1 High · 3 Med",
-        "ci_line_pct": "NA",
-        "ci_branch_pct": "NA",
-        "pr_note": "PRs #22 + #75 · MERGED",
+        "ci_line_pct": "77.7%",
+        "ci_branch_pct": "77.7%",
+        "pr_note": "PRs #22 reps · #75 texttransform MERGED",
         "testplan_note": "FF Race · 11/11 GWT",
         "ladr_note": "—",
-        "report_file": "MSC-195138-05-27-2026-17-57-12-IST.html",
+        "report_file": "MSC-195138-06-02-2026-14-39-24-IST.html",
+        "summary_short": "FF2.0 messaging race conditions",
     },
 }
-LATEST_EXAMPLE = {**REPORT_MATRIX["MSC-205625"], "key": "MSC-205625", "summary_short": "PFT Clear passport incremental workflow (SIT)"}
+
+
+def _metric_after_label(html: str, label: str) -> str:
+    pattern = re.escape(label) + r"</div>.*?metric-value\">([^<]+)"
+    m = re.search(pattern, html, re.S | re.I)
+    return (m.group(1).strip() if m else "") or "—"
+
+
+def refresh_report_matrix_from_html(reports_dir: Path | None = None) -> str | None:
+    """Load newest HTML report per MSC key; return key used as LATEST_EXAMPLE."""
+    base = reports_dir or (ROOT / "reports")
+    if not base.is_dir():
+        return None
+    by_key: dict[str, Path] = {}
+    for path in base.glob("MSC-*.html"):
+        if "Guide" in path.name:
+            continue
+        m = re.match(r"(MSC-\d+)-", path.name)
+        if not m:
+            continue
+        key = m.group(1)
+        prev = by_key.get(key)
+        if not prev or path.stat().st_mtime > prev.stat().st_mtime:
+            by_key[key] = path
+
+    latest_key: str | None = None
+    latest_mtime = 0.0
+    for key, path in by_key.items():
+        html = path.read_text(encoding="utf-8", errors="replace")
+        entry = REPORT_MATRIX.setdefault(
+            key,
+            {
+                "type": "Story",
+                "generated": "",
+                "verdict": "Pass with gaps",
+                "dev_code_pct": "—",
+                "dev_tests_pct": "—",
+                "req_mapped": "—",
+                "testplan_ac_pct": "—",
+                "qa_remaining": "—",
+                "open_gaps": "—",
+                "ci_line_pct": "NA",
+                "ci_branch_pct": "NA",
+                "pr_note": "—",
+                "testplan_note": "—",
+                "ladr_note": "—",
+                "report_file": path.name,
+                "summary_short": key,
+            },
+        )
+        entry["report_file"] = path.name
+        gen = re.search(r"Generated:.*?(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2})", html)
+        if gen:
+            entry["generated"] = f"{gen.group(2)}-{gen.group(3)}-{gen.group(1)} {gen.group(4)} IST"
+        status_m = re.search(r"Status:.*?>([^<]+)</span>\s*&nbsp;\|", html)
+        type_m = re.search(r"Type:.*?>([^<]+)</span>\s*&nbsp;\|", html)
+        if status_m and type_m:
+            entry["type"] = f"{type_m.group(1).strip()} · {status_m.group(1).strip()}"
+        title_m = re.search(r"Coverage validation: MSC-\d+ — ([^<]+)<", html)
+        if title_m:
+            entry["summary_short"] = title_m.group(1).strip()[:80]
+        if "verdict-fail" in html:
+            entry["verdict"] = "Fail"
+        elif "verdict-pass-gaps" in html:
+            entry["verdict"] = "Pass with gaps"
+        elif "verdict-pass" in html:
+            entry["verdict"] = "Pass"
+        entry["dev_code_pct"] = _metric_after_label(html, "Dev code coverage") or entry["dev_code_pct"]
+        entry["dev_tests_pct"] = _metric_after_label(html, "Dev unit / integration test coverage") or entry["dev_tests_pct"]
+        entry["req_mapped"] = _metric_after_label(html, "Requirements mapped") or entry["req_mapped"]
+        entry["testplan_ac_pct"] = _metric_after_label(html, "Test plan acceptance criteria coverage") or entry["testplan_ac_pct"]
+        entry["qa_remaining"] = _metric_after_label(html, "QA scope remaining") or entry["qa_remaining"]
+        entry["open_gaps"] = _metric_after_label(html, "Open gaps") or entry["open_gaps"]
+        entry["ci_line_pct"] = _metric_after_label(html, "CI line coverage") or entry["ci_line_pct"]
+        entry["ci_branch_pct"] = _metric_after_label(html, "CI branch coverage") or entry["ci_branch_pct"]
+        mtime = path.stat().st_mtime
+        if mtime > latest_mtime:
+            latest_mtime = mtime
+            latest_key = key
+    return latest_key
+
+
+def _set_latest_example(key: str | None) -> None:
+    global LATEST_EXAMPLE
+    k = key or "MSC-212571"
+    if k not in REPORT_MATRIX:
+        k = next(iter(REPORT_MATRIX))
+    LATEST_EXAMPLE = {**REPORT_MATRIX[k], "key": k, "summary_short": REPORT_MATRIX[k].get("summary_short", k)}
+
+
+_set_latest_example("MSC-212571")
 
 
 class Deck:
@@ -539,7 +651,7 @@ class Deck:
         cmd = self._rect(s, Inches(2.5), Inches(6.35), Inches(8.3), Inches(0.5), DARK, radius=True)
         cmd.line.fill.background()
         ct = s.shapes.add_textbox(Inches(2.65), Inches(6.42), Inches(8), Inches(0.38))
-        ct.text_frame.text = "/msc-dev-code-and-qa-test-coverage-validator MSC-205625   ·   --from-cache --auto"
+        ct.text_frame.text = "/msc-dev-code-and-qa-test-coverage-validator MSC-212571   ·   --auto --write"
         ct.text_frame.paragraphs[0].font.size = Pt(14)
         ct.text_frame.paragraphs[0].font.name = "Consolas"
         ct.text_frame.paragraphs[0].font.color.rgb = GOLD
@@ -550,14 +662,14 @@ class Deck:
         s.background.fill.solid()
         s.background.fill.fore_color.rgb = WHITE
         self.footer(s)
-        self._slide_title(s, "Automated workflow", "End-to-end in ~2–5 minutes · Jira MCP + Confluence LADR + cached GitHub prefetch")
+        self._slide_title(s, "Automated workflow", "Slash command --auto --write · ~2–5 min · one MCP turn + batched shells")
         steps = [
-            ("1", "Jira", "Story, AC,\nattachments, LADR\nwiki links"),
-            ("2", "Confluence", "getConfluencePage\nLADR requirements\nL1…Ln"),
-            ("3", "Test plan", "Excel xlsx,\nGiven/When/Then,\nsemantic map"),
-            ("4", "GitHub", "PR diff,\nchecks, CI"),
-            ("5", "Map", "R1…Rn +\nLADR → TCs"),
-            ("6", "Report", "HTML + tooltips\n+ footer credit"),
+            ("1", "Jira", "Parallel MCP:\nissue + remote\nwiki links"),
+            ("2", "Confluence", "LADR ESS or\npassport scenarios"),
+            ("3", "Test plan", "Excel attach,\nGWT, Evidence"),
+            ("4", "GitHub", "prefetch PR(s)\nor branch compare"),
+            ("5", "Map", "map_requirements_\nto_diff.py"),
+            ("6", "Report", "build_coverage_\nreport.py + tooltips"),
         ]
         sw = Inches(1.95)
         for i, (num, title, sub) in enumerate(steps):
@@ -591,9 +703,10 @@ class Deck:
         self._rect(s, Inches(0.55), Inches(4.25), Inches(12.2), Inches(1.15), SOFT_GOLD, radius=True)
         cb = s.shapes.add_textbox(Inches(0.75), Inches(4.4), Inches(11.8), Inches(0.9))
         cb.text_frame.text = (
-            "Performance: reports/.cache/ stores Jira, Confluence LADR, test plan, and GitHub prefetch — "
-            "reuse with --from-cache --auto. When Jira comments reference LADR or wiki URLs, "
-            "fetch_confluence_requirements.py (or getConfluencePage MCP) merges Confluence LADR requirements with Jira AC before test plan scoring."
+            "Cache: reports/.cache/{KEY}-jira|confluence|testplan|prefetch|mapping.json — reuse --from-cache. "
+            "No linked PR? fetch_coverage_github.py --compare develop + branchCompare mapping. "
+            "Verdict: Fail only when gap_summary has ≥1 High (not “0 High · N Med”). "
+            "build_coverage_report.py fills CI {{CI_*}} and Dev tests columns automatically."
         )
         cb.text_frame.paragraphs[0].font.size = Pt(12)
         cb.text_frame.paragraphs[0].font.color.rgb = BODY
@@ -653,7 +766,7 @@ class Deck:
         )
         sections = [
             ("1", "Coverage summary", "8 metric cards + i tooltips"),
-            ("2", "Linked PR(s)", "PR · Repo · State · Title · Dev tests · CI"),
+            ("2", "Linked PR(s)", "PR · Repo · State · Title · Files · Dev tests · CI"),
             ("3", "Test plan", "Excel attachment · GWT · Mascot or IDs"),
             ("4", "Dev vs QA", "Ownership split"),
             ("5", "Traceability", "Row-per-AC matrix"),
@@ -714,7 +827,7 @@ class Deck:
             "Header verdict (Pass / Pass with gaps / Fail)",
             "All 8 section titles + 3 summary group titles",
             "All 8 Coverage summary metric cards",
-            "Linked PR(s) — 6 column headers (PR, Repo, State, Title, Dev tests, CI status)",
+            "Linked PR(s) — 7 columns (PR, Repo, State, Title, Files, Dev tests, CI status)",
             "Test plan + traceability table headers",
             "Dev vs QA cards · Implementation review panels",
         ]
@@ -907,7 +1020,7 @@ class Deck:
             f"Example — MSC-204417: Jira references a LADR doc; agent fetches Confluence LADR requirements and merges with "
             f"Promo Caption Monitoring test plan (12 scenarios, {ex['testplan_note']}). "
             f"Report {ex['report_file']}: {ex['dev_code_pct']} dev code · {ex['testplan_ac_pct']} test plan AC · "
-            f"{ex['req_mapped']} mapped · {ex['verdict']}. Generic LADR parsing — not limited to one domain."
+            f"{ex['req_mapped']} mapped · {ex['verdict']}. ESS LADR + passport scenario pages (word-boundary safe)."
         )
         ex_box.text_frame.paragraphs[0].font.size = Pt(11)
         ex_box.text_frame.paragraphs[0].font.color.rgb = BODY
@@ -926,7 +1039,7 @@ class Deck:
             self._rect(s, left, Inches(6.28), cw - Inches(0.05), Inches(0.55), LIGHT_GRAY, cap, 8, False, NAVY, True)
 
     def report_matrix_slide(self):
-        """Latest HTML report metrics — MSC-205625, MSC-204417, MSC-195138."""
+        """Latest HTML report metrics — four recent MSC validations."""
         s = self.blank()
         s.background.fill.solid()
         s.background.fill.fore_color.rgb = WHITE
@@ -934,7 +1047,7 @@ class Deck:
         self._slide_title(
             s,
             "Latest report matrix — 8-card coverage summary",
-            "From generated HTML reports · MSC-205625 · MSC-204417 · MSC-195138",
+            f"From HTML reports · newest: {LATEST_EXAMPLE['key']} ({LATEST_EXAMPLE['generated']})",
         )
         headers = [
             "Ticket",
@@ -952,7 +1065,7 @@ class Deck:
         for ci, h in enumerate(headers):
             left = Inches(0.55) + col_w * ci
             self._rect(s, left, top, col_w - Inches(0.03), Inches(0.4), NAVY, h, 8, True, WHITE)
-        keys = ["MSC-205625", "MSC-204417", "MSC-195138"]
+        keys = ["MSC-212571", "MSC-205625", "MSC-204417", "MSC-195138"]
         for ri, key in enumerate(keys):
             r = REPORT_MATRIX[key]
             row = [
@@ -966,7 +1079,7 @@ class Deck:
                 r["ci_line_pct"],
                 r["verdict"].replace("Pass with gaps", "Pass w/ gaps"),
             ]
-            y = top + Inches(0.46) + Inches(0.44) * ri
+            y = top + Inches(0.42) + Inches(0.38) * ri
             bg = LIGHT_GRAY if ri % 2 else WHITE
             for ci, cell in enumerate(row):
                 left = Inches(0.55) + col_w * ci
@@ -975,18 +1088,42 @@ class Deck:
                     fc = GREEN if cell.startswith("100") else AMBER if not cell.startswith("66") else AMBER
                 if ci == 7 and cell == "NA":
                     fc = MUTED
-                self._rect(s, left, y, col_w - Inches(0.03), Inches(0.4), bg, cell, 7, ci == 0, fc)
+                self._rect(s, left, y, col_w - Inches(0.03), Inches(0.36), bg, cell, 7, ci == 0, fc)
         # Detail rows — report files + notes
-        self._rect(s, Inches(0.55), Inches(3.05), Inches(12.2), Inches(0.35), CORAL, "Report artifacts (latest)", 11, True, WHITE, True)
+        self._rect(s, Inches(0.55), Inches(2.95), Inches(12.2), Inches(0.32), CORAL, "Report artifacts (latest)", 10, True, WHITE, True)
         for ri, key in enumerate(keys):
             r = REPORT_MATRIX[key]
             note = f"{key} · {r['report_file']} · {r['generated']} · {r['pr_note']} · {r['testplan_note']}"
             if r.get("ladr_note") and r["ladr_note"] != "—":
                 note += f" · {r['ladr_note']}"
-            y = Inches(3.48) + Inches(0.38) * ri
-            self._rect(s, Inches(0.55), y, Inches(12.2), Inches(0.34), SOFT_BLUE if ri == 1 else LIGHT_GRAY, note, 8, False, NAVY if ri == 1 else BODY)
-        # Mini 8-card legend for one ticket (MSC-204417 as LADR example)
-        self._rect(s, Inches(0.55), Inches(4.75), Inches(5.9), Inches(0.35), NAVY, "MSC-204417 — sample §1 cards", 10, True, WHITE)
+            y = Inches(3.32) + Inches(0.32) * ri
+            highlight = key == LATEST_EXAMPLE["key"]
+            self._rect(
+                s,
+                Inches(0.55),
+                y,
+                Inches(12.2),
+                Inches(0.3),
+                SOFT_GOLD if highlight else LIGHT_GRAY,
+                note,
+                7,
+                False,
+                NAVY if highlight else BODY,
+            )
+        # Mini 8-card legend — newest report + branch-only example
+        self._rect(s, Inches(0.55), Inches(4.55), Inches(5.9), Inches(0.32), NAVY, f"{LATEST_EXAMPLE['key']} — newest §1 cards", 9, True, WHITE)
+        r_new = REPORT_MATRIX[LATEST_EXAMPLE["key"]]
+        cards_new = [
+            ("Dev code", r_new["dev_code_pct"]),
+            ("Dev tests", r_new["dev_tests_pct"]),
+            ("Test plan AC", r_new["testplan_ac_pct"]),
+            ("CI line", r_new["ci_line_pct"]),
+        ]
+        for ci, (lbl, val) in enumerate(cards_new):
+            left = Inches(0.55) + Inches(1.48) * ci
+            fill = SOFT_GOLD if val == "NA" else SOFT_BLUE
+            self._kpi_card(s, left, Inches(4.92), Inches(1.38), Inches(0.82), val, lbl, None, fill, NAVY)
+        self._rect(s, Inches(6.65), Inches(4.55), Inches(6.1), Inches(0.32), NAVY, "MSC-204417 — branch-only (no PR)", 9, True, WHITE)
         r417 = REPORT_MATRIX["MSC-204417"]
         cards417 = [
             ("Dev code", r417["dev_code_pct"]),
@@ -995,9 +1132,9 @@ class Deck:
             ("CI line", r417["ci_line_pct"]),
         ]
         for ci, (lbl, val) in enumerate(cards417):
-            left = Inches(0.55) + Inches(1.48) * ci
-            self._kpi_card(s, left, Inches(5.15), Inches(1.38), Inches(0.85), val, lbl, None, SOFT_GOLD if val == "NA" else SOFT_BLUE, NAVY)
-        self._rect(s, Inches(6.65), Inches(4.75), Inches(6.1), Inches(0.35), NAVY, "MSC-205625 — sample §1 cards (PR + CI)", 10, True, WHITE)
+            left = Inches(6.65) + Inches(1.48) * ci
+            self._kpi_card(s, left, Inches(4.92), Inches(1.38), Inches(0.82), val, lbl, None, SOFT_GOLD if val == "NA" else SOFT_BLUE, NAVY)
+        self._rect(s, Inches(0.55), Inches(5.85), Inches(12.2), Inches(0.32), LIGHT_GRAY, "MSC-205625 — dual PR + passport Confluence LADR · CI 95%+", 8, False, NAVY, True)
         r625 = REPORT_MATRIX["MSC-205625"]
         cards625 = [
             ("Dev code", r625["dev_code_pct"]),
@@ -1006,8 +1143,8 @@ class Deck:
             ("CI line", r625["ci_line_pct"]),
         ]
         for ci, (lbl, val) in enumerate(cards625):
-            left = Inches(6.65) + Inches(1.48) * ci
-            self._kpi_card(s, left, Inches(5.15), Inches(1.38), Inches(0.85), val, lbl, None, GREEN_BG, GREEN)
+            left = Inches(0.55) + Inches(1.48) * ci
+            self._kpi_card(s, left, Inches(6.22), Inches(1.38), Inches(0.75), val, lbl, None, GREEN_BG, GREEN)
 
     def dev_qa_slide(self):
         s = self.blank()
@@ -1237,7 +1374,7 @@ class Deck:
         lines = [
             "Scripts (batched — no manual gh per run):",
             "fetch_confluence_requirements.py  ·  fetch_jira_testplan.py  ·  prefetch_coverage_inputs.py",
-            "apply_report_ui_enhancements()  ·  Cache: reports/.cache/{KEY}-*.json",
+            "map_requirements_to_diff.py  ·  build_coverage_report.py  ·  apply_report_ui_enhancements()",
             f"sync_pegasus_qa_agents_lab.py → push to github.com/mgunjal11/pegasus-qa-agents-lab",
         ]
         for j, line in enumerate(lines):
@@ -1255,7 +1392,7 @@ class Deck:
         self.footer(s)
         self._slide_title(s, "Proven MSC outcomes", "Latest HTML reports — see full 8-card matrix on prior slide")
         cases = []
-        for key in ("MSC-205625", "MSC-204417", "MSC-195138"):
+        for key in ("MSC-212571", "MSC-205625", "MSC-204417", "MSC-195138"):
             r = REPORT_MATRIX[key]
             notes = f"{r['pr_note']} · {r['testplan_note']}"
             if r.get("ladr_note") and r["ladr_note"] != "—":
@@ -1357,6 +1494,10 @@ class Deck:
 
 
 def build(out: Path) -> None:
+    latest = refresh_report_matrix_from_html()
+    _set_latest_example(latest)
+    if latest:
+        print(f"Latest report: {latest} -> {REPORT_MATRIX[latest]['report_file']}")
     d = Deck()
     d.build_all()
     out.parent.mkdir(parents=True, exist_ok=True)

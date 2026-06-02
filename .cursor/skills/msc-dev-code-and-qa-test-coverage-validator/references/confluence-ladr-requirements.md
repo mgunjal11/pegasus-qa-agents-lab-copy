@@ -45,7 +45,9 @@ Or run `fetch_confluence_requirements.py` after MCP auth so REST uses `ATLASSIAN
 
 ## LADR ESS requirements (Caption Monitoring)
 
-Parsed as `L1`…`Ln` from the LADR **ESS** section:
+Parsed as `L1`…`Ln` only when the Confluence body has **real ESS context** (`\bess\b` or explicit milestone task names). Substrings like **“address”** must **not** trigger the ESS table parser.
+
+From the LADR **ESS** section:
 
 | Task | Statuses |
 |------|----------|
@@ -73,6 +75,20 @@ coverageDetail example:
 ```
 
 Use **`NA`** only when `status` is `no_testplan`. Do not report **0%** when test cases semantically cover LADR/Jira scope but lacked token overlap — re-run fetch after Confluence merge.
+
+## Passport / pick-genie design pages (non-ESS)
+
+When the linked wiki page describes **passport attachment scenarios** (e.g. MSC-205625, MSC-204417) and does **not** contain an ESS milestone table, `confluence_requirements.py` uses **`parse_passport_confluence_requirements()`**:
+
+| Scenario (examples) | Requirement text |
+|---------------------|------------------|
+| MVP Full | Passport always attached |
+| Incremental to Full on PICK | Passport when pick evaluates full |
+| MDU to Full in Pack | Passport in pack fulfillment |
+| Incremental | Stamp-change audit path |
+| MDU in Pick | Passport not attached (expected) |
+
+Test-case mapping uses `kind: passport_scenario` keyword rules in `map_testcases_to_requirements()` (incremental, full, mdu, pick).
 
 ## Report impact
 
