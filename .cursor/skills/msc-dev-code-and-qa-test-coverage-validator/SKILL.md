@@ -250,7 +250,7 @@ After prefetch and test plan caches exist:
 python scripts/map_requirements_to_diff.py {ISSUE-KEY}
 ```
 
-Writes `reports/.cache/{ISSUE-KEY}-mapping.json` with per-requirement `codeStatus`, `devTestStatus`, `matchedFiles`, `confidence`, **suggestedTestCases** for partial keyword overlap, and per-PR **`devTests`** (comma-separated pytest module names from `diffNames`, e.g. `test_passport_manager.py`).
+Writes `reports/.cache/{ISSUE-KEY}-mapping.json` with per-requirement `codeStatus`, `devTestStatus`, `matchedFiles`, `confidence` (**high** only when `matchedFiles` non-empty; else medium/low with **`evidenceNote`**), **suggestedTestCases** for partial keyword overlap, and per-PR **`devTests`** (comma-separated pytest module names from `diffNames`, e.g. `test_passport_manager.py`).
 
 When **`prs` is empty** but **`branchCompare.files`** exists, mapping uses branch file paths, commit messages, and domain hints (caption/passport/status codes) for scoring.
 
@@ -426,7 +426,7 @@ Optional narrative overrides: `python scripts/build_coverage_report.py {ISSUE-KE
 
 Analysis JSON keys (optional): `verdict`, `verdictClass`, `verdictRationale`, `reqCoveragePct`, `reqCoverageDetail`, `devCoveragePct`, `devCoverageDetail`, `qaScopeSummary`, `openGapsSummary`, `openGapsClass`, `openGapsDetail`, `gapsList`, `devCoveredList`, `qaHandoffList`, `correctlyImplementedList`, `assumptionsList`, `actionsList`, `requirementRows`, `prNote`, `storyTitle`.
 
-The builder fills: Jira readiness block, quick links, release score, split test plan metrics, **Linked PR rows** (file counts + **auto Dev tests** from prefetch/mapping), **branch-compare rows** when no PRs, **CI pipeline cards** via `ci_coverage_report_fields()` (re-extracts Sonar/Codecov/pytest-cov; `finalize_ci_coverage()` for branch display), auto traceability rows from mapping cache (unless `requirementRows` in analysis), unmapped TCs, suggested mappings. **`{{PR_NOTE}}`** from analysis or `build_branch_compare_pr_note()`. Always runs `apply_report_ui_enhancements()` before write (idempotent if called twice).
+The builder fills: Jira readiness block, **quick links** (`build_quick_links()` — Jira, SharePoint test plan, PR(s), **Confluence** via `collect_confluence_page_links()` from confluence cache, test plan cache, Jira remote/wiki text, and any `reports/.cache/{KEY}*.json` including analysis), release score, split test plan metrics, **Linked PR rows** (file counts + **auto Dev tests** from prefetch/mapping), **branch-compare rows** when no PRs, **CI pipeline cards** via `ci_coverage_report_fields()` (re-extracts Sonar/Codecov/pytest-cov; `finalize_ci_coverage()` for branch display), auto traceability rows from mapping cache (unless `requirementRows` in analysis), unmapped TCs, suggested mappings. **`{{PR_NOTE}}`** from analysis or `build_branch_compare_pr_note()`. Always runs `apply_report_ui_enhancements()` before write (idempotent if called twice).
 
 **Manual / agent-refined:** Read [report-template.html](report-template.html) and replace all `{{PLACEHOLDER}}` tokens. New placeholders: `{{CACHE_META}}`, `{{QUICK_LINKS}}`, `{{JIRA_READINESS_BLOCK}}`, `{{RELEASE_SCORE_BLOCK}}`, `{{TESTPLAN_SPLIT_METRICS}}`, `{{UNMAPPED_TC_BLOCK}}`, `{{SUGGESTED_MAPPING_BLOCK}}`.
 
@@ -486,7 +486,7 @@ Never put PR title or dev tests in the CI status column.
 
 **Report UI enhancements (mandatory before write)**
 
-After replacing all placeholders, pass the HTML through **`coverage_report_helpers.apply_report_ui_enhancements(html)`** — idempotent; upgrades legacy tooltip CSS (v1–v4) to **v5**.
+After replacing all placeholders, pass the HTML through **`coverage_report_helpers.apply_report_ui_enhancements(html)`** — idempotent; upgrades legacy tooltip CSS to **v8** and ownership block to **v3**.
 
 The helper adds (idempotent — safe to call on template or post-builder HTML):
 
@@ -495,16 +495,21 @@ The helper adds (idempotent — safe to call on template or post-builder HTML):
   - Jira input readiness panel + each checklist item (AC, PR, test plan, Confluence)
   - Verdict banner, all §1–§8 section h2 headings, summary group titles
   - All Coverage summary metric labels (including **Release readiness score** and CI line/branch)
-  - Test plan note-box, Jira/LADR split metrics, §4 ownership section lead
-  - Table column headers: Linked PR(s) (7 cols), test plan, LADR trace, requirements traceability
-  - Dev vs QA ownership cards, review panels (gaps, unmapped TCs, suggested mappings, correctly implemented)
+  - Test plan note-box, Jira/LADR split metrics, §4 Dev vs QA ownership (section h2, intro callout icon at **end** of paragraph, metric cards)
+  - Table column headers: Linked PR(s) (7 cols), test plan, LADR trace, **requirements traceability** (§5 — **QA scope** and **Evidence** open **left** to avoid table clip)
+  - Review panels (gaps, unmapped TCs, suggested mappings, correctly implemented); LADR block uses `ladr-section-lead` (not `section-lead-with-tip`)
 - **Linked PR table** — body via `render_pr_rows()` / `render_pr_rows_from_prefetch()`; plain `<thead>` upgraded by `inject_pr_table_header_tooltips()`
-- **Tooltip layout fix v5** — `.container` and `.report-section` use `overflow: visible`. Table header tooltips: default columns anchor **left** from the icon; **last two columns** (`th:nth-last-child(-n+2)`, e.g. **Dev tests** and **CI status** in Linked PR(s)) anchor to the **right edge of the `<th>` cell** so long tooltip text is not clipped
+- **Tooltip layout fix v8** — `overflow: visible` on sections/tables. PR/trace **last two columns** open left; metric cards in summary flip **up**; **§4 ownership (v3)** — section title tooltip below header; intro tooltip **below** top-right icon; **Covered by dev tests** / **QA handoff** tooltips **below** icon inside each card (`metric-qa` aligns tooltip **left** so columns do not overlap)
+- **Requirements traceability (§5)** — `trace-section-lead`, `trace-table`, evidence file list + `evidenceNote` when no path match (`inject_trace_section_styles` v2)
 - **Footer attribution** — `Generated by msc-dev-code-and-qa-test-coverage-validator · Developed by Mayur Gunjal` (`REPORT_AGENT_NAME`, `REPORT_DEVELOPER` in `coverage_report_helpers.py`)
 
-Tooltip copy lives in `SUMMARY_METRIC_INFO`, `PR_TABLE_COLUMN_INFO`, `SECTION_HEADER_INFO`, `META_FIELD_INFO`, `READINESS_*_INFO`, etc. in `scripts/coverage_report_helpers.py` — extend those dicts when adding new UI labels; do not duplicate tooltip HTML in reports.
+Tooltip copy lives in `SUMMARY_METRIC_INFO`, `PR_TABLE_COLUMN_INFO`, `SECTION_HEADER_INFO`, `OWNERSHIP_LABEL_INFO`, `TRACE_TABLE_COLUMN_INFO`, etc. in `scripts/coverage_report_helpers.py` — extend those dicts when adding new UI labels; do not duplicate tooltip HTML in reports.
+
+**Quick links:** `build_quick_links()` uses `confluence_requirements.collect_confluence_page_links()` — do not rely only on `confluence.json` `pages[].webUrl`; inferred LADR without a fetched page may still resolve a wiki URL from Jira text or `{KEY}-analysis.json`.
 
 Do **not** hand-roll tooltip CSS in generated reports; always call the helper once before write. Base template `report-template.html` uses `.report-section { overflow: visible; }` — do not revert to `overflow: hidden`.
+
+**Regression tests:** `python -m pytest scripts/test_report_ui_enhancements.py scripts/test_quick_links.py scripts/test_confluence_requirements.py -q`
 
 ```python
 from coverage_report_helpers import apply_report_ui_enhancements, render_pr_rows_from_prefetch

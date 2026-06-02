@@ -341,6 +341,86 @@ def load_confluence_cache(issue_key: str) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _page_dict_to_link(page: dict[str, Any]) -> dict[str, str] | None:
+    """Normalize a Confluence page record to {url, title} for quick links."""
+    url = (page.get("webUrl") or page.get("url") or "").strip()
+    page_id = str(page.get("id") or page.get("pageId") or "").strip()
+    if not url and page_id:
+        url = f"https://wbdstreaming.atlassian.net/wiki/pages/viewpage.action?pageId={page_id}"
+    if not url:
+        return None
+    title = (page.get("title") or page.get("context") or "Confluence").strip() or "Confluence"
+    return {"url": url, "title": title}
+
+
+def collect_confluence_page_links(issue_key: str, root: Path | None = None) -> list[dict[str, str]]:
+    """
+    Collect Confluence wiki URLs for quick navigation and LADR source lines.
+
+    Sources (deduped): confluence cache, test plan cache, Jira cache remote links / text,
+    and any reports/.cache/{KEY}*.json file (e.g. analysis.json with embedded wiki hrefs).
+    """
+    base = root or repo_root()
+    key = issue_key.upper()
+    cache_dir = base / "reports" / ".cache"
+    seen_urls: set[str] = set()
+    links: list[dict[str, str]] = []
+
+    def add(url: str, title: str = "Confluence") -> None:
+        url = url.rstrip(").,]\"\\").strip()
+        if not url or url in seen_urls:
+            return
+        seen_urls.add(url)
+        links.append({"url": url, "title": (title or "Confluence").strip() or "Confluence"})
+
+    conf = load_confluence_cache(key) if (cache_dir / f"{key}-confluence.json").exists() else {}
+    for ref in conf.get("confluenceUrls") or []:
+        if isinstance(ref, dict) and ref.get("url"):
+            add(str(ref["url"]), str(ref.get("title") or ref.get("context") or "Confluence"))
+    for page in conf.get("pages") or []:
+        if isinstance(page, dict):
+            link = _page_dict_to_link(page)
+            if link:
+                add(link["url"], link["title"])
+
+    tp_path = cache_dir / f"{key}-testplan.json"
+    if tp_path.exists():
+        try:
+            tp = json.loads(tp_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            tp = {}
+        for page in (tp.get("confluence") or {}).get("pages") or []:
+            if isinstance(page, dict):
+                link = _page_dict_to_link(page)
+                if link:
+                    add(link["url"], link["title"])
+
+    jira_path = cache_dir / f"{key}-jira.json"
+    jira_data: dict[str, Any] = {}
+    if jira_path.exists():
+        try:
+            jira_data = json.loads(jira_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            jira_data = {}
+    for ref in merge_confluence_url_lists(
+        extract_confluence_urls(collect_jira_texts(jira_data)),
+        extract_confluence_from_jira_links(jira_data),
+    ):
+        add(ref["url"], str(ref.get("title") or ref.get("context") or "Confluence"))
+
+    blob_texts: list[str] = []
+    if cache_dir.is_dir():
+        for path in sorted(cache_dir.glob(f"{key}*.json")):
+            try:
+                blob_texts.append(path.read_text(encoding="utf-8"))
+            except OSError:
+                continue
+    for ref in extract_confluence_urls(blob_texts):
+        add(ref["url"], str(ref.get("title") or ref.get("context") or "Confluence"))
+
+    return links
+
+
 def merge_requirement_sets(
     jira_requirements: list[dict[str, str]],
     ladr_requirements: list[dict[str, str]],

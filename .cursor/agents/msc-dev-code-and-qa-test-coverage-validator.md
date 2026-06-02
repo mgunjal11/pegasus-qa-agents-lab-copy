@@ -46,6 +46,9 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 - **Linked PR(s):** `render_pr_rows_from_prefetch()` — Files, **Dev tests** (from mapping `prs[].devTests` + `diffNames`), CI status
 - **No PR:** `build_branch_compare_pr_note()` + `render_branch_compare_pr_rows()` when `branchCompare` in prefetch
 - **§3 test plan:** `build_testplan_report_fields()` — Evidence, LADR trace, gaps, split Jira/LADR metrics
+- **Quick links:** `collect_confluence_page_links()` — Confluence in header even when LADR is inferred (wiki URL from Jira/analysis caches)
+- **Mapping:** `confidence` high only with `matchedFiles`; `evidenceNote` when keyword-only
+- **UI:** `apply_report_ui_enhancements()` — tooltips **v8**, §4 ownership **v3**, §5 trace **v2**
 - **Verdict:** Fail only when `gap_summary` has **≥1 High** (`[1-9]+ High`), not when text is `0 High · N Med`
 - **Overrides:** `--analysis` JSON for `reqCoveragePct`, `devCoveragePct`, narrative lists, `requirementRows`, `prNote`
 
@@ -57,7 +60,7 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 4. Prefer `build_coverage_report.py` over per-ticket `regen_*.py` scripts.
 5. Do not fabricate evidence or coverage %.
 6. HTML → `reports/<KEY>-<MM-DD-YYYY-HH-MM-SS>-<TZ>.html`; save `lastReportFile` in manifest.
-7. `apply_report_ui_enhancements(html)` before write (tooltips v5, footer attribution).
+7. `apply_report_ui_enhancements(html)` before write (tooltips v8, ownership v3, footer attribution).
 8. No Jira/GitHub comments unless `--post-jira`.
 
 ## Jira template

@@ -14,7 +14,7 @@ Validate the Jira issue in `$ARGUMENTS` against linked GitHub PR(s) and attached
 8. **Report** — prefer generic builder: `python scripts/build_coverage_report.py {KEY}` (caches + mapping; auto **CI** `{{CI_*}}` placeholders; auto **Dev tests** in Linked PR table; `apply_report_ui_enhancements()`). Refine via `--analysis` JSON if needed.
 9. **Never** issue multiple separate `gh` calls when a script or cache can be used.
 10. Follow skill `.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/SKILL.md` completely (dev/QA sections, test plan validation, LADR traceability, Jira readiness block, HTML report).
-11. **Report UI** — `apply_report_ui_enhancements()` in `scripts/coverage_report_helpers.py` adds info-icon tooltips on **all** report labels (header, readiness, release score, summary metrics, tables, review panels); tooltip layout v5; footer — Developed by Mayur Gunjal. Builder already calls this — do not skip on manual HTML edits.
+11. **Report UI** — `apply_report_ui_enhancements()` adds info-icon tooltips (layout **v8**, §4 ownership **v3**, §5 trace **v2**); **quick links** include Confluence via `collect_confluence_page_links()` (all `{KEY}*.json` caches). Builder calls this — do not skip on manual HTML edits.
 
 If PR URL is unknown, use manifest/repo from defaults; search once via prefetch script, not repeated gh calls.
 

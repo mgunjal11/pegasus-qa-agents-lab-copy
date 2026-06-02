@@ -123,15 +123,22 @@ def render_ladr_traceability_block(testplan_cache: dict[str, Any]) -> str:
     cov = testplan_cache.get("coverage") or {}
     ladr_total = cov.get("ladrRequirementCount") or len(traceability)
     ladr_covered = cov.get("ladrRequirementsCovered") or sum(1 for r in traceability if r.get("mapped"))
-    confluence = testplan_cache.get("confluence") or {}
-    pages = confluence.get("pages") or []
+    from confluence_requirements import collect_confluence_page_links
+
+    issue_key = str(testplan_cache.get("issueKey") or "")
     page_links = []
-    for page in pages:
-        url = page.get("webUrl") or ""
-        title = page.get("title") or page.get("pageId") or "Confluence"
-        if url:
-            page_links.append(f'<a href="{esc(url)}" target="_blank">{esc(title)}</a>')
-    source_line = " · ".join(page_links) if page_links else "Confluence LADR (linked from Jira)"
+    for page in collect_confluence_page_links(issue_key) if issue_key else []:
+        page_links.append(
+            f'<a href="{esc(page["url"])}" target="_blank">{esc(page["title"])}</a>'
+        )
+    if not page_links:
+        confluence = testplan_cache.get("confluence") or {}
+        for page in confluence.get("pages") or []:
+            url = page.get("webUrl") or page.get("url") or ""
+            title = page.get("title") or page.get("pageId") or "Confluence"
+            if url:
+                page_links.append(f'<a href="{esc(url)}" target="_blank">{esc(title)}</a>')
+    source_line = " · ".join(page_links) if page_links else "Confluence LADR (inferred — no wiki URL in cache)"
     lead = (
         f"{ladr_covered}/{ladr_total} LADR requirements mapped to test cases in the attached Excel plan. "
         f"Source: {source_line}."
@@ -139,7 +146,7 @@ def render_ladr_traceability_block(testplan_cache: dict[str, Any]) -> str:
     return (
         '<div class="review-panel review-info ladr-trace-block" style="margin-bottom:1rem;">'
         "<h3>LADR ↔ test plan traceability</h3>"
-        f'<p class="section-lead">{lead}</p>'
+        f'<p class="ladr-section-lead">{lead}</p>'
         '<div class="table-wrap">'
         '<table class="ladr-trace-table">'
         "<thead>"
@@ -397,6 +404,8 @@ def build_cache_meta_line(issue_key: str, root: Path | None = None) -> str:
 
 
 def build_quick_links(issue_key: str, root: Path | None = None) -> str:
+    from confluence_requirements import collect_confluence_page_links
+
     jira = load_jira_cache(issue_key, root)
     prefetch = load_prefetch_cache(issue_key, root)
     links = [
@@ -412,13 +421,12 @@ def build_quick_links(issue_key: str, root: Path | None = None) -> str:
         n = pr.get("number")
         if u:
             links.append(f'<a href="{esc(u)}" target="_blank">PR #{n}</a>')
-    conf_path = (root or Path(__file__).resolve().parents[1]) / "reports" / ".cache" / f"{issue_key.upper()}-confluence.json"
-    if conf_path.exists():
-        conf = json.loads(conf_path.read_text(encoding="utf-8"))
-        for page in conf.get("pages") or []:
-            if page.get("webUrl"):
-                links.append(f'<a href="{esc(page["webUrl"])}" target="_blank">Confluence</a>')
-                break
+    conf_pages = collect_confluence_page_links(issue_key, root)
+    for i, page in enumerate(conf_pages):
+        label = page["title"] if len(conf_pages) > 1 else "Confluence"
+        if len(label) > 48:
+            label = label[:45] + "…"
+        links.append(f'<a href="{esc(page["url"])}" target="_blank">{esc(label)}</a>')
     return '<div class="quick-links">' + " · ".join(links) + "</div>" if links else ""
 
 
@@ -434,13 +442,50 @@ def _badge_for_status(status: str, kind: str = "code") -> str:
     return f'<span class="badge {cls}">{esc(label)}</span>'
 
 
+def _render_trace_evidence_cell(
+    matched_files: list[str],
+    confidence: str,
+    evidence_note: str = "",
+) -> str:
+    """Evidence column: file list (not truncated) + mapping confidence."""
+    conf = confidence or "low"
+    files = [f for f in (matched_files or []) if f]
+    if not files:
+        note = (evidence_note or "").strip()
+        body = (
+            f'<p class="evidence-note">{esc(note)}</p>'
+            if note
+            else '<span class="evidence-empty">—</span>'
+        )
+        return (
+            f'<td class="evidence-cell">'
+            f"{body} "
+            f'<span class="conf-badge" title="Mapping confidence for cited evidence">'
+            f"{esc(conf)}</span></td>"
+        )
+    shown = files[:6]
+    items = "".join(f"<li><code>{esc(f)}</code></li>" for f in shown)
+    extra = ""
+    if len(files) > 6:
+        extra = f'<li class="evidence-more">+{len(files) - 6} more file(s)</li>'
+    return (
+        f'<td class="evidence-cell">'
+        f'<ul class="evidence-list">{items}{extra}</ul>'
+        f'<span class="conf-badge">{esc(conf)}</span></td>'
+    )
+
+
 def render_requirement_rows_from_mapping(issue_key: str, root: Path | None = None) -> str:
     mapping = load_mapping_cache(issue_key, root)
     rows = []
     for req in mapping.get("requirements") or []:
         rid = req.get("id", "")
-        files = ", ".join(req.get("matchedFiles") or [])[:200] or "—"
         conf = req.get("confidence", "low")
+        evidence = _render_trace_evidence_cell(
+            req.get("matchedFiles") or [],
+            conf,
+            str(req.get("evidenceNote") or ""),
+        )
         rows.append(
             f"<tr>"
             f"<td>{esc(rid)}</td>"
@@ -449,7 +494,7 @@ def render_requirement_rows_from_mapping(issue_key: str, root: Path | None = Non
             f"<td>{_badge_for_status(req.get('devTestStatus', 'missing'), 'dev')}</td>"
             f'<td><span class="badge badge-dev">{esc(str(req.get("owner", "shared")).title())}</span></td>'
             f'<td><span class="badge badge-e2e">{esc(str(req.get("qaScope", "e2e")).title())}</span></td>'
-            f'<td><code>{esc(files)}</code> <span class="conf-badge">{esc(conf)}</span></td>'
+            f"{evidence}"
             f"</tr>"
         )
     return "\n".join(rows) if rows else '<tr><td colspan="7">—</td></tr>'
@@ -1089,19 +1134,31 @@ METRIC_INFO_CSS = """
       position: static;
     }
     th:nth-last-child(2) .metric-info-tip {
-      position: static;
+      position: relative;
     }
     th:nth-last-child(2) .metric-info-tooltip {
       left: auto;
-      right: 0;
-      transform: none;
+      right: calc(100% + 10px);
+      top: 50%;
+      bottom: auto;
+      transform: translateY(-50%);
+    }
+    th:last-child .metric-info-tip {
+      position: relative;
+    }
+    th:last-child .metric-info-tooltip {
+      left: auto;
+      right: calc(100% + 10px);
+      top: 50%;
+      bottom: auto;
+      transform: translateY(-50%);
     }
     .metric-info-tip:hover .metric-info-tooltip,
     .metric-info-tip:focus .metric-info-tooltip,
     .metric-info-tip:focus-within .metric-info-tooltip { visibility: visible; opacity: 1; }
 """
 
-TOOLTIP_LAYOUT_FIX_MARKER = "/* tooltip layout fix v5 — prevent clipping in panels and sections */"
+TOOLTIP_LAYOUT_FIX_MARKER = "/* tooltip layout fix v8 — prevent clipping in panels and sections */"
 
 TOOLTIP_LAYOUT_FIX_CSS = """
     """ + TOOLTIP_LAYOUT_FIX_MARKER + """
@@ -1137,7 +1194,7 @@ TOOLTIP_LAYOUT_FIX_CSS = """
       position: static !important;
     }
     th:nth-last-child(-n+2) .metric-info-tip {
-      position: static !important;
+      position: relative !important;
     }
     th:nth-last-child(-n+2):has(.metric-info-tip:hover),
     th:nth-last-child(-n+2):has(.metric-info-tip:focus-within),
@@ -1182,13 +1239,285 @@ TOOLTIP_LAYOUT_FIX_CSS = """
       right: 0 !important;
       transform: none !important;
     }
+    /* Last two columns (e.g. QA scope + Evidence): open tooltip to the left — avoids table overflow clip */
+    th:last-child .metric-info-tooltip,
+    th:nth-last-child(2) .metric-info-tooltip {
+      top: 50% !important;
+      bottom: auto !important;
+      left: auto !important;
+      right: calc(100% + 10px) !important;
+      transform: translateY(-50%) !important;
+      max-width: min(320px, calc(100vw - 2rem)) !important;
+      width: min(320px, calc(100vw - 2rem)) !important;
+    }
+    th:last-child .metric-info-tip:hover,
+    th:nth-last-child(2) .metric-info-tip:hover,
+    th:last-child .metric-info-tip:focus-within,
+    th:nth-last-child(2) .metric-info-tip:focus-within {
+      z-index: 350 !important;
+    }
+    .section-testplan .table-wrap,
+    .section-trace .table-wrap {
+      overflow-x: auto !important;
+      overflow-y: visible !important;
+      padding-top: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .section-testplan table,
+    .section-trace table.trace-table,
+    .section-trace .table-wrap > table {
+      overflow: visible !important;
+    }
+    .section-trace thead,
+    .section-testplan thead {
+      position: relative;
+      z-index: 2;
+    }
+    .section-trace .section-head h2,
+    .section-trace .section-head .heading-label-row {
+      color: #fff !important;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    }
+    /* Ownership + summary metric cards: flip label-row tooltips up (avoids list/content overlap) */
+    .metric-card,
+    .metric-grid,
+    .section-ownership .section-body {
+      overflow: visible !important;
+    }
+    .metric-card .label-row {
+      position: relative;
+      z-index: 1;
+    }
+    .metric-card .label-row .metric-info-tip {
+      position: relative !important;
+      flex-shrink: 0;
+    }
+    .metric-card .label-row .metric-info-tooltip {
+      top: auto !important;
+      bottom: calc(100% + 8px) !important;
+      left: auto !important;
+      right: 0 !important;
+      transform: none !important;
+      width: min(300px, calc(100vw - 2rem)) !important;
+      max-width: 300px !important;
+    }
+    .metric-card .label-row .metric-info-tip:hover,
+    .metric-card .label-row .metric-info-tip:focus-within {
+      z-index: 400 !important;
+    }
+    /* §4 ownership: open below icon (v3 block adds column alignment + isolation) */
+    .section-ownership .metric-card .label-row .metric-info-tooltip {
+      top: calc(100% + 8px) !important;
+      bottom: auto !important;
+      transform: none !important;
+    }
 """
+
+OWNERSHIP_TOOLTIP_CSS_MARKER = "/* ownership section tooltips v3 */"
+
+OWNERSHIP_TOOLTIP_CSS = """
+    """ + OWNERSHIP_TOOLTIP_CSS_MARKER + """
+    .section-ownership,
+    .section-ownership .section-head,
+    .section-ownership .section-body,
+    .section-ownership .metric-grid,
+    .section-ownership .metric-card {
+      overflow: visible !important;
+    }
+    .section-ownership .section-head {
+      position: relative;
+      z-index: 5;
+    }
+    .section-ownership .section-head:has(.metric-info-tip:hover),
+    .section-ownership .section-head:has(.metric-info-tip:focus-within) {
+      z-index: 500 !important;
+    }
+    .section-ownership .section-head .heading-label-row .metric-info-tooltip {
+      top: calc(100% + 8px) !important;
+      bottom: auto !important;
+      left: auto !important;
+      right: 0 !important;
+      transform: none !important;
+      z-index: 501 !important;
+      width: min(300px, calc(100vw - 2rem)) !important;
+      max-width: 300px !important;
+    }
+    .section-ownership .section-body {
+      position: relative;
+      z-index: 1;
+    }
+    .section-ownership .section-lead-with-tip {
+      display: block !important;
+      position: relative;
+      overflow: visible !important;
+      padding-right: 2.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .section-ownership .section-lead-with-tip .metric-info-tip {
+      position: absolute;
+      top: 0.65rem;
+      right: 0.75rem;
+      margin: 0;
+    }
+    .section-ownership .section-lead-with-tip .metric-info-tooltip {
+      top: calc(100% + 8px) !important;
+      bottom: auto !important;
+      left: auto !important;
+      right: 0 !important;
+      transform: none !important;
+      width: min(300px, calc(100vw - 2rem)) !important;
+      max-width: 300px !important;
+      z-index: 400 !important;
+    }
+    .section-ownership .section-lead-with-tip .metric-info-tip:hover,
+    .section-ownership .section-lead-with-tip .metric-info-tip:focus-within {
+      z-index: 450 !important;
+    }
+    .section-ownership .metric-grid {
+      padding-top: 0.25rem;
+      position: relative;
+      align-items: start;
+    }
+    .section-ownership .metric-card {
+      position: relative;
+      isolation: isolate;
+    }
+    .section-ownership .metric-card:has(.label-row .metric-info-tip:hover),
+    .section-ownership .metric-card:has(.label-row .metric-info-tip:focus-within) {
+      z-index: 40 !important;
+    }
+    .section-ownership .metric-card .label-row {
+      position: relative;
+      z-index: 2;
+      overflow: visible !important;
+    }
+    .section-ownership .metric-card .label-row .metric-info-tip {
+      position: relative !important;
+      z-index: 3;
+    }
+    /* Open below icon inside card — avoids overlapping banner / sibling column */
+    .section-ownership .metric-card .label-row .metric-info-tooltip {
+      top: calc(100% + 8px) !important;
+      bottom: auto !important;
+      left: auto !important;
+      right: 0 !important;
+      transform: none !important;
+      width: min(280px, calc(100vw - 2rem)) !important;
+      max-width: 280px !important;
+      z-index: 50 !important;
+    }
+    .section-ownership .metric-card.metric-qa .label-row .metric-info-tooltip {
+      left: 0 !important;
+      right: auto !important;
+    }
+    .section-ownership .metric-card .label-row .metric-info-tip:hover,
+    .section-ownership .metric-card .label-row .metric-info-tip:focus-within {
+      z-index: 50 !important;
+    }
+    .ladr-section-lead {
+      color: #475569;
+      font-size: 0.875rem;
+      margin: 0 0 0.75rem;
+      line-height: 1.45;
+    }
+"""
+
+OWNERSHIP_TOOLTIP_CSS_BLOCK_RE = re.compile(
+    r"\s*/\* ownership section tooltips v\d+ \*/[\s\S]*?"
+    r"(?=\n\s*(?:/\* trace section visibility|\s*</style>))",
+    re.MULTILINE,
+)
 
 TOOLTIP_LAYOUT_FIX_BLOCK_RE = re.compile(
     r"\s*/\* tooltip layout fix(?: v\d+)? — prevent clipping in panels and sections \*/[\s\S]*?"
     r"(?=\n\s*</style>)",
     re.MULTILINE,
 )
+
+TRACE_SECTION_CSS_MARKER = "/* trace section visibility v2 */"
+
+TRACE_SECTION_CSS = """
+    """ + TRACE_SECTION_CSS_MARKER + """
+    .section-trace { border: 2px solid #8b5cf6 !important; }
+    .section-trace .section-head { background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%) !important; }
+    .section-trace .section-head h2,
+    .section-trace .section-head .heading-label-row { color: #fff !important; text-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+    .section-trace .section-body {
+      padding: 1.25rem 1.5rem 1.5rem !important;
+      background: linear-gradient(180deg, #faf5ff 0%, #fff 100%) !important;
+    }
+    .section-trace .trace-section-lead {
+      color: #4c1d95;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+      padding: 0.65rem 0.9rem;
+      background: #ede9fe;
+      border-left: 3px solid #7c3aed;
+      border-radius: 0 6px 6px 0;
+      line-height: 1.5;
+    }
+    .section-trace .table-wrap {
+      padding: 0.5rem 0 0 !important;
+      overflow-y: visible !important;
+      margin-bottom: 1rem;
+    }
+    .section-trace table.trace-table,
+    .section-trace .table-wrap > table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      border: 1px solid #c4b5fd;
+      border-radius: 8px;
+      overflow: visible;
+      font-size: 0.9rem;
+      background: #fff;
+    }
+    .section-trace table th {
+      background: #ede9fe !important;
+      color: #4c1d95 !important;
+      font-weight: 700;
+      padding: 0.7rem 0.75rem !important;
+      border-bottom: 2px solid #c4b5fd !important;
+    }
+    .section-trace table td {
+      color: #1e293b !important;
+      vertical-align: top;
+      padding: 0.7rem 0.75rem !important;
+      border-bottom: 1px solid #ede9fe !important;
+      line-height: 1.45;
+    }
+    .section-trace tbody tr:nth-child(even) td { background: #faf5ff; }
+    .section-trace tbody tr:hover td { background: #f5f3ff; }
+    .section-trace td:first-child { font-weight: 700; color: #6d28d9 !important; white-space: nowrap; }
+    .section-trace td:nth-child(2) { min-width: 200px; max-width: 340px; }
+    .section-trace td.evidence-cell { min-width: 180px; max-width: 320px; }
+    .section-trace .evidence-list {
+      margin: 0.25rem 0 0.35rem;
+      padding-left: 1.15rem;
+      font-size: 0.8rem;
+      list-style: disc;
+    }
+    .section-trace .evidence-list code {
+      font-size: 0.78rem;
+      word-break: break-word;
+      white-space: normal;
+      background: #f1f5f9;
+      padding: 0.1rem 0.25rem;
+      border-radius: 3px;
+    }
+    .section-trace .evidence-empty { color: #94a3b8; }
+    .section-trace .evidence-note {
+      font-size: 0.78rem;
+      color: #475569;
+      margin: 0 0 0.35rem;
+      line-height: 1.4;
+    }
+    .section-trace .conf-badge {
+      font-size: 0.72rem;
+      color: #64748b;
+      font-style: italic;
+    }
+"""
 
 PR_TABLE_INFO_CSS = """
     .section-pr th .th-label-row,
@@ -1311,7 +1640,10 @@ TRACE_TABLE_COLUMN_INFO: dict[str, str] = {
     "Dev tests": "Whether unit or integration tests in the PR cover this requirement.",
     "Owner": "Who owns verification: Dev, Shared (dev + QA), or QA.",
     "QA scope": "Type of QA verification still needed, if any (E2E, Manual, Regression, etc.).",
-    "Evidence": "File paths, test names, or test plan references supporting the assessment.",
+    "Evidence": (
+        "Changed file paths (or commit message) supporting the code/dev-test assessment. "
+        "Confidence: high = matched files; medium/low = keyword-only in diff/commits with no path hit."
+    ),
 }
 
 OWNERSHIP_LABEL_INFO: dict[str, str] = {
@@ -1574,7 +1906,7 @@ def inject_readiness_block_tooltips(html: str) -> str:
 
 
 def inject_note_box_tooltip(html: str) -> str:
-    if "note-box-with-tip" in html:
+    if 'aria-label="About Test plan source"' in html:
         return html
     plain = '<div class="note-box">'
     if plain not in html:
@@ -1603,14 +1935,81 @@ def inject_split_metric_tooltips(html: str) -> str:
     return html
 
 
+def _normalize_ladr_section_lead(html: str) -> str:
+    """LADR block in §3 must not use section-lead (reserved for §4 ownership intro)."""
+    html = re.sub(
+        r'(<div class="review-panel review-info ladr-trace-block"[\s\S]*?<h3>[^<]*</h3>\s*)'
+        r'<p class="section-lead section-lead-with-tip">'
+        r'<span class="metric-info-tip" tabindex="0" role="button" aria-label="About Dev vs QA ownership">'
+        r'<span class="metric-info-icon" aria-hidden="true">i</span>'
+        r'<span class="metric-info-tooltip">[^<]*</span></span>\s*',
+        r'\1<p class="ladr-section-lead">',
+        html,
+        count=1,
+    )
+    return re.sub(
+        r'(<div class="review-panel review-info ladr-trace-block"[\s\S]*?<h3>[^<]*</h3>\s*)'
+        r'<p class="section-lead">',
+        r'\1<p class="ladr-section-lead">',
+        html,
+        count=1,
+    )
+
+
+def _normalize_ownership_section_lead_icon(html: str) -> str:
+    """Move §4 lead info icon to end of callout (v1 injected it at the start)."""
+    icon = metric_info_icon_html("Dev vs QA ownership", SECTION_LEAD_INFO)
+    lead_tip_re = (
+        r'<span class="metric-info-tip" tabindex="0" role="button" '
+        r'aria-label="About Dev vs QA ownership">'
+        r'<span class="metric-info-icon" aria-hidden="true">i</span>'
+        r'<span class="metric-info-tooltip">[^<]*</span></span>'
+    )
+    pattern = (
+        r'(<section class="report-section section-ownership">[\s\S]*?)'
+        r'<p class="section-lead section-lead-with-tip">\s*'
+        + lead_tip_re
+        + r'\s*([\s\S]*?)</p>'
+    )
+
+    def _repl(m: re.Match[str]) -> str:
+        body = re.sub(r"\s+", " ", m.group(2).strip())
+        return f'{m.group(1)}<p class="section-lead section-lead-with-tip">{body} {icon}</p>'
+
+    return re.sub(pattern, _repl, html, count=1, flags=re.DOTALL)
+
+
 def inject_section_lead_tooltip(html: str) -> str:
-    if "section-lead-with-tip" in html:
-        return html
-    plain = '<p class="section-lead">'
-    if plain not in html:
+    """Tooltip on §4 ownership intro only (not LADR lead in §3)."""
+    html = _normalize_ownership_section_lead_icon(html)
+    if re.search(
+        r'<section class="report-section section-ownership">[\s\S]*?'
+        r'<p class="section-lead section-lead-with-tip">',
+        html,
+    ):
         return html
     icon = metric_info_icon_html("Dev vs QA ownership", SECTION_LEAD_INFO)
-    return html.replace(plain, f'<p class="section-lead section-lead-with-tip">{icon} ', 1)
+    pattern = (
+        r'(<section class="report-section section-ownership">[\s\S]*?)'
+        r'<p class="section-lead">([\s\S]*?)</p>'
+    )
+    if not re.search(pattern, html, flags=re.DOTALL):
+        return html
+    return re.sub(
+        pattern,
+        rf'\1<p class="section-lead section-lead-with-tip">\2 {icon}</p>',
+        html,
+        count=1,
+        flags=re.DOTALL,
+    )
+
+
+def inject_ownership_tooltip_styles(html: str) -> str:
+    """§4 Dev vs QA ownership tooltip layout (idempotent; upgrades v1 → v2)."""
+    if OWNERSHIP_TOOLTIP_CSS_MARKER in html:
+        return html
+    html = OWNERSHIP_TOOLTIP_CSS_BLOCK_RE.sub("", html)
+    return html.replace("</style>", OWNERSHIP_TOOLTIP_CSS + "\n  </style>", 1)
 
 
 def inject_all_metric_label_tooltips(html: str) -> str:
@@ -1634,6 +2033,44 @@ def _strip_legacy_tooltip_layout_fix(html: str) -> str:
         count=1,
         flags=re.DOTALL,
     )
+
+
+TRACE_SECTION_CSS_BLOCK_RE = re.compile(
+    r"\s*/\* trace section visibility v\d+ \*/[\s\S]*?"
+    r"(?=\n\s*(?:/\* tooltip layout fix|\s*</style>))",
+    re.MULTILINE,
+)
+
+
+def inject_trace_section_styles(html: str) -> str:
+    """Stronger §5 Requirements traceability layout (idempotent; upgrades v1 → v2)."""
+    if TRACE_SECTION_CSS_MARKER in html:
+        return html
+    html = TRACE_SECTION_CSS_BLOCK_RE.sub("", html)
+    return html.replace("</style>", TRACE_SECTION_CSS + "\n  </style>", 1)
+
+
+def inject_trace_section_markup(html: str) -> str:
+    """Add section lead and trace-table class when template is legacy."""
+    if "trace-section-lead" not in html and 'class="report-section section-trace"' in html:
+        html = re.sub(
+            r'(<section class="report-section section-trace">.*?<div class="section-body">)\s*'
+            r'(<div class="table-wrap">)',
+            r'\1\n        <p class="trace-section-lead">Per-requirement mapping from Jira acceptance criteria '
+            r"to branch/PR code, dev tests, ownership, and file-level evidence.</p>\n        \2",
+            html,
+            count=1,
+            flags=re.DOTALL,
+        )
+    if 'class="trace-table"' not in html:
+        html = re.sub(
+            r'(<section class="report-section section-trace">.*?<div class="table-wrap">\s*)<table>',
+            r'\1<table class="trace-table">',
+            html,
+            count=1,
+            flags=re.DOTALL,
+        )
+    return html
 
 
 def inject_tooltip_layout_fix(html: str) -> str:
@@ -1690,9 +2127,13 @@ def apply_report_ui_enhancements(html: str) -> str:
     html = inject_testplan_table_header_tooltips(html)
     html = inject_note_box_tooltip(html)
     html = inject_split_metric_tooltips(html)
+    html = _normalize_ladr_section_lead(html)
     html = inject_section_lead_tooltip(html)
+    html = inject_ownership_tooltip_styles(html)
     html = inject_review_panel_tooltips(html)
     html = inject_trace_table_header_tooltips(html)
+    html = inject_trace_section_styles(html)
+    html = inject_trace_section_markup(html)
     html = inject_report_footer(html)
     return html
 

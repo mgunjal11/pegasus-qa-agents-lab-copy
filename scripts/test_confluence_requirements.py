@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from confluence_requirements import (  # noqa: E402
     build_ladr_traceability,
+    collect_confluence_page_links,
     compute_testplan_coverage,
     map_testcases_to_requirements,
     merge_requirement_sets,
@@ -73,6 +74,24 @@ def test_map_caption_monitoring_scenarios():
     trace = build_ladr_traceability(cases, ladr)
     assert trace
     assert any(r["id"] == "L1" and r["mapped"] for r in trace)
+
+
+def test_collect_confluence_page_links_from_issue_caches():
+    """MSC-204417 analysis cache embeds LADR wiki URL even when confluence.json has no pages."""
+    links = collect_confluence_page_links("MSC-204417")
+    assert links
+    assert any("2984378410" in link["url"] for link in links)
+    assert any(
+        "LADR" in link["title"] or "Captions" in link["title"] or "2984378410" in link["url"]
+        for link in links
+    )
+
+
+def test_collect_confluence_page_links_dedupes():
+    links = collect_confluence_page_links("MSC-205625")
+    urls = [link["url"] for link in links]
+    assert urls
+    assert len(urls) == len(set(urls))
 
 
 if __name__ == "__main__":

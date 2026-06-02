@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import re
+
 from coverage_report_helpers import (
     SECTION_HEADER_INFO,
     TESTPLAN_TABLE_COLUMN_INFO,
@@ -71,6 +73,8 @@ def test_apply_report_ui_enhancements_covers_all_sections():
     assert "About Release readiness score" in out
     assert "About Test plan source" in out
     assert "About Dev vs QA ownership" in out
+    assert "ownership section tooltips v3" in out
+    assert "section-ownership" in out and "section-lead-with-tip" in out
     assert "About Unmapped test cases" in out
     assert "About Coverage summary" in out
     assert "About Linked PR(s)" not in out or "section-pr" in out
@@ -79,7 +83,8 @@ def test_apply_report_ui_enhancements_covers_all_sections():
     assert "About ID" in out
     assert "About QA handoff" in out
     assert "About Test plan gaps" in out
-    assert "tooltip layout fix v5" in out
+    assert "tooltip layout fix v8" in out
+    assert "right: calc(100% + 10px)" in out
     assert "section-head .heading-label-row .metric-info-tooltip" in out
     assert "th:nth-last-child(2) .metric-info-tooltip" in out
     twice = apply_report_ui_enhancements(out)
@@ -119,7 +124,8 @@ def test_tooltip_layout_fix_upgrades_legacy_css():
         1,
     )
     out = apply_report_ui_enhancements(legacy)
-    assert "tooltip layout fix v5" in out
+    assert "tooltip layout fix v8" in out
+    assert "right: calc(100% + 10px)" in out
     assert "th .metric-info-tooltip { left: 50%" not in out.replace(" ", "")
     assert "th:nth-last-child(2) .metric-info-tooltip" in out
     assert "section-head .heading-label-row .metric-info-tooltip" in out
@@ -135,9 +141,57 @@ def test_tooltip_layout_fix_upgrades_v2_css():
         1,
     )
     out = apply_report_ui_enhancements(v2)
-    assert "tooltip layout fix v5" in out
+    assert "tooltip layout fix v8" in out
+    assert "right: calc(100% + 10px)" in out
     assert "tooltip layout fix v2" not in out
     assert "th:nth-last-child(2) .metric-info-tooltip" in out
+
+
+def test_ownership_section_tooltip_layout():
+    """§4 tooltips: header/lead/cards open below icon; QA card aligns tooltip left."""
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    assert "ownership section tooltips v3" in out
+    assert ".section-ownership .section-head:has(.metric-info-tip:hover)" in out
+    assert ".section-ownership .metric-card.metric-qa .label-row .metric-info-tooltip" in out
+    block = out.split("ownership section tooltips v3")[1].split("/* trace section visibility")[0]
+    assert ".section-ownership .metric-card .label-row .metric-info-tooltip" in block
+    assert "top: calc(100% + 8px)" in block
+    assert "bottom: calc(100% + 8px)" not in block
+    assert "isolation: isolate" in block
+    # Lead icon at end of paragraph, not before body text
+    m = re.search(
+        r'<section class="report-section section-ownership">[\s\S]*?'
+        r'<p class="section-lead section-lead-with-tip">([\s\S]*?)</p>',
+        out,
+    )
+    assert m is not None
+    assert m.group(1).strip().endswith('</span>')
+    assert 'aria-label="About Dev vs QA ownership"' in m.group(1)
+    upgraded = apply_report_ui_enhancements(
+        MINIMAL_REPORT.replace(
+            "</style>",
+            """
+    /* ownership section tooltips v2 */
+    .section-ownership .metric-card .label-row .metric-info-tooltip {
+      bottom: calc(100% + 8px) !important;
+    }
+  </style>""",
+            1,
+        ).replace(
+            '<p class="section-lead">Dev-owned items',
+            '<p class="section-lead section-lead-with-tip">'
+            '<span class="metric-info-tip" tabindex="0" role="button" '
+            'aria-label="About Dev vs QA ownership">'
+            '<span class="metric-info-icon" aria-hidden="true">i</span>'
+            '<span class="metric-info-tooltip">old</span></span> Dev-owned items',
+            1,
+        )
+    )
+    assert "ownership section tooltips v3" in upgraded
+    assert "ownership section tooltips v2" not in upgraded
+    assert "bottom: calc(100% + 8px)" not in upgraded.split("ownership section tooltips v3")[1].split(
+        "/* trace section visibility"
+    )[0]
 
 
 def test_pr_table_dev_tests_tooltip_right_aligned_to_th():

@@ -21,6 +21,8 @@ python scripts/fetch_jira_testplan.py {ISSUE-KEY} --from-jira-cache
 
 Cache: `reports/.cache/{KEY}-confluence.json`
 
+**Quick links (report header):** `build_quick_links()` calls `collect_confluence_page_links()` — sources include `confluence.json` (`pages`, `confluenceUrls`), `testplan.json` → `confluence.pages`, Jira `remoteLinks`/description/comments, and wiki URLs embedded in any `reports/.cache/{KEY}*.json` (e.g. `{KEY}-analysis.json`). Do not omit Confluence when LADR requirements exist but `pages` is empty (inferred ESS table).
+
 ### Atlassian MCP (agent)
 
 When REST credentials are unavailable or for freshest content, call in parallel with Jira:

@@ -38,6 +38,56 @@ def _tokens(text: str, min_len: int = 4) -> list[str]:
     return [t.lower() for t in re.split(r"\W+", text) if len(t) >= min_len]
 
 
+def _path_tokens(text: str) -> list[str]:
+    """Tokens for matching requirement text to file paths (includes short domain terms)."""
+    tokens = list(dict.fromkeys(_tokens(text, min_len=4)))
+    low = text.lower()
+    for term in (
+        "ess",
+        "v2",
+        "caption",
+        "kafka",
+        "spotlight",
+        "disco",
+        "status",
+        "error",
+        "failure",
+        "constant",
+        "enum",
+        "passport",
+        "pick",
+        "genie",
+    ):
+        if term in low and term not in tokens:
+            tokens.append(term)
+    return tokens
+
+
+def _evidence_confidence(combined: float, code_score: float, matched_files: list[str]) -> str:
+    """Confidence for Evidence column — requires file/commit pointers when marking high."""
+    if matched_files:
+        return _confidence(combined)
+    if code_score >= 0.35:
+        return "medium"
+    if code_score >= 0.15:
+        return "low"
+    return "low"
+
+
+def _commit_evidence_note(
+    req_tokens: list[str],
+    commits: list[dict[str, Any]],
+) -> str:
+    for commit in commits:
+        msg = str(commit.get("message") or "")
+        if _overlap_score(req_tokens, msg) >= 0.25:
+            sha = str(commit.get("sha") or "")[:7]
+            author = commit.get("author") or ""
+            prefix = f"Commit {sha}" + (f" ({author})" if author else "")
+            return f"{prefix}: {msg.strip()}"
+    return ""
+
+
 def _overlap_score(req_tokens: list[str], haystack: str) -> float:
     if not req_tokens:
         return 0.0
@@ -208,9 +258,20 @@ def map_requirements(
                 1.0 if dev_status == "covered" else 0.5 if dev_status == "partial" else 0.0
             )
 
+        path_tokens = _path_tokens(text)
         matched_files = [
-            f for f in prod_files + test_files if any(t in f.lower() for t in req_tokens[:8])
+            f for f in prod_files + test_files if any(t in f.lower() for t in path_tokens)
         ][:5]
+
+        evidence_note = ""
+        if not matched_files and code_score >= 0.2:
+            bc_commits = (prefetch.get("branchCompare") or {}).get("commits") or []
+            evidence_note = _commit_evidence_note(req_tokens, bc_commits)
+            if not evidence_note:
+                evidence_note = (
+                    "Keyword overlap in branch diff/commits only — "
+                    "no changed file path matched requirement terms"
+                )
 
         mapped_reqs.append(
             {
@@ -222,8 +283,9 @@ def map_requirements(
                 "devTestScore": round(test_score, 3),
                 "owner": "qa" if is_qa_only else ("dev" if dev_status == "covered" else "shared"),
                 "qaScope": "manual" if is_qa_only else ("e2e" if dev_status != "covered" else "none"),
-                "confidence": _confidence(combined),
+                "confidence": _evidence_confidence(combined, code_score, matched_files),
                 "matchedFiles": matched_files,
+                "evidenceNote": evidence_note,
                 "suggestedTestCases": [],
             }
         )
