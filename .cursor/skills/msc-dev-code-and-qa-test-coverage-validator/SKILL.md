@@ -426,7 +426,7 @@ Optional narrative overrides: `python scripts/build_coverage_report.py {ISSUE-KE
 
 Analysis JSON keys (optional): `verdict`, `verdictClass`, `verdictRationale`, `reqCoveragePct`, `reqCoverageDetail`, `devCoveragePct`, `devCoverageDetail`, `qaScopeSummary`, `openGapsSummary`, `openGapsClass`, `openGapsDetail`, `gapsList`, `devCoveredList`, `qaHandoffList`, `correctlyImplementedList`, `assumptionsList`, `actionsList`, `requirementRows`, `prNote`, `storyTitle`.
 
-The builder fills: Jira readiness block, **quick links** (`build_quick_links()` — Jira, SharePoint test plan, PR(s), **Confluence** via `collect_confluence_page_links()` from confluence cache, test plan cache, Jira remote/wiki text, and any `reports/.cache/{KEY}*.json` including analysis), release score, split test plan metrics, **Linked PR rows** (file counts + **auto Dev tests** from prefetch/mapping), **branch-compare rows** when no PRs, **CI pipeline cards** via `ci_coverage_report_fields()` (re-extracts Sonar/Codecov/pytest-cov; `finalize_ci_coverage()` for branch display), auto traceability rows from mapping cache (unless `requirementRows` in analysis), unmapped TCs, suggested mappings. **`{{PR_NOTE}}`** from analysis or `build_branch_compare_pr_note()`. Always runs `apply_report_ui_enhancements()` before write (idempotent if called twice).
+The builder fills: Jira readiness block, **quick links** (`build_quick_links()` — Jira, SharePoint test plan, PR(s), **Confluence** via `collect_confluence_page_links()` from confluence cache, test plan cache, Jira remote/wiki text, and any `reports/.cache/{KEY}*.json` including analysis), release score, split test plan metrics, **§4 Dev vs QA ownership** via `build_qa_ownership_fields()` — requirements with **QA scope None** (dev unit/integration **Covered**) are **not** listed for QA test-plan execution; only TCs mapped to QA-scoped `R*` appear in handoff, **Linked PR rows** (file counts + **auto Dev tests** from prefetch/mapping), **branch-compare rows** when no PRs, **CI pipeline cards** via `ci_coverage_report_fields()` (re-extracts Sonar/Codecov/pytest-cov; `finalize_ci_coverage()` for branch display), auto traceability rows from mapping cache (unless `requirementRows` in analysis), unmapped TCs, suggested mappings. **`{{PR_NOTE}}`** from analysis or `build_branch_compare_pr_note()`. Always runs `apply_report_ui_enhancements()` before write (idempotent if called twice).
 
 **Manual / agent-refined:** Read [report-template.html](report-template.html) and replace all `{{PLACEHOLDER}}` tokens. New placeholders: `{{CACHE_META}}`, `{{QUICK_LINKS}}`, `{{JIRA_READINESS_BLOCK}}`, `{{RELEASE_SCORE_BLOCK}}`, `{{TESTPLAN_SPLIT_METRICS}}`, `{{UNMAPPED_TC_BLOCK}}`, `{{SUGGESTED_MAPPING_BLOCK}}`.
 
@@ -509,7 +509,7 @@ Tooltip copy lives in `SUMMARY_METRIC_INFO`, `PR_TABLE_COLUMN_INFO`, `SECTION_HE
 
 Do **not** hand-roll tooltip CSS in generated reports; always call the helper once before write. Base template `report-template.html` uses `.report-section { overflow: visible; }` — do not revert to `overflow: hidden`.
 
-**Regression tests:** `python -m pytest scripts/test_report_ui_enhancements.py scripts/test_quick_links.py scripts/test_confluence_requirements.py -q`
+**Regression tests:** `python -m pytest scripts/test_report_ui_enhancements.py scripts/test_quick_links.py scripts/test_qa_scope_handoff.py scripts/test_confluence_requirements.py -q`
 
 ```python
 from coverage_report_helpers import apply_report_ui_enhancements, render_pr_rows_from_prefetch

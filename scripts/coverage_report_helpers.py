@@ -442,6 +442,118 @@ def _badge_for_status(status: str, kind: str = "code") -> str:
     return f'<span class="badge {cls}">{esc(label)}</span>'
 
 
+def _badge_for_qa_scope(scope: str) -> str:
+    """QA scope column badge — None when dev tests fully cover the requirement."""
+    key = (scope or "e2e").lower().replace(" ", "-")
+    labels = {
+        "none": ("badge-na", "None"),
+        "n/a": ("badge-na", "N/A"),
+        "na": ("badge-na", "N/A"),
+        "spot-check": ("badge-spot", "Spot-check"),
+        "e2e": ("badge-e2e", "E2E"),
+        "manual": ("badge-manual", "Manual"),
+        "regression": ("badge-e2e", "Regression"),
+    }
+    cls, label = labels.get(key, ("badge-e2e", key.replace("-", " ").title()))
+    return f'<span class="badge {cls}">{esc(label)}</span>'
+
+
+def _qa_scope_needs_qa_execution(scope: str) -> bool:
+    return (scope or "").lower() not in ("none", "n/a", "na", "")
+
+
+def build_qa_ownership_fields(issue_key: str, root: Path | None = None) -> dict[str, str]:
+    """
+    §4 Dev vs QA lists and QA scope summary from mapping + test plan.
+
+    Requirements with QA scope **None** (dev unit/integration covered) are listed under
+    dev-covered only — not in QA handoff or execute-test-plan bullets.
+    """
+    mapping = load_mapping_cache(issue_key, root)
+    tp = load_testplan_cache(issue_key, root)
+    reqs = mapping.get("requirements") or []
+
+    dev_items: list[str] = []
+    qa_items: list[str] = []
+    reqs_needing_qa: set[str] = set()
+
+    for req in reqs:
+        rid = str(req.get("id") or "")
+        if not rid:
+            continue
+        scope = str(req.get("qaScope") or "e2e")
+        dev = str(req.get("devTestStatus") or "missing")
+        snippet = (req.get("text") or "")[:90]
+        if not _qa_scope_needs_qa_execution(scope):
+            if dev == "covered":
+                dev_items.append(
+                    f"<li><strong>{esc(rid)}</strong> — {esc(snippet)}"
+                    f" — {_badge_for_qa_scope(scope)}; proven by PR unit/integration tests.</li>"
+                )
+            continue
+
+        reqs_needing_qa.add(rid)
+        qa_items.append(
+            f"<li><strong>{esc(rid)}</strong> — {esc(snippet)} — {_badge_for_qa_scope(scope)}</li>"
+        )
+
+    tc_ids: list[str] = []
+    for tc in tp.get("testCases") or []:
+        mapped_r = [str(m) for m in (tc.get("mapped_requirements") or []) if str(m).startswith("R")]
+        if not mapped_r:
+            continue
+        if any(m in reqs_needing_qa for m in mapped_r):
+            tid = str(tc.get("id") or "")
+            if tid:
+                tc_ids.append(tid)
+
+    if qa_items:
+        if tc_ids:
+            tc_sorted = ", ".join(sorted(set(tc_ids), key=lambda x: (len(x), x)))
+            qa_items.append(
+                f'<li class="medium">Execute attached test plan case(s) for QA-scoped requirements only: '
+                f"<strong>{esc(tc_sorted)}</strong> — skip scenarios mapped only to dev-covered acceptance criteria.</li>"
+            )
+    else:
+        qa_items.append(
+            "<li>No Jira acceptance criteria require separate QA execution — "
+            "dev unit/integration tests in the PR cover the scored requirements.</li>"
+        )
+
+    if not dev_items:
+        dev_items.append("<li>See requirements traceability (§5) for dev test file evidence.</li>")
+
+    n_qa = len(reqs_needing_qa)
+    n_none = sum(
+        1
+        for r in reqs
+        if not _qa_scope_needs_qa_execution(str(r.get("qaScope") or ""))
+        and str(r.get("devTestStatus")) == "covered"
+    )
+    summary = f"{n_qa} item(s)" if n_qa else "0 items"
+    detail = (
+        f"{n_none} dev-covered with QA scope None"
+        if n_none
+        else "No dev-covered requirements scored"
+    )
+    if n_qa and tc_ids:
+        detail += f" · {len(set(tc_ids))} test plan case(s) for QA"
+
+    actions = (
+        "<li>Review §5 traceability and run QA-scoped test plan cases only (see §4).</li>"
+        if n_qa
+        else "<li>Confirm dev test evidence in §5; no separate QA execution required for scored acceptance criteria.</li>"
+    )
+
+    return {
+        "devCoveredList": "".join(dev_items),
+        "qaHandoffList": "".join(qa_items),
+        "qaScopeSummary": summary,
+        "qaScopeDetail": detail,
+        "actionsList": actions,
+    }
+
+
 def _render_trace_evidence_cell(
     matched_files: list[str],
     confidence: str,
@@ -493,7 +605,7 @@ def render_requirement_rows_from_mapping(issue_key: str, root: Path | None = Non
             f"<td>{_badge_for_status(req.get('codeStatus', 'missing'))}</td>"
             f"<td>{_badge_for_status(req.get('devTestStatus', 'missing'), 'dev')}</td>"
             f'<td><span class="badge badge-dev">{esc(str(req.get("owner", "shared")).title())}</span></td>'
-            f'<td><span class="badge badge-e2e">{esc(str(req.get("qaScope", "e2e")).title())}</span></td>'
+            f"<td>{_badge_for_qa_scope(str(req.get('qaScope', 'e2e')))}</td>"
             f"{evidence}"
             f"</tr>"
         )

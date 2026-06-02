@@ -46,6 +46,7 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 - **Linked PR(s):** `render_pr_rows_from_prefetch()` — Files, **Dev tests** (from mapping `prs[].devTests` + `diffNames`), CI status
 - **No PR:** `build_branch_compare_pr_note()` + `render_branch_compare_pr_rows()` when `branchCompare` in prefetch
 - **§3 test plan:** `build_testplan_report_fields()` — Evidence, LADR trace, gaps, split Jira/LADR metrics
+- **§4 Dev vs QA:** `build_qa_ownership_fields()` — if dev test status is **Covered**, `qaScope` is **None**; do **not** ask QA to execute test plan cases mapped only to those `R*` (`derive_owner_and_qa_scope()` in mapping)
 - **Quick links:** `collect_confluence_page_links()` — Confluence in header even when LADR is inferred (wiki URL from Jira/analysis caches)
 - **Mapping:** `confidence` high only with `matchedFiles`; `evidenceNote` when keyword-only
 - **UI:** `apply_report_ui_enhancements()` — tooltips **v8**, §4 ownership **v3**, §5 trace **v2**

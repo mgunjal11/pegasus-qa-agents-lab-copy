@@ -26,7 +26,7 @@ If tier is unclear, infer from test file location, fixtures, and whether externa
 
 | QA scope | When to use |
 |----------|-------------|
-| **None** | Dev tests fully cover the requirement; no separate QA scenario needed beyond regression |
+| **None** | Dev unit/integration tests in the PR fully cover the requirement — **do not** list mapped test plan cases under QA handoff for this requirement |
 | **Spot-check** | Dev tests cover core logic; QA confirms in staging (config, logging, observability, happy path) |
 | **E2E** | Multi-service or UI workflow; production-like data; cannot be asserted in PR tests alone |
 | **Manual** | Visual/UX, exploratory, permissions in real env, ops runbooks, or compliance sign-off |
@@ -72,8 +72,9 @@ dev_test_coverage_pct = round(100 * sum(dev_score) / count(dev-scored items), 1)
 
 - Count requirements by QA scope: None, Spot-check, E2E, Manual, Regression
 - **QA remaining** = items where QA scope is E2E, Manual, or Regression, **plus** Shared/Dev items where Dev test status is Partial or Missing
+- **QA scope None** = Dev test status **Covered** — `build_qa_ownership_fields()` omits these from §4 QA handoff and limits “execute test plan” bullets to TCs mapped only to requirements that still need QA
 
-Report both the dev coverage % and a plain-language QA handoff list.
+Report both the dev coverage % and a plain-language QA handoff list. `map_requirements_to_diff.py` sets `qaScope: none` when `devTestStatus` is **covered** (see `derive_owner_and_qa_scope()`).
 
 ## Evidence to cite
 

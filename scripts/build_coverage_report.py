@@ -26,9 +26,9 @@ from coverage_report_helpers import (  # noqa: E402
     apply_report_ui_enhancements,
     build_branch_compare_pr_note,
     build_jira_readiness_block,
+    build_qa_ownership_fields,
     build_quick_links,
     build_release_score_block,
-    build_testplan_gaps_html,
     build_testplan_report_fields,
     build_cache_meta_line,
     ci_coverage_report_fields,
@@ -132,6 +132,7 @@ def build_report(
 
     tc_n = cov.get("testCaseCount", 0)
     gwt_n = cov.get("completeGwtCount", 0)
+    qa_fields = build_qa_ownership_fields(key, base)
     if not analysis or not analysis.get("verdictRationale"):
         rationale = (
             f"{verdict} — {len(mapping.get('requirements') or [])} acceptance criteria; "
@@ -165,7 +166,11 @@ def build_report(
         "{{REQ_MAPPED_SUMMARY}}": f"{cov.get('requirementsCovered', 0)}/{cov.get('requirementCount', 0)} AC in test plan",
         "{{REQ_MAPPED_CLASS}}": testplan_coverage_class(tp_pct),
         "{{REQ_MAPPED_DETAIL}}": "Jira + LADR from test plan cache",
-        "{{QA_SCOPE_SUMMARY}}": analysis.get("qaScopeSummary", f"{tc_n} E2E scenarios") if analysis else f"{tc_n} scenarios",
+        "{{QA_SCOPE_SUMMARY}}": (
+            analysis.get("qaScopeSummary", qa_fields["qaScopeSummary"])
+            if analysis
+            else qa_fields["qaScopeSummary"]
+        ),
         "{{OPEN_GAPS_SUMMARY}}": (
             analysis.get("openGapsSummary", gap_summary) if analysis else gap_summary
         ),
@@ -188,12 +193,24 @@ def build_report(
             if analysis and analysis.get("requirementRows")
             else render_requirement_rows_from_mapping(key, base)
         ),
-        "{{DEV_COVERED_LIST}}": analysis.get("devCoveredList", "<li>See requirements traceability (auto-mapped)</li>") if analysis else "<li>See requirements traceability (auto-mapped)</li>",
-        "{{QA_HANDOFF_LIST}}": analysis.get("qaHandoffList", "<li>Execute attached test plan scenarios in SIT/INT</li>") if analysis else "<li>Execute attached test plan scenarios in SIT/INT</li>",
+        "{{DEV_COVERED_LIST}}": (
+            analysis.get("devCoveredList", qa_fields["devCoveredList"])
+            if analysis
+            else qa_fields["devCoveredList"]
+        ),
+        "{{QA_HANDOFF_LIST}}": (
+            analysis.get("qaHandoffList", qa_fields["qaHandoffList"])
+            if analysis
+            else qa_fields["qaHandoffList"]
+        ),
         "{{CORRECTLY_IMPLEMENTED_LIST}}": analysis.get("correctlyImplementedList", "<li>See PR diff and mapping cache</li>") if analysis else "<li>See PR diff and mapping cache</li>",
         "{{GAPS_LIST}}": gaps_html or "<li>—</li>",
         "{{ASSUMPTIONS_LIST}}": analysis.get("assumptionsList", "<li>Auto-generated report — review mapping confidence before release</li>") if analysis else "<li>Auto-generated report — review mapping confidence before release</li>",
-        "{{ACTIONS_LIST}}": analysis.get("actionsList", "<li>Review gaps and execute QA test plan</li>") if analysis else "<li>Review gaps and execute QA test plan</li>",
+        "{{ACTIONS_LIST}}": (
+            analysis.get("actionsList", qa_fields["actionsList"])
+            if analysis
+            else qa_fields["actionsList"]
+        ),
         "{{CACHE_META}}": build_cache_meta_line(key, base),
         "{{QUICK_LINKS}}": build_quick_links(key, base),
         "{{JIRA_READINESS_BLOCK}}": build_jira_readiness_block(key, base),

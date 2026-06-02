@@ -5,7 +5,7 @@ Three Cursor agents for MSC QA on [wbdstreaming.atlassian.net](https://wbdstream
 | Agent | Invoke | Output |
 |-------|--------|--------|
 | **msc-testcase-writer** | `@msc-testcase-writer MSC-1234` | `testcases/{KEY}-testcases.xlsx` (QMetry FF2.0) |
-| **msc-dev-code-and-qa-test-coverage-validator** | `/msc-dev-code-and-qa-test-coverage-validator MSC-1234` | `reports/{KEY}-{timestamp}-{TZ}.html` — `build_coverage_report.py`; quick links (Confluence from all caches); CI + Dev tests; branch-only; passport/ESS LADR; tooltips v8 |
+| **msc-dev-code-and-qa-test-coverage-validator** | `/msc-dev-code-and-qa-test-coverage-validator MSC-1234` | `build_coverage_report.py`; QA scope None when dev tests cover AC (no redundant QA execute); Confluence quick links; CI + Dev tests; tooltips v8 / §4 v3 |
 | **msc-jira-bug** | `@msc-jira-bug` + defect description | MSC Bug in Jira (after explicit approval) |
 
 ## Skills

@@ -112,6 +112,38 @@ def _test_status(score: float, has_test_file: bool) -> str:
     return "missing"
 
 
+def derive_owner_and_qa_scope(
+    text: str,
+    dev_status: str,
+    code_status: str,
+) -> tuple[str, str]:
+    """
+    Owner + QA scope for traceability and §4 handoff.
+
+    When dev unit/integration tests cover a requirement, QA scope is **none**
+    so QA handoff does not ask to re-execute mapped test plan scenarios for it.
+    """
+    is_qa_only = bool(
+        re.search(r"\b(sit|e2e|manual|mascot|validated in)\b", text, re.I)
+        and not re.search(r"\b(unit|integration|implement|code)\b", text, re.I)
+    )
+    if is_qa_only:
+        return "qa", "manual"
+
+    if dev_status == "covered":
+        return "dev", "none"
+
+    if dev_status == "partial":
+        if re.search(r"\b(monitor|ui|visible|staging|sit)\b", text, re.I):
+            return "shared", "spot-check"
+        return "shared", "e2e"
+
+    owner = "shared" if code_status in ("implemented", "partial") else "qa"
+    if re.search(r"\b(monitor|ui|e2e|sit|manual)\b", text, re.I):
+        return owner, "e2e" if owner == "shared" else "manual"
+    return owner, "e2e"
+
+
 def _confidence(score: float) -> str:
     if score >= 0.45:
         return "high"
@@ -249,11 +281,8 @@ def map_requirements(
         dev_status = _test_status(test_score, has_test)
         scores.append(1.0 if code_status == "implemented" else 0.5 if code_status == "partial" else 0.0)
 
-        is_qa_only = bool(
-            re.search(r"\b(sit|e2e|manual|mascot|validated in)\b", text, re.I)
-            and not re.search(r"\b(unit|integration|implement|code)\b", text, re.I)
-        )
-        if not is_qa_only:
+        owner, qa_scope = derive_owner_and_qa_scope(text, dev_status, code_status)
+        if owner != "qa":
             dev_scores.append(
                 1.0 if dev_status == "covered" else 0.5 if dev_status == "partial" else 0.0
             )
@@ -281,8 +310,8 @@ def map_requirements(
                 "codeScore": round(code_score, 3),
                 "devTestStatus": dev_status,
                 "devTestScore": round(test_score, 3),
-                "owner": "qa" if is_qa_only else ("dev" if dev_status == "covered" else "shared"),
-                "qaScope": "manual" if is_qa_only else ("e2e" if dev_status != "covered" else "none"),
+                "owner": owner,
+                "qaScope": qa_scope,
                 "confidence": _evidence_confidence(combined, code_score, matched_files),
                 "matchedFiles": matched_files,
                 "evidenceNote": evidence_note,
