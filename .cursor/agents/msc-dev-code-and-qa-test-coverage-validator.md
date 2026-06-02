@@ -47,7 +47,7 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 - **No PR:** `build_branch_compare_pr_note()` + `render_branch_compare_pr_rows()` when `branchCompare` in prefetch
 - **§3 test plan:** `build_testplan_report_fields()` — Evidence, LADR trace, gaps, split Jira/LADR metrics
 - **§4 Dev vs QA:** `build_qa_ownership_fields()` — if dev test status is **Covered**, `qaScope` is **None**; do **not** ask QA to execute test plan cases mapped only to those `R*` (`derive_owner_and_qa_scope()` in mapping)
-- **Quick links:** `collect_confluence_page_links()` — Confluence in header even when LADR is inferred (wiki URL from Jira/analysis caches)
+- **Quick links:** `collect_ladr_page_links()` — LADR/design Confluence only in header (excludes grooming, deployment, refactor remote links; passport design pages with L1…Ln still included)
 - **Mapping:** `confidence` high only with `matchedFiles`; `evidenceNote` when keyword-only
 - **UI:** `apply_report_ui_enhancements()` — tooltips **v8**, §4 ownership **v3**, §5 trace **v2**
 - **Verdict:** Fail only when `gap_summary` has **≥1 High** (`[1-9]+ High`), not when text is `0 High · N Med`

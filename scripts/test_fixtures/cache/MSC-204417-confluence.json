@@ -1,0 +1,32 @@
+{
+  "issueKey": "MSC-204417",
+  "confluenceUrls": [
+    {
+      "url": "https://wbdstreaming.atlassian.net/wiki/spaces/HST/pages/2984378410/LADR+Captions+Delivery+Visibility+Monitoring",
+      "pageId": "2984378410",
+      "context": "LADR: Captions Delivery Visibility Monitoring",
+      "title": "LADR: Captions + Delivery Visibility & Monitoring"
+    },
+    {
+      "url": "https://wbdstreaming.atlassian.net/wiki/pages/viewpage.action?pageId=3621063040",
+      "pageId": "3621063040",
+      "context": "Deployment 06-02-2026",
+      "title": "Deployment 06-02-2026"
+    }
+  ],
+  "pages": [
+    {
+      "id": "2984378410",
+      "title": "LADR: Captions + Delivery Visibility & Monitoring",
+      "webUrl": "https://wbdstreaming.atlassian.net/wiki/spaces/HST/pages/2984378410/LADR+Captions+Delivery+Visibility+Monitoring",
+      "ladrRequirements": [{"id": "L1", "text": "demandAcknowledgment — Completed", "source": "ladr"}]
+    },
+    {
+      "id": "3621063040",
+      "title": "Deployment 06-02-2026",
+      "webUrl": "https://wbdstreaming.atlassian.net/wiki/spaces/HST/pages/3621063040/Deployment+06-02-2026",
+      "ladrRequirements": [{"id": "L1", "text": "demandAcknowledgment — Completed", "source": "ladr"}]
+    }
+  ],
+  "ladrRequirements": [{"id": "L1", "source": "ladr"}]
+}

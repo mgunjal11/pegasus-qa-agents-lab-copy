@@ -123,11 +123,11 @@ def render_ladr_traceability_block(testplan_cache: dict[str, Any]) -> str:
     cov = testplan_cache.get("coverage") or {}
     ladr_total = cov.get("ladrRequirementCount") or len(traceability)
     ladr_covered = cov.get("ladrRequirementsCovered") or sum(1 for r in traceability if r.get("mapped"))
-    from confluence_requirements import collect_confluence_page_links
+    from confluence_requirements import collect_ladr_page_links
 
     issue_key = str(testplan_cache.get("issueKey") or "")
     page_links = []
-    for page in collect_confluence_page_links(issue_key) if issue_key else []:
+    for page in collect_ladr_page_links(issue_key) if issue_key else []:
         page_links.append(
             f'<a href="{esc(page["url"])}" target="_blank">{esc(page["title"])}</a>'
         )
@@ -404,7 +404,7 @@ def build_cache_meta_line(issue_key: str, root: Path | None = None) -> str:
 
 
 def build_quick_links(issue_key: str, root: Path | None = None) -> str:
-    from confluence_requirements import collect_confluence_page_links
+    from confluence_requirements import collect_ladr_page_links
 
     jira = load_jira_cache(issue_key, root)
     prefetch = load_prefetch_cache(issue_key, root)
@@ -421,9 +421,13 @@ def build_quick_links(issue_key: str, root: Path | None = None) -> str:
         n = pr.get("number")
         if u:
             links.append(f'<a href="{esc(u)}" target="_blank">PR #{n}</a>')
-    conf_pages = collect_confluence_page_links(issue_key, root)
-    for i, page in enumerate(conf_pages):
-        label = page["title"] if len(conf_pages) > 1 else "Confluence"
+    conf_pages = collect_ladr_page_links(issue_key, root)
+    for page in conf_pages:
+        title = (page.get("title") or "").strip()
+        if len(conf_pages) == 1 and not title.upper().startswith("LADR"):
+            label = "LADR" if title else "LADR (Confluence)"
+        else:
+            label = title or "LADR"
         if len(label) > 48:
             label = label[:45] + "…"
         links.append(f'<a href="{esc(page["url"])}" target="_blank">{esc(label)}</a>')
@@ -1144,7 +1148,7 @@ CACHE_META_INFO = (
 
 QUICK_LINKS_INFO = (
     "Quick navigation to the Jira story, SharePoint test plan, linked pull requests, "
-    "and Confluence (when a design page was cached)."
+    "and LADR Confluence (only when a LADR or design-requirements page is linked)."
 )
 
 META_FIELD_INFO: dict[str, str] = {

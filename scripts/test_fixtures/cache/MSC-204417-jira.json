@@ -1,0 +1,21 @@
+{
+  "issueKey": "MSC-204417",
+  "testPlanReferences": [
+    {
+      "type": "sharepoint",
+      "url": "https://warnermedia.sharepoint.com/test/Promo%20Caption%20Monitoring.xlsx",
+      "filename": "Promo Caption Monitoring.xlsx",
+      "sheet": "Caption Monitoring"
+    }
+  ],
+  "confluenceLinks": [
+    {
+      "url": "https://wbdstreaming.atlassian.net/wiki/spaces/HST/pages/2984378410/LADR+Captions+Delivery+Visibility+Monitoring",
+      "pageId": "2984378410",
+      "title": "LADR Captions Delivery Visibility Monitoring"
+    }
+  ],
+  "comments": [
+    "LADR: https://wbdstreaming.atlassian.net/wiki/spaces/HST/pages/2984378410/LADR+Captions+Delivery+Visibility+Monitoring"
+  ]
+}

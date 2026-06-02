@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from confluence_requirements import (  # noqa: E402
     build_ladr_traceability,
     collect_confluence_page_links,
+    collect_ladr_page_links,
     compute_testplan_coverage,
     map_testcases_to_requirements,
     merge_requirement_sets,
@@ -76,9 +77,9 @@ def test_map_caption_monitoring_scenarios():
     assert any(r["id"] == "L1" and r["mapped"] for r in trace)
 
 
-def test_collect_confluence_page_links_from_issue_caches():
+def test_collect_confluence_page_links_from_issue_caches(fixture_repo_root):
     """MSC-204417 analysis cache embeds LADR wiki URL even when confluence.json has no pages."""
-    links = collect_confluence_page_links("MSC-204417")
+    links = collect_confluence_page_links("MSC-204417", fixture_repo_root)
     assert links
     assert any("2984378410" in link["url"] for link in links)
     assert any(
@@ -87,11 +88,25 @@ def test_collect_confluence_page_links_from_issue_caches():
     )
 
 
-def test_collect_confluence_page_links_dedupes():
-    links = collect_confluence_page_links("MSC-205625")
+def test_collect_confluence_page_links_dedupes(fixture_repo_root):
+    links = collect_confluence_page_links("MSC-205625", fixture_repo_root)
     urls = [link["url"] for link in links]
     assert urls
     assert len(urls) == len(set(urls))
+
+
+def test_collect_ladr_page_links_excludes_non_ladr_remote_links(fixture_repo_root):
+    """MSC-204417: LADR wiki yes; deployment / grooming remote links no."""
+    ladr_links = collect_ladr_page_links("MSC-204417", fixture_repo_root)
+    assert any("2984378410" in link["url"] for link in ladr_links)
+    assert not any("3621063040" in link["url"] for link in ladr_links)
+    assert not any("Deployment" in (link.get("title") or "") for link in ladr_links)
+
+
+def test_collect_ladr_page_links_includes_passport_design_page(fixture_repo_root):
+    """MSC-205625: passport design page has L1…Ln even without LADR in title."""
+    ladr_links = collect_ladr_page_links("MSC-205625", fixture_repo_root)
+    assert any("3480813727" in link["url"] for link in ladr_links)
 
 
 if __name__ == "__main__":

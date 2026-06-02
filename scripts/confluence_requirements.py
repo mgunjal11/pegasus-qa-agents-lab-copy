@@ -25,6 +25,11 @@ CONFLUENCE_VIEWPAGE_RE = re.compile(
     re.IGNORECASE,
 )
 LADR_URL_HINT_RE = re.compile(r"\bLADR\b", re.IGNORECASE)
+# Confluence pages that mention ESS/LADR tables but are not LADR design docs (quick links).
+NON_LADR_PAGE_TITLE_RE = re.compile(
+    r"\b(deployment|grooming|go\s*live|learnings|refactor|pvc\s+go)\b",
+    re.IGNORECASE,
+)
 
 ESS_TASKS = (
     "demandAcknowledgment",
@@ -353,9 +358,75 @@ def _page_dict_to_link(page: dict[str, Any]) -> dict[str, str] | None:
     return {"url": url, "title": title}
 
 
+def page_id_from_confluence_url(url: str) -> str:
+    """Extract numeric Confluence pageId from a wiki URL."""
+    if not url:
+        return ""
+    match = CONFLUENCE_PAGE_URL_RE.search(url) or CONFLUENCE_VIEWPAGE_RE.search(url)
+    return match.group(1) if match else ""
+
+
+def ladr_page_ids_from_confluence_cache(conf: dict[str, Any]) -> set[str]:
+    """Page IDs that produced L1…Ln requirements (ESS or passport/design scenarios)."""
+    ids: set[str] = set()
+    for page in conf.get("pages") or []:
+        if not isinstance(page, dict):
+            continue
+        pid = str(page.get("id") or page.get("pageId") or "").strip()
+        if pid and page.get("ladrRequirements"):
+            ids.add(pid)
+    return ids
+
+
+def is_ladr_confluence_link(
+    url: str,
+    title: str = "",
+    *,
+    ladr_page_ids: set[str] | None = None,
+) -> bool:
+    """
+    True when a Confluence URL is an LADR / design-requirements source (not grooming notes).
+
+    Includes title/URL with LADR, or cached pages with ladrRequirements that are design docs
+    (excludes deployment/grooming pages that only embed ESS tables).
+    """
+    label = f"{url} {title}"
+    if NON_LADR_PAGE_TITLE_RE.search(title or ""):
+        return False
+    if LADR_URL_HINT_RE.search(label):
+        return True
+    pid = page_id_from_confluence_url(url)
+    if pid and ladr_page_ids and pid in ladr_page_ids:
+        return True
+    return False
+
+
+def collect_ladr_page_links(issue_key: str, root: Path | None = None) -> list[dict[str, str]]:
+    """
+    Confluence wiki URLs for quick navigation — LADR / design pages only.
+
+    Filters out Jira remote links such as grooming notes, deployment pages, and ADRs
+    that are not LADR requirement sources.
+    """
+    key = issue_key.upper()
+    conf = load_confluence_cache(key)
+    ladr_page_ids = ladr_page_ids_from_confluence_cache(conf)
+    return [
+        link
+        for link in collect_confluence_page_links(key, root)
+        if is_ladr_confluence_link(
+            link.get("url") or "",
+            link.get("title") or "",
+            ladr_page_ids=ladr_page_ids,
+        )
+    ]
+
+
 def collect_confluence_page_links(issue_key: str, root: Path | None = None) -> list[dict[str, str]]:
     """
-    Collect Confluence wiki URLs for quick navigation and LADR source lines.
+    Collect all Confluence wiki URLs referenced by caches (internal / traceability use).
+
+    For report quick navigation, use collect_ladr_page_links() instead.
 
     Sources (deduped): confluence cache, test plan cache, Jira cache remote links / text,
     and any reports/.cache/{KEY}*.json file (e.g. analysis.json with embedded wiki hrefs).

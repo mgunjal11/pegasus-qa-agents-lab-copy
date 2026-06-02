@@ -1,0 +1,21 @@
+{
+  "issueKey": "MSC-205625",
+  "confluenceUrls": [
+    {
+      "url": "https://wbdstreaming.atlassian.net/wiki/pages/viewpage.action?pageId=3480813727",
+      "pageId": "3480813727",
+      "title": "Passport getting dropped issue"
+    }
+  ],
+  "pages": [
+    {
+      "id": "3480813727",
+      "title": "Passport getting dropped issue",
+      "webUrl": "https://wbdstreaming.atlassian.net/wiki/spaces/HST/pages/3480813727/Passport+getting+dropped+issue",
+      "ladrRequirements": [
+        {"id": "L1", "text": "MVP Full — passport attached", "source": "ladr", "kind": "passport_scenario"}
+      ]
+    }
+  ],
+  "ladrRequirements": [{"id": "L1", "source": "ladr"}]
+}

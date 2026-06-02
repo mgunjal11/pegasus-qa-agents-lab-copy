@@ -21,7 +21,7 @@ python scripts/fetch_jira_testplan.py {ISSUE-KEY} --from-jira-cache
 
 Cache: `reports/.cache/{KEY}-confluence.json`
 
-**Quick links (report header):** `build_quick_links()` calls `collect_confluence_page_links()` — sources include `confluence.json` (`pages`, `confluenceUrls`), `testplan.json` → `confluence.pages`, Jira `remoteLinks`/description/comments, and wiki URLs embedded in any `reports/.cache/{KEY}*.json` (e.g. `{KEY}-analysis.json`). Do not omit Confluence when LADR requirements exist but `pages` is empty (inferred ESS table).
+**Quick links (report header):** `build_quick_links()` calls `collect_ladr_page_links()` — only LADR or design-requirements Confluence pages (parsed `ladrRequirements` on the page, or LADR in title/URL). Grooming, deployment, and other remote wiki links are excluded. Sources are filtered from the same caches as `collect_confluence_page_links()`. Do not omit LADR when requirements exist but `pages` is empty (inferred ESS table with LADR in Jira text).
 
 ### Atlassian MCP (agent)
 
