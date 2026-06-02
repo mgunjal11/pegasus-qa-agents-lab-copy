@@ -243,11 +243,11 @@ def load_jira_cache(issue_key: str, root: Path | None = None) -> dict[str, Any]:
 
 
 def _readiness_item(label: str, ok: bool, detail: str) -> str:
-    cls = "ready-ok" if ok else "ready-warn"
-    icon = "✓" if ok else "!"
+    cls = "ready-ok" if ok else "ready-missing"
+    icon = "✓" if ok else "✗"
     return (
         f'<li class="readiness-item {cls}">'
-        f'<span class="readiness-icon">{icon}</span>'
+        f'<span class="readiness-icon" aria-hidden="true">{icon}</span>'
         f"<strong>{esc(label)}</strong> — {esc(detail)}</li>"
     )
 
@@ -1271,7 +1271,34 @@ METRIC_INFO_CSS = """
     }
     .metric-info-tip:hover .metric-info-tooltip,
     .metric-info-tip:focus .metric-info-tooltip,
-    .metric-info-tip:focus-within .metric-info-tooltip { visibility: visible; opacity: 1; }
+    .metric-info-tip:focus-within .metric-info-tooltip,
+    .metric-info-tip.is-open .metric-info-tooltip { visibility: visible; opacity: 1; }
+"""
+
+METRIC_INFO_CLICK_JS_MARKER = "/* metric-info-tip click toggle */"
+METRIC_INFO_CLICK_JS = """
+    """ + METRIC_INFO_CLICK_JS_MARKER + """
+    (function () {
+      function closeAll(except) {
+        document.querySelectorAll('.metric-info-tip.is-open').forEach(function (t) {
+          if (t !== except) t.classList.remove('is-open');
+        });
+      }
+      document.querySelectorAll('.metric-info-tip').forEach(function (tip) {
+        tip.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var open = tip.classList.toggle('is-open');
+          closeAll(open ? tip : null);
+          if (open) tip.focus();
+        });
+        tip.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') tip.classList.remove('is-open');
+        });
+      });
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest('.metric-info-tip')) closeAll(null);
+      });
+    })();
 """
 
 TOOLTIP_LAYOUT_FIX_MARKER = "/* tooltip layout fix v8 — prevent clipping in panels and sections */"
@@ -1666,6 +1693,22 @@ PR_TABLE_INFO_CSS = """
       display: flex; align-items: flex-start; gap: 0.35rem; flex-wrap: wrap;
     }
     .jira-readiness-block .readiness-item .metric-info-tip { margin-left: 0.2rem; vertical-align: middle; }
+    .jira-readiness-block ul { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+    .jira-readiness-block .readiness-item {
+      display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.4rem 0; line-height: 1.45;
+    }
+    .jira-readiness-block .readiness-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 1.4rem; height: 1.4rem; border-radius: 50%;
+      font-weight: 700; font-size: 0.8rem; line-height: 1; flex-shrink: 0; margin-top: 0.05rem;
+    }
+    .readiness-item.ready-ok .readiness-icon {
+      color: var(--pass); background: var(--pass-bg); border: 1px solid var(--pass-border);
+    }
+    .readiness-item.ready-missing .readiness-icon,
+    .readiness-item.ready-warn .readiness-icon {
+      color: var(--fail); background: var(--fail-bg); border: 1px solid var(--fail-border);
+    }
     .split-metric-with-tip { display: inline-flex; align-items: center; gap: 0.2rem; vertical-align: middle; }
 """
 
@@ -2226,9 +2269,42 @@ def inject_report_footer(html: str) -> str:
     return html
 
 
+def inject_metric_info_click_script(html: str) -> str:
+    """Click (or tap) the i icon toggles the definition callout; Escape / outside click closes."""
+    if METRIC_INFO_CLICK_JS_MARKER in html:
+        return html
+    script = f"  <script>{METRIC_INFO_CLICK_JS}\n  </script>"
+    if "</body>" in html:
+        return html.replace("</body>", f"{script}\n  </body>", 1)
+    return html + script
+
+
+def normalize_jira_readiness_icons(html: str) -> str:
+    """Green ✓ when input present; red ✗ when missing (upgrades legacy ! / ready-warn)."""
+    if "jira-readiness-block" not in html:
+        return html
+    html = html.replace('class="readiness-item ready-warn"', 'class="readiness-item ready-missing"')
+    html = re.sub(
+        r'(<li class="readiness-item ready-missing">)\s*'
+        r'<span class="readiness-icon"[^>]*>!</span>',
+        r'\1<span class="readiness-icon" aria-hidden="true">✗</span>',
+        html,
+        flags=re.I,
+    )
+    html = re.sub(
+        r'(<li class="readiness-item ready-ok">)\s*'
+        r'<span class="readiness-icon"(?![^>]*aria-hidden)[^>]*>',
+        r'\1<span class="readiness-icon" aria-hidden="true">',
+        html,
+        flags=re.I,
+    )
+    return html
+
+
 def apply_report_ui_enhancements(html: str) -> str:
     """Add info-icon tooltips and footer attribution across the coverage validation report."""
     html = _ensure_info_icon_styles(html)
+    html = normalize_jira_readiness_icons(html)
     html = inject_tooltip_layout_fix(html)
     html = inject_report_h1_tooltip(html)
     html = inject_meta_field_tooltips(html)
@@ -2250,6 +2326,7 @@ def apply_report_ui_enhancements(html: str) -> str:
     html = inject_trace_table_header_tooltips(html)
     html = inject_trace_section_styles(html)
     html = inject_trace_section_markup(html)
+    html = inject_metric_info_click_script(html)
     html = inject_report_footer(html)
     return html
 

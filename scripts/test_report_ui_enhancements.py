@@ -5,6 +5,7 @@ from coverage_report_helpers import (
     SECTION_HEADER_INFO,
     TESTPLAN_TABLE_COLUMN_INFO,
     TRACE_TABLE_COLUMN_INFO,
+    _readiness_item,
     apply_report_ui_enhancements,
 )
 
@@ -59,6 +60,36 @@ MINIMAL_REPORT = """
   <div class="section-head"><h2>Recommended actions</h2></div>
 </section>
 """
+
+
+def test_normalize_legacy_readiness_warn_to_red_x():
+    legacy = (
+        '<div class="jira-readiness-block"><ul>'
+        '<li class="readiness-item ready-warn"><span class="readiness-icon">!</span>'
+        "<strong>GitHub PR</strong> — missing</li></ul></div>"
+    )
+    out = apply_report_ui_enhancements(f"<style></style>{legacy}")
+    assert 'class="readiness-item ready-missing"' in out
+    assert 'class="readiness-item ready-warn"' not in out
+    assert '<span class="readiness-icon" aria-hidden="true">✗</span>' in out
+
+
+def test_jira_readiness_icons_green_red():
+    block = (
+        '<div class="jira-readiness-block"><h3>Jira input readiness</h3><ul>'
+        + _readiness_item("Acceptance criteria", True, "4 requirement(s) extracted")
+        + _readiness_item("GitHub PR", False, "Add PR URL in description or comment")
+        + "</ul></div>"
+    )
+    out = apply_report_ui_enhancements(f"<style></style>{block}")
+    assert 'class="readiness-item ready-ok"' in out
+    assert 'class="readiness-item ready-missing"' in out
+    assert '<span class="readiness-icon" aria-hidden="true">✓</span>' in out
+    assert '<span class="readiness-icon" aria-hidden="true">✗</span>' in out
+    assert ".readiness-item.ready-ok .readiness-icon" in out
+    assert ".readiness-item.ready-missing .readiness-icon" in out
+    assert "var(--pass)" in out
+    assert "var(--fail)" in out
 
 
 def test_apply_report_ui_enhancements_covers_all_sections():
@@ -208,3 +239,11 @@ def test_pr_table_dev_tests_tooltip_right_aligned_to_th():
     assert 'aria-label="About Dev tests"' in out
     assert "Key unit or integration test classes or files added or changed in the PR" in out
     assert "dev-owned acceptance criteria" in out
+
+
+def test_metric_info_click_toggle_script():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    assert "metric-info-tip click toggle" in out
+    assert ".metric-info-tip.is-open .metric-info-tooltip" in out
+    assert "classList.toggle('is-open')" in out
+    assert "</script>" in out
