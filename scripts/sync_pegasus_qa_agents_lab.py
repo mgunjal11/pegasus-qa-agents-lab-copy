@@ -226,7 +226,7 @@ Three Cursor agents for MSC QA on [wbdstreaming.atlassian.net](https://wbdstream
 | Agent | Invoke | Output |
 |-------|--------|--------|
 | **msc-testcase-writer** | `@msc-testcase-writer MSC-1234` | `testcases/{KEY}-testcases.xlsx` (QMetry FF2.0) |
-| **msc-dev-code-and-qa-test-coverage-validator** | `/msc-dev-code-and-qa-test-coverage-validator MSC-1234` | `build_coverage_report.py`; QA scope None when dev tests cover AC; Jira readiness green ✓ / red ✗; Confluence quick links; CI + Dev tests; tooltips v8 / §4 v3 |
+| **msc-dev-code-and-qa-test-coverage-validator** | `/msc-dev-code-and-qa-test-coverage-validator MSC-1234` | `build_coverage_report.py`; QA scope None when dev tests cover AC; Jira readiness green ✓ / red ✗; Confluence quick links; CI + Dev tests; report tooltips **v22** (no h1 / readiness h3 tooltip) |
 | **msc-jira-bug** | `@msc-jira-bug` + defect description | MSC Bug in Jira (after explicit approval) |
 
 ## Skills

@@ -49,7 +49,7 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 - **§4 Dev vs QA:** `build_qa_ownership_fields()` — if dev test status is **Covered**, `qaScope` is **None**; do **not** ask QA to execute test plan cases mapped only to those `R*` (`derive_owner_and_qa_scope()` in mapping)
 - **Quick links:** `collect_ladr_page_links()` — LADR/design Confluence only in header (excludes grooming, deployment, refactor remote links; passport design pages with L1…Ln still included)
 - **Mapping:** `confidence` high only with `matchedFiles`; `evidenceNote` when keyword-only
-- **UI:** `apply_report_ui_enhancements()` — tooltips **v8**, §4 ownership **v3**, §5 trace **v2**; **Jira input readiness** — green ✓ when AC/PR/test plan/LADR present, red ✗ when required input missing
+- **UI:** `apply_report_ui_enhancements()` — hover **`i` tooltips** (layout **v22**): row-anchored metric cards; summary group titles open below/right; first table column left-aligned; **no** report h1 or **Jira input readiness** h3 tooltip; readiness checklist rows still have tooltips; green ✓ / red ✗ icons; §5 trace **v2**
 - **Verdict:** Fail only when `gap_summary` has **≥1 High** (`[1-9]+ High`), not when text is `0 High · N Med`
 - **Overrides:** `--analysis` JSON for `reqCoveragePct`, `devCoveragePct`, narrative lists, `requirementRows`, `prNote`
 
@@ -61,7 +61,7 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 4. Prefer `build_coverage_report.py` over per-ticket `regen_*.py` scripts.
 5. Do not fabricate evidence or coverage %.
 6. HTML → `reports/<KEY>-<MM-DD-YYYY-HH-MM-SS>-<TZ>.html`; save `lastReportFile` in manifest.
-7. `apply_report_ui_enhancements(html)` before write (tooltips v8, ownership v3, footer attribution).
+7. `apply_report_ui_enhancements(html)` before write (tooltips v22; readiness icons; trace layout; footer).
 8. No Jira/GitHub comments unless `--post-jira`.
 
 ## Jira template

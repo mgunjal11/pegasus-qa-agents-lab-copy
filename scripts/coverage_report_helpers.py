@@ -665,7 +665,8 @@ def build_release_score_block(
     score, cls = compute_release_score(r, d, t, gap_n)
     return (
         f'<div class="metric-card {cls} release-score-card">'
-        f'<div class="label">Release readiness score</div>'
+        f'<div class="label-row"><div class="label">Release readiness score</div>'
+        f'{metric_info_icon_html("Release readiness score")}</div>'
         f'<div class="metric-value">{score}%</div>'
         f'<div class="note">Weighted: dev code, dev tests, test plan, gaps</div>'
         f"</div>"
@@ -1131,8 +1132,9 @@ SUMMARY_METRIC_INFO: dict[str, str] = {
         "in CI, from Codecov, SonarQube, or pytest-cov on the linked PR."
     ),
     "Release readiness score": (
-        "Weighted composite score from dev code coverage, dev test coverage, "
-        "test plan coverage, and open-gap severity (higher is better)."
+        "Weighted composite score (0–100%) combining dev code coverage, "
+        "dev unit/integration test coverage, test plan acceptance criteria coverage, "
+        "and open-gap severity from the review (higher is better)."
     ),
 }
 
@@ -1198,6 +1200,21 @@ SECTION_LEAD_INFO = (
     "QA-owned items need functional, E2E, or manual verification outside the PR test suite."
 )
 
+TRACE_SECTION_LEAD_INFO = (
+    "Per-requirement mapping from Jira acceptance criteria (R1, R2, …) to branch/PR code, "
+    "dev unit/integration tests, Dev vs QA ownership, QA scope, and file-level evidence."
+)
+
+LADR_SECTION_LEAD_INFO = (
+    "Summary of how many Confluence LADR requirements (L1, L2, …) are covered by test cases "
+    "in the attached Excel plan, with links to the source design page when available."
+)
+
+LEAD_PARAGRAPH_INFO: dict[str, tuple[str, str]] = {
+    "trace-section-lead": ("Requirements traceability intro", TRACE_SECTION_LEAD_INFO),
+    "ladr-section-lead": ("LADR traceability summary", LADR_SECTION_LEAD_INFO),
+}
+
 METRIC_INFO_CSS = """
     .label-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.35rem; margin-bottom: 0.3rem; }
     .label-row .label { margin-bottom: 0; flex: 1; min-width: 0; }
@@ -1215,43 +1232,43 @@ METRIC_INFO_CSS = """
     .metric-info-tooltip {
       visibility: hidden; opacity: 0;
       position: absolute; z-index: 200;
-      left: 0; right: auto; top: calc(100% + 8px);
-      width: min(280px, calc(100vw - 2.5rem));
-      max-width: 280px;
-      padding: 0.55rem 0.65rem;
-      background: #0f172a; color: #f8fafc;
-      font-size: 0.72rem; font-weight: 400; line-height: 1.45;
+      left: 50%; right: auto; top: calc(100% + 10px);
+      transform: translateX(-50%);
+      width: min(340px, calc(100vw - 2.5rem));
+      max-width: 340px;
+      min-width: 12rem;
+      height: auto;
+      max-height: none;
+      overflow: visible;
+      padding: 0.75rem 0.85rem;
+      background: #0f172a; color: #e2e8f0;
+      font-size: 0.72rem; font-weight: 400;
       text-transform: none; letter-spacing: normal;
-      border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.18);
-      transition: opacity 0.15s ease;
+      border-radius: 8px; box-shadow: 0 8px 20px rgba(15,23,42,0.32);
+      transition: opacity 0.15s ease, visibility 0.15s ease;
       pointer-events: none;
       white-space: normal;
+      text-align: left;
+      box-sizing: border-box;
     }
-    .label-row .metric-info-tooltip,
-    .group-title-row .metric-info-tooltip {
-      left: auto;
-      right: 0;
+    .metric-info-tooltip .tooltip-title {
+      display: block;
+      font-weight: 600;
+      font-size: 0.75rem;
+      color: #f8fafc;
+      margin: 0 0 0.55rem;
+      padding: 0 0 0.55rem 0;
+      border-bottom: 1px solid rgba(248,250,252,0.22);
+      line-height: 1.35;
     }
-    .section-head .heading-label-row .metric-info-tooltip,
-    .review-panel h3 .heading-label-row .metric-info-tooltip {
-      left: auto;
-      right: 0;
-      transform: none;
+    .metric-info-tooltip .tooltip-body {
+      display: block;
+      color: #cbd5e1;
+      line-height: 1.55;
+      margin: 0;
+      padding: 0.1rem 0 0;
     }
-    th:last-child .metric-info-tooltip {
-      left: auto;
-      right: 0;
-      transform: none;
-    }
-    th:nth-last-child(2) {
-      position: relative;
-    }
-    th:nth-last-child(2) .th-label-row {
-      position: static;
-    }
-    th:nth-last-child(2) .metric-info-tip {
-      position: relative;
-    }
+    th:last-child .metric-info-tooltip,
     th:nth-last-child(2) .metric-info-tooltip {
       left: auto;
       right: calc(100% + 10px);
@@ -1259,20 +1276,34 @@ METRIC_INFO_CSS = """
       bottom: auto;
       transform: translateY(-50%);
     }
-    th:last-child .metric-info-tip {
+    th:nth-last-child(-n+2) .metric-info-tip {
       position: relative;
     }
-    th:last-child .metric-info-tooltip {
-      left: auto;
-      right: calc(100% + 10px);
-      top: 50%;
-      bottom: auto;
-      transform: translateY(-50%);
-    }
+    /* Description on hover (or keyboard focus) */
     .metric-info-tip:hover .metric-info-tooltip,
     .metric-info-tip:focus .metric-info-tooltip,
-    .metric-info-tip:focus-within .metric-info-tooltip,
-    .metric-info-tip.is-open .metric-info-tooltip { visibility: visible; opacity: 1; }
+    .metric-info-tip:focus-within .metric-info-tooltip {
+      visibility: visible; opacity: 1; pointer-events: auto;
+    }
+    .trace-section-lead-with-tip,
+    .ladr-section-lead-with-tip {
+      position: relative;
+      padding-right: 2rem;
+      margin-bottom: 0.75rem;
+    }
+    .trace-section-lead-with-tip .metric-info-tip,
+    .ladr-section-lead-with-tip .metric-info-tip {
+      position: absolute;
+      top: 0.1rem;
+      right: 0;
+    }
+    .trace-section-lead-with-tip .metric-info-tip > .metric-info-tooltip,
+    .ladr-section-lead-with-tip .metric-info-tip > .metric-info-tooltip {
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+      top: calc(100% + 10px);
+    }
 """
 
 METRIC_INFO_CLICK_JS_MARKER = "/* metric-info-tip click toggle */"
@@ -1281,18 +1312,32 @@ METRIC_INFO_CLICK_JS = """
     (function () {
       function closeAll(except) {
         document.querySelectorAll('.metric-info-tip.is-open').forEach(function (t) {
-          if (t !== except) t.classList.remove('is-open');
+          if (t !== except) {
+            t.classList.remove('is-open');
+            t.setAttribute('aria-expanded', 'false');
+          }
         });
       }
       document.querySelectorAll('.metric-info-tip').forEach(function (tip) {
+        if (!tip.getAttribute('aria-expanded')) tip.setAttribute('aria-expanded', 'false');
         tip.addEventListener('click', function (e) {
           e.stopPropagation();
           var open = tip.classList.toggle('is-open');
+          tip.setAttribute('aria-expanded', open ? 'true' : 'false');
           closeAll(open ? tip : null);
           if (open) tip.focus();
         });
         tip.addEventListener('keydown', function (e) {
-          if (e.key === 'Escape') tip.classList.remove('is-open');
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            var open = tip.classList.toggle('is-open');
+            tip.setAttribute('aria-expanded', open ? 'true' : 'false');
+            closeAll(open ? tip : null);
+          }
+          if (e.key === 'Escape') {
+            tip.classList.remove('is-open');
+            tip.setAttribute('aria-expanded', 'false');
+          }
         });
       });
       document.addEventListener('click', function (e) {
@@ -1301,7 +1346,7 @@ METRIC_INFO_CLICK_JS = """
     })();
 """
 
-TOOLTIP_LAYOUT_FIX_MARKER = "/* tooltip layout fix v8 — prevent clipping in panels and sections */"
+TOOLTIP_LAYOUT_FIX_MARKER = "/* tooltip layout fix v22 — group titles open below, right-aligned to icon */"
 
 TOOLTIP_LAYOUT_FIX_CSS = """
     """ + TOOLTIP_LAYOUT_FIX_MARKER + """
@@ -1349,42 +1394,166 @@ TOOLTIP_LAYOUT_FIX_CSS = """
     .metric-info-tip {
       cursor: pointer !important;
     }
-    .metric-info-tooltip {
-      z-index: 300 !important;
-      left: 0 !important;
+    header,
+    header .meta,
+    header .cache-meta,
+    header .quick-links,
+    header .jira-readiness-block,
+    header .verdict {
+      overflow: visible !important;
+      position: relative;
+    }
+    .metric-info-tip {
+      position: relative !important;
+      vertical-align: middle;
+    }
+    .metric-info-tip > .metric-info-tooltip {
+      z-index: 500 !important;
+      left: 50% !important;
       right: auto !important;
-      transform: none !important;
-      top: calc(100% + 8px) !important;
-      width: min(280px, calc(100vw - 2.5rem)) !important;
-      max-width: 280px !important;
+      top: calc(100% + 10px) !important;
+      bottom: auto !important;
+      transform: translateX(-50%) !important;
+      width: min(300px, calc(100vw - 2rem)) !important;
+      max-width: 300px !important;
+      min-width: 12rem;
+      padding: 0.75rem 0.85rem !important;
       white-space: normal !important;
+      word-wrap: break-word !important;
+      overflow-wrap: break-word !important;
+      box-sizing: border-box !important;
     }
-    .label-row .metric-info-tooltip,
-    .group-title-row .metric-info-tooltip,
-    .section-head .heading-label-row .metric-info-tooltip,
-    .review-panel h3 .heading-label-row .metric-info-tooltip {
-      left: auto !important;
-      right: 0 !important;
+    .metric-info-tooltip .tooltip-title {
+      margin-bottom: 0.55rem !important;
+      padding-bottom: 0.55rem !important;
+      line-height: 1.35 !important;
+    }
+    .metric-info-tooltip .tooltip-body {
+      line-height: 1.55 !important;
+      padding-top: 0.1rem !important;
+    }
+    .metric-info-tip:hover,
+    .metric-info-tip:focus-within {
+      z-index: 600 !important;
+    }
+    .heading-label-row,
+    .group-title-row,
+    .label-row,
+    .th-label-row,
+    .split-metric-with-tip {
+      position: relative;
+      overflow: visible !important;
+    }
+    .section-head .heading-label-row,
+    header h1 .heading-label-row {
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 0.35rem !important;
+      flex-wrap: wrap !important;
+    }
+    /* Header / meta lines: icon at line start — center transform clips text off the left */
+    header .cache-meta-with-tip,
+    header .quick-links-with-tip,
+    header .meta,
+    header .verdict,
+    .jira-readiness-block .readiness-item,
+    .split-metric-with-tip,
+    .note-box-with-tip {
+      overflow: visible !important;
+      position: relative;
+    }
+    header .cache-meta-with-tip .metric-info-tip,
+    header .quick-links-with-tip .metric-info-tip,
+    header .meta .metric-info-tip,
+    header .verdict .metric-info-tip,
+    .jira-readiness-block .readiness-item .metric-info-tip,
+    .split-metric-with-tip .metric-info-tip,
+    .note-box-with-tip .metric-info-tip {
+      position: static !important;
+    }
+    header .cache-meta-with-tip .metric-info-tip > .metric-info-tooltip,
+    header .quick-links-with-tip .metric-info-tip > .metric-info-tooltip,
+    header .meta .metric-info-tip > .metric-info-tooltip,
+    header .verdict .metric-info-tip > .metric-info-tooltip,
+    .jira-readiness-block .readiness-item .metric-info-tip > .metric-info-tooltip,
+    .split-metric-with-tip .metric-info-tip > .metric-info-tooltip,
+    .note-box-with-tip .metric-info-tip > .metric-info-tooltip {
+      left: 0 !important;
+      right: auto !important;
+      top: calc(100% + 10px) !important;
+      bottom: auto !important;
       transform: none !important;
+      z-index: 850 !important;
+      width: min(360px, calc(100vw - 2rem)) !important;
+      max-width: 360px !important;
     }
-    th .metric-info-tooltip {
+    header .cache-meta-with-tip:has(.metric-info-tip:hover),
+    header .quick-links-with-tip:has(.metric-info-tip:hover),
+    header .meta:has(.metric-info-tip:hover),
+    header:has(.cache-meta-with-tip .metric-info-tip:hover),
+    header:has(.quick-links-with-tip .metric-info-tip:hover) {
+      z-index: 400 !important;
+      overflow: visible !important;
+    }
+    /* §1–§8 section banners: tooltip above h2 (below was hidden under section-body) */
+    .report-section .section-head {
+      position: relative !important;
+      z-index: 8 !important;
+      overflow: visible !important;
+    }
+    .report-section .section-head h2 {
+      overflow: visible !important;
+      position: relative !important;
+    }
+    .report-section .section-body {
+      position: relative !important;
+      z-index: 1 !important;
+    }
+    .report-section .section-head:has(.metric-info-tip:hover),
+    .report-section .section-head:has(.metric-info-tip:focus-within) {
+      z-index: 900 !important;
+      overflow: visible !important;
+    }
+    .report-section .section-head .heading-label-row {
+      position: relative !important;
+      overflow: visible !important;
+    }
+    .report-section .section-head .heading-label-row .metric-info-tip {
+      position: static !important;
+    }
+    .report-section .section-head .heading-label-row .metric-info-tip > .metric-info-tooltip {
+      top: auto !important;
+      bottom: calc(100% + 10px) !important;
       left: 0 !important;
       right: auto !important;
       transform: none !important;
+      z-index: 950 !important;
     }
-    th:last-child .metric-info-tooltip {
-      left: auto !important;
-      right: 0 !important;
+    .report-section .section-head .metric-info-tip:hover,
+    .report-section .section-head .metric-info-tip:focus-within {
+      z-index: 960 !important;
+    }
+    /* Last two columns (e.g. QA scope + Evidence): open to the left of header */
+    /* First table column: centered tooltip clips off the left edge of the grid */
+    thead th:first-child .th-label-row,
+    th:first-child .th-label-row {
+      position: relative !important;
+      overflow: visible !important;
+    }
+    thead th:first-child .metric-info-tip,
+    th:first-child .metric-info-tip {
+      position: static !important;
+    }
+    thead th:first-child .metric-info-tip > .metric-info-tooltip,
+    th:first-child .metric-info-tip > .metric-info-tooltip {
+      top: calc(100% + 10px) !important;
+      bottom: auto !important;
+      left: 0 !important;
+      right: auto !important;
       transform: none !important;
+      z-index: 600 !important;
     }
-    th:nth-last-child(2) .metric-info-tooltip {
-      left: auto !important;
-      right: 0 !important;
-      transform: none !important;
-    }
-    /* Last two columns (e.g. QA scope + Evidence): open tooltip to the left — avoids table overflow clip */
-    th:last-child .metric-info-tooltip,
-    th:nth-last-child(2) .metric-info-tooltip {
+    th:nth-last-child(-n+2) .metric-info-tip > .metric-info-tooltip {
       top: 50% !important;
       bottom: auto !important;
       left: auto !important;
@@ -1421,38 +1590,141 @@ TOOLTIP_LAYOUT_FIX_CSS = """
       color: #fff !important;
       text-shadow: 0 1px 2px rgba(0,0,0,0.15);
     }
-    /* Ownership + summary metric cards: flip label-row tooltips up (avoids list/content overlap) */
-    .metric-card,
-    .metric-grid,
-    .section-ownership .section-body {
+    /* Metric cards: label-row tooltips must paint above .metric-value / .note (sibling below in DOM) */
+    .metric-card {
       overflow: visible !important;
+    }
+    .metric-card .metric-value,
+    .metric-card .note {
+      position: relative;
+      z-index: 0;
     }
     .metric-card .label-row {
       position: relative;
-      z-index: 1;
+      z-index: 2;
+    }
+    .metric-card:has(.label-row .metric-info-tip:hover) .label-row,
+    .metric-card:has(.label-row .metric-info-tip:focus-within) .label-row {
+      z-index: 100 !important;
+    }
+    /* Metric / summary grids: row-anchored tooltips (fixes first grid column left clip) */
+    .metric-grid,
+    .summary-grid,
+    .summary-groups {
+      overflow: visible !important;
+    }
+    .metric-card .label-row {
+      position: relative !important;
+      overflow: visible !important;
+      z-index: 2;
+    }
+    .metric-card:has(.label-row .metric-info-tip:hover),
+    .metric-card:has(.label-row .metric-info-tip:focus-within) {
+      z-index: 50 !important;
     }
     .metric-card .label-row .metric-info-tip {
-      position: relative !important;
+      position: static !important;
       flex-shrink: 0;
     }
-    .metric-card .label-row .metric-info-tooltip {
+    .metric-card .label-row .metric-info-tip > .metric-info-tooltip {
       top: auto !important;
-      bottom: calc(100% + 8px) !important;
-      left: auto !important;
-      right: 0 !important;
+      bottom: calc(100% + 10px) !important;
+      left: 0 !important;
+      right: auto !important;
       transform: none !important;
-      width: min(300px, calc(100vw - 2rem)) !important;
-      max-width: 300px !important;
+      z-index: 800 !important;
+      width: min(340px, calc(100vw - 2rem)) !important;
+      max-width: 340px !important;
+      min-width: 12rem;
+      height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
     }
     .metric-card .label-row .metric-info-tip:hover,
     .metric-card .label-row .metric-info-tip:focus-within {
-      z-index: 400 !important;
+      z-index: 850 !important;
     }
-    /* §4 ownership: open below icon (v3 block adds column alignment + isolation) */
-    .section-ownership .metric-card .label-row .metric-info-tooltip {
-      top: calc(100% + 8px) !important;
+    /* Summary group titles (Implementation & tests, …): open below — flip-up was clipped under release score */
+    .summary-group-title {
+      overflow: visible !important;
+      position: relative;
+    }
+    .summary-group-title .group-title-row {
+      position: relative !important;
+      overflow: visible !important;
+      z-index: 2;
+    }
+    .summary-group-title:has(.metric-info-tip:hover),
+    .summary-group-title:has(.metric-info-tip:focus-within) {
+      z-index: 120 !important;
+    }
+    .summary-group-title .group-title-row .metric-info-tip {
+      position: static !important;
+      flex-shrink: 0;
+    }
+    .summary-group-title .group-title-row .metric-info-tip > .metric-info-tooltip {
+      top: calc(100% + 10px) !important;
       bottom: auto !important;
+      left: auto !important;
+      right: 0 !important;
       transform: none !important;
+      z-index: 900 !important;
+      width: min(340px, calc(100vw - 2rem)) !important;
+      max-width: 340px !important;
+      min-width: 12rem;
+      height: auto !important;
+      max-height: none !important;
+      overflow: visible !important;
+    }
+    .summary-group-title .group-title-row .metric-info-tip:hover,
+    .summary-group-title .group-title-row .metric-info-tip:focus-within {
+      z-index: 910 !important;
+    }
+    .summary-groups > div:first-child .summary-group-title:has(.metric-info-tip:hover),
+    .summary-groups > div:first-child .summary-group-title:has(.metric-info-tip:focus-within) {
+      z-index: 200 !important;
+    }
+    /* Review panel h3 titles (same row layout as metric labels) */
+    .review-panel h3 .heading-label-row {
+      position: relative !important;
+      overflow: visible !important;
+    }
+    .review-panel h3 .heading-label-row .metric-info-tip {
+      position: static !important;
+    }
+    .review-panel h3 .heading-label-row .metric-info-tip > .metric-info-tooltip {
+      top: auto !important;
+      bottom: calc(100% + 10px) !important;
+      left: 0 !important;
+      right: auto !important;
+      transform: none !important;
+      z-index: 700 !important;
+    }
+    /* Release readiness: wider tooltip + stack above §1 body */
+    .release-score-row,
+    .release-score-card {
+      overflow: visible !important;
+      position: relative;
+    }
+    .release-score-row {
+      margin-bottom: 1.5rem;
+      z-index: 12 !important;
+    }
+    .section-summary:has(.release-score-card .metric-info-tip:hover) .section-body,
+    .section-summary:has(.release-score-card .metric-info-tip:focus-within) .section-body {
+      z-index: 30 !important;
+    }
+    .release-score-card .label-row .metric-info-tip > .metric-info-tooltip {
+      width: min(360px, calc(100vw - 2.5rem)) !important;
+      max-width: 360px !important;
+      min-width: 18rem;
+      z-index: 1200 !important;
+    }
+    .release-score-card:has(.metric-info-tip:hover),
+    .release-score-card:has(.metric-info-tip:focus-within),
+    .release-score-row:has(.metric-info-tip:hover),
+    .release-score-row:has(.metric-info-tip:focus-within) {
+      z-index: 995 !important;
     }
 """
 
@@ -1475,15 +1747,13 @@ OWNERSHIP_TOOLTIP_CSS = """
     .section-ownership .section-head:has(.metric-info-tip:focus-within) {
       z-index: 500 !important;
     }
-    .section-ownership .section-head .heading-label-row .metric-info-tooltip {
-      top: calc(100% + 8px) !important;
+    .section-ownership .section-head .metric-info-tip > .metric-info-tooltip {
+      top: calc(100% + 10px) !important;
       bottom: auto !important;
-      left: auto !important;
-      right: 0 !important;
-      transform: none !important;
+      left: 50% !important;
+      right: auto !important;
+      transform: translateX(-50%) !important;
       z-index: 501 !important;
-      width: min(300px, calc(100vw - 2rem)) !important;
-      max-width: 300px !important;
     }
     .section-ownership .section-body {
       position: relative;
@@ -1502,14 +1772,12 @@ OWNERSHIP_TOOLTIP_CSS = """
       right: 0.75rem;
       margin: 0;
     }
-    .section-ownership .section-lead-with-tip .metric-info-tooltip {
-      top: calc(100% + 8px) !important;
+    .section-ownership .section-lead-with-tip .metric-info-tip > .metric-info-tooltip {
+      top: calc(100% + 10px) !important;
       bottom: auto !important;
-      left: auto !important;
-      right: 0 !important;
-      transform: none !important;
-      width: min(300px, calc(100vw - 2rem)) !important;
-      max-width: 300px !important;
+      left: 50% !important;
+      right: auto !important;
+      transform: translateX(-50%) !important;
       z-index: 400 !important;
     }
     .section-ownership .section-lead-with-tip .metric-info-tip:hover,
@@ -1529,34 +1797,7 @@ OWNERSHIP_TOOLTIP_CSS = """
     .section-ownership .metric-card:has(.label-row .metric-info-tip:focus-within) {
       z-index: 40 !important;
     }
-    .section-ownership .metric-card .label-row {
-      position: relative;
-      z-index: 2;
-      overflow: visible !important;
-    }
-    .section-ownership .metric-card .label-row .metric-info-tip {
-      position: relative !important;
-      z-index: 3;
-    }
-    /* Open below icon inside card — avoids overlapping banner / sibling column */
-    .section-ownership .metric-card .label-row .metric-info-tooltip {
-      top: calc(100% + 8px) !important;
-      bottom: auto !important;
-      left: auto !important;
-      right: 0 !important;
-      transform: none !important;
-      width: min(280px, calc(100vw - 2rem)) !important;
-      max-width: 280px !important;
-      z-index: 50 !important;
-    }
-    .section-ownership .metric-card.metric-qa .label-row .metric-info-tooltip {
-      left: 0 !important;
-      right: auto !important;
-    }
-    .section-ownership .metric-card .label-row .metric-info-tip:hover,
-    .section-ownership .metric-card .label-row .metric-info-tip:focus-within {
-      z-index: 50 !important;
-    }
+    /* §4 metric cards use global row-anchored tooltips (v21) */
     .ladr-section-lead {
       color: #475569;
       font-size: 0.875rem;
@@ -1712,6 +1953,28 @@ PR_TABLE_INFO_CSS = """
     .split-metric-with-tip { display: inline-flex; align-items: center; gap: 0.2rem; vertical-align: middle; }
 """
 
+JIRA_READINESS_UI_MARKER = "/* jira readiness status icons */"
+
+JIRA_READINESS_UI_CSS = """
+    """ + JIRA_READINESS_UI_MARKER + """
+    .jira-readiness-block ul { list-style: none; padding: 0; margin: 0.5rem 0 0; }
+    .jira-readiness-block .readiness-item {
+      display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.4rem 0; line-height: 1.45;
+    }
+    .jira-readiness-block .readiness-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 1.4rem; height: 1.4rem; border-radius: 50%;
+      font-weight: 700; font-size: 0.8rem; line-height: 1; flex-shrink: 0; margin-top: 0.05rem;
+    }
+    .readiness-item.ready-ok .readiness-icon {
+      color: var(--pass); background: var(--pass-bg); border: 1px solid var(--pass-border);
+    }
+    .readiness-item.ready-missing .readiness-icon,
+    .readiness-item.ready-warn .readiness-icon {
+      color: var(--fail); background: var(--fail-bg); border: 1px solid var(--fail-border);
+    }
+"""
+
 PR_TABLE_COLUMN_INFO: dict[str, str] = {
     "PR": "GitHub pull request number with a link to the PR page.",
     "Repo": "GitHub organization and repository (org/repo) that contains the pull request.",
@@ -1849,11 +2112,14 @@ def metric_info_icon_html(label: str, tip: str | None = None) -> str:
     text = tip if tip is not None else SUMMARY_METRIC_INFO.get(label, "")
     if not text:
         return ""
+    title = f"About {label}"
     return (
         f'<span class="metric-info-tip" tabindex="0" role="button" '
-        f'aria-label="About {esc(label)}">'
+        f'aria-label="{esc(title)}">'
         f'<span class="metric-info-icon" aria-hidden="true">i</span>'
-        f'<span class="metric-info-tooltip">{esc(text)}</span></span>'
+        f'<span class="metric-info-tooltip" role="tooltip">'
+        f'<span class="tooltip-title">{esc(title)}</span>'
+        f'<span class="tooltip-body">{esc(text)}</span></span></span>'
     )
 
 
@@ -1872,20 +2138,25 @@ def render_pr_table_header_row() -> str:
 
 
 def _inject_heading_tooltip(html: str, tag: str, title: str, tip: str) -> str:
+    if f'aria-label="About {esc(title)}"' in html:
+        return html
     if f'<span class="heading-label-row">{esc(title)}' in html:
         return html
     if f'<span class="heading-label-row">{title}' in html:
         return html
-    plain = f"<{tag}>{title}</{tag}>"
-    wrapped = (
-        f"<{tag}><span class=\"heading-label-row\">{title}"
-        f"{metric_info_icon_html(title, tip)}</span></{tag}>"
+    icon = metric_info_icon_html(title, tip)
+    inner = f'<span class="heading-label-row">{title}{icon}</span>'
+    wrapped = f"<{tag}>{inner}</{tag}>"
+    for plain in (f"<{tag}>{title}</{tag}>", f"<{tag}>{esc(title)}</{tag}>"):
+        if plain in html:
+            return html.replace(plain, wrapped, 1)
+    pattern = (
+        rf'(<div class="section-head">[\s\S]*?<{tag}>)\s*'
+        rf'{re.escape(title)}\s*'
+        rf'(</{tag}>)'
     )
-    if plain in html:
-        return html.replace(plain, wrapped, 1)
-    plain_esc = f"<{tag}>{esc(title)}</{tag}>"
-    if plain_esc in html:
-        return html.replace(plain_esc, wrapped, 1)
+    if re.search(pattern, html):
+        return re.sub(pattern, rf"\1{inner}\2", html, count=1)
     return html
 
 
@@ -2006,17 +2277,16 @@ def inject_review_panel_tooltips(html: str) -> str:
 
 
 def inject_report_h1_tooltip(html: str) -> str:
+    """Report h1 title is intentionally without an info tooltip."""
     if 'aria-label="About Report title"' in html:
-        return html
-    match = re.search(r"<h1>([^<]+)</h1>", html)
-    if not match:
-        return html
-    title = match.group(1)
-    wrapped = (
-        f"<h1><span class=\"heading-label-row\">{title}"
-        f"{metric_info_icon_html('Report title', HEADER_H1_INFO)}</span></h1>"
-    )
-    return html.replace(match.group(0), wrapped, 1)
+        html = re.sub(
+            r"<h1><span class=\"heading-label-row\">([\s\S]*?)"
+            r"<span class=\"metric-info-tip\"[\s\S]*?</span></span></h1>",
+            r"<h1>\1</h1>",
+            html,
+            count=1,
+        )
+    return html
 
 
 def inject_meta_field_tooltips(html: str) -> str:
@@ -2052,8 +2322,16 @@ def inject_quick_links_tooltip(html: str) -> str:
 
 
 def inject_readiness_block_tooltips(html: str) -> str:
-    for title, tip in READINESS_PANEL_INFO.items():
-        html = _inject_heading_tooltip(html, "h3", title, tip)
+    """Checklist item tooltips only; Jira input readiness h3 heading has no tooltip."""
+    for title in READINESS_PANEL_INFO:
+        if f'aria-label="About {title}"' in html:
+            html = re.sub(
+                rf"<h3><span class=\"heading-label-row\">{re.escape(title)}"
+                r"<span class=\"metric-info-tip\"[\s\S]*?</span></span></h3>",
+                f"<h3>{title}</h3>",
+                html,
+                count=1,
+            )
     for label, tip in READINESS_ITEM_INFO.items():
         marker = f'<strong>{label}</strong>{metric_info_icon_html(label, tip)}'
         if marker in html:
@@ -2136,6 +2414,25 @@ def _normalize_ownership_section_lead_icon(html: str) -> str:
         return f'{m.group(1)}<p class="section-lead section-lead-with-tip">{body} {icon}</p>'
 
     return re.sub(pattern, _repl, html, count=1, flags=re.DOTALL)
+
+
+def inject_lead_paragraph_tooltips(html: str) -> str:
+    """Standard info icon on §3 LADR and §5 trace intro paragraphs."""
+    for css_class, (label, tip) in LEAD_PARAGRAPH_INFO.items():
+        aria = f'aria-label="About {esc(label)}"'
+        if aria in html:
+            continue
+        pattern = rf'(<p class="{re.escape(css_class)}">)([\s\S]*?)(</p>)'
+        match = re.search(pattern, html)
+        if not match:
+            continue
+        body = match.group(2).strip()
+        icon = metric_info_icon_html(label, tip)
+        replacement = (
+            f'<p class="{css_class} {css_class}-with-tip">{body} {icon}</p>'
+        )
+        html = html[: match.start()] + replacement + html[match.end() :]
+    return html
 
 
 def inject_section_lead_tooltip(html: str) -> str:
@@ -2232,11 +2529,23 @@ def inject_trace_section_markup(html: str) -> str:
     return html
 
 
+def _strip_modern_tooltip_layout_fix(html: str) -> str:
+    """Remove tooltip layout fix v4+ block so v20 can replace v19."""
+    return re.sub(
+        r"\s*/\* tooltip layout fix v\d+[^*]*\*/[\s\S]*?"
+        r"(?=\n\s*/\* ownership section tooltips|\n\s*/\* trace section visibility|\n\s*</style>)",
+        "\n",
+        html,
+        count=1,
+    )
+
+
 def inject_tooltip_layout_fix(html: str) -> str:
-    """Ensure tooltip CSS avoids overflow clipping (idempotent; upgrades v1–v3 → v4)."""
+    """Ensure tooltip CSS avoids overflow clipping (idempotent; upgrades v1–v19 → v20)."""
     html = html.replace("cursor: help;", "cursor: pointer;")
     html = _strip_legacy_tooltip_layout_fix(html)
     html = TOOLTIP_LAYOUT_FIX_BLOCK_RE.sub("", html)
+    html = _strip_modern_tooltip_layout_fix(html)
     if TOOLTIP_LAYOUT_FIX_MARKER in html:
         return html
     return html.replace("</style>", TOOLTIP_LAYOUT_FIX_CSS + "\n  </style>", 1)
@@ -2301,9 +2610,116 @@ def normalize_jira_readiness_icons(html: str) -> str:
     return html
 
 
+METRIC_INFO_CSS_BLOCK_RE = re.compile(
+    r"\s*\.label-row \{ display: flex[\s\S]*?"
+    r"\.ladr-section-lead-with-tip \.metric-info-tip \{[\s\S]*?\}\s*",
+    re.MULTILINE,
+)
+
+PR_TABLE_INFO_CSS_BLOCK_RE = re.compile(
+    r"\s*\.section-pr th \.th-label-row[\s\S]*?"
+    r"\.split-metric-with-tip \{[\s\S]*?\}\s*",
+    re.MULTILINE,
+)
+
+METRIC_INFO_SCRIPT_RE = re.compile(
+    r"\s*<script>\s*/\* metric-info-tip click toggle \*/[\s\S]*?</script>",
+    re.IGNORECASE,
+)
+
+
+def _remove_metric_info_tip_spans(html: str) -> str:
+    """Remove nested metric-info-tip markup (one span tree per iteration)."""
+    marker = '<span class="metric-info-tip"'
+    while marker in html:
+        start = html.find(marker)
+        if start < 0:
+            break
+        depth = 0
+        i = start
+        end = -1
+        while i < len(html):
+            if html.startswith("<span", i):
+                depth += 1
+                close = html.find(">", i)
+                if close < 0:
+                    break
+                i = close + 1
+            elif html.startswith("</span>", i):
+                depth -= 1
+                i += len("</span>")
+                if depth == 0:
+                    end = i
+                    break
+            else:
+                i += 1
+        if end < 0:
+            break
+        html = html[:start] + html[end:]
+    return html
+
+
+def strip_report_tooltips(html: str) -> str:
+    """Remove info-icon tooltips, related CSS, and click script (idempotent)."""
+    html = _remove_metric_info_tip_spans(html)
+    html = METRIC_INFO_CSS_BLOCK_RE.sub("", html)
+    html = PR_TABLE_INFO_CSS_BLOCK_RE.sub("", html)
+    html = TOOLTIP_LAYOUT_FIX_BLOCK_RE.sub("", html)
+    html = _strip_modern_tooltip_layout_fix(html)
+    html = OWNERSHIP_TOOLTIP_CSS_BLOCK_RE.sub("", html)
+    html = METRIC_INFO_SCRIPT_RE.sub("", html)
+    html = _strip_legacy_tooltip_layout_fix(html)
+    for tag in ("h1", "h2", "h3"):
+        html = re.sub(
+            rf"<{tag}><span class=\"heading-label-row\">([\s\S]*?)</span></{tag}>",
+            rf"<{tag}>\1</{tag}>",
+            html,
+            flags=re.IGNORECASE,
+        )
+    html = re.sub(
+        r'<div class="summary-group-title"><span class="group-title-row">'
+        r'<span class="group-title-text">([^<]*)</span></span></div>',
+        r'<div class="summary-group-title">\1</div>',
+        html,
+    )
+    html = re.sub(
+        r'<div class="label-row"><div class="label">([^<]*)</div>\s*</div>',
+        r'<div class="label">\1</div>',
+        html,
+    )
+    html = re.sub(
+        r"<th><span class=\"th-label-row\">([^<]*)</span></th>",
+        r"<th>\1</th>",
+        html,
+    )
+    html = html.replace("cache-meta-with-tip", "cache-meta")
+    html = html.replace("quick-links-with-tip", "quick-links")
+    html = html.replace("note-box-with-tip", "note-box")
+    html = html.replace("split-metric-with-tip", "split-metric")
+    html = re.sub(r'\bsection-lead-with-tip\b', "section-lead", html)
+    html = re.sub(r'\btrace-section-lead-with-tip\b', "trace-section-lead", html)
+    html = re.sub(r'\bladr-section-lead-with-tip\b', "ladr-section-lead", html)
+    html = re.sub(
+        r'<p class="section-lead">\s*([\s\S]*?)\s*</p>',
+        lambda m: f'<p class="section-lead">{m.group(1).strip()}</p>',
+        html,
+        count=1,
+    )
+    return html
+
+
+def inject_jira_readiness_styles(html: str) -> str:
+    """Green ✓ / red ✗ readiness row styling (no tooltips)."""
+    if JIRA_READINESS_UI_MARKER in html or "jira-readiness-block" not in html:
+        return html
+    return html.replace("</style>", JIRA_READINESS_UI_CSS + "\n  </style>", 1)
+
+
 def apply_report_ui_enhancements(html: str) -> str:
-    """Add info-icon tooltips and footer attribution across the coverage validation report."""
+    """Info-icon tooltips on all labels, readiness icons, trace layout, footer."""
+    html = strip_report_tooltips(html)
     html = _ensure_info_icon_styles(html)
+    html = inject_jira_readiness_styles(html)
     html = normalize_jira_readiness_icons(html)
     html = inject_tooltip_layout_fix(html)
     html = inject_report_h1_tooltip(html)
@@ -2320,13 +2736,15 @@ def apply_report_ui_enhancements(html: str) -> str:
     html = inject_note_box_tooltip(html)
     html = inject_split_metric_tooltips(html)
     html = _normalize_ladr_section_lead(html)
+    html = inject_lead_paragraph_tooltips(html)
     html = inject_section_lead_tooltip(html)
+    html = inject_ownership_card_tooltips(html)
     html = inject_ownership_tooltip_styles(html)
     html = inject_review_panel_tooltips(html)
     html = inject_trace_table_header_tooltips(html)
     html = inject_trace_section_styles(html)
     html = inject_trace_section_markup(html)
-    html = inject_metric_info_click_script(html)
+    html = inject_lead_paragraph_tooltips(html)
     html = inject_report_footer(html)
     return html
 

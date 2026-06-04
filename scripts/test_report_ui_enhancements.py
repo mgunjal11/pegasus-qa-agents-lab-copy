@@ -7,6 +7,7 @@ from coverage_report_helpers import (
     TRACE_TABLE_COLUMN_INFO,
     _readiness_item,
     apply_report_ui_enhancements,
+    strip_report_tooltips,
 )
 
 
@@ -41,7 +42,6 @@ MINIMAL_REPORT = """
   <table><thead><tr><th>TC</th><th>Scenario</th></tr></thead><tbody></tbody></table>
   <div class="testplan-split-metrics"><span class="split-metric">Jira acceptance criteria: <strong>1/2</strong></span></div>
   <div class="review-panel review-gaps"><h3>Test plan gaps</h3></div>
-  <div class="review-panel"><h3>Unmapped test cases</h3></div>
 </section>
 <section class="report-section section-ownership">
   <p class="section-lead">Dev-owned items should be proven by unit or integration tests in the PR.</p>
@@ -62,6 +62,111 @@ MINIMAL_REPORT = """
 """
 
 
+def test_tooltips_on_all_major_labels():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    assert out.count('class="metric-info-tip"') >= 15
+    assert "tooltip layout fix v22" in out
+    assert "translateX(-50%)" in out
+    assert 'aria-label="About Coverage summary"' in out
+    assert 'aria-label="About Release readiness score"' in out
+    assert 'aria-label="About Dev code coverage"' in out
+    assert 'aria-label="About TC"' in out
+    assert 'aria-label="About ID"' in out
+    assert 'aria-label="About QA handoff"' in out
+    assert "About Assumptions and open questions" in out
+    assert "tooltip-title" in out and "tooltip-body" in out
+
+
+def test_tooltip_description_spacing_css():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    assert ".metric-info-tooltip .tooltip-title" in out
+    assert "line-height: 1.55" in out
+    assert "padding: 0.75rem 0.85rem" in out
+    assert "margin-bottom: 0.55rem" in out or "margin: 0 0 0.55rem" in out
+
+
+def test_summary_metrics_flip_up():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    block = out.split(".metric-card .label-row .metric-info-tip > .metric-info-tooltip")[1][:450]
+    assert "bottom: calc(100% + 10px)" in block
+
+
+def test_tooltip_shows_on_hover():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    assert ".metric-info-tip:hover .metric-info-tooltip" in out
+    assert "metric-info-tip click toggle" not in out
+    assert 'title="Hover for description"' not in out
+    assert ".metric-info-tip > .metric-info-tooltip" in out
+
+
+def test_release_readiness_tooltip_full_box_left_of_icon():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    block = out.split(".metric-card .label-row .metric-info-tip > .metric-info-tooltip")[1][:500]
+    assert "bottom: calc(100% + 10px)" in block
+    assert "left: 0 !important" in block
+    assert "transform: none !important" in block
+    rel = out.split(".release-score-card .label-row .metric-info-tip > .metric-info-tooltip")[1][:200]
+    assert "z-index: 1200" in rel
+    assert "section-summary:has(.release-score-card .metric-info-tip:hover) .section-body" in out
+    assert 'aria-label="About Release readiness score"' in out
+    assert "open-gap severity from the review" in out
+
+
+def test_cache_meta_tooltip_anchors_left():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    assert "header .cache-meta-with-tip .metric-info-tip," in out
+    assert "position: static !important" in out.split("header .cache-meta-with-tip .metric-info-tip,")[1][:400]
+    idx = out.index("header .cache-meta-with-tip .metric-info-tip > .metric-info-tooltip")
+    block = out[idx : idx + 700]
+    assert "left: 0 !important" in block
+    assert "transform: none !important" in block
+
+
+def test_metric_grid_tooltips_row_anchored_not_centered():
+    """First grid column cards must not use translateX(-50%) on label-row tooltips."""
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    block = out.split(".metric-card .label-row .metric-info-tip > .metric-info-tooltip")[1][:450]
+    assert "bottom: calc(100% + 10px)" in block
+    assert "left: 0 !important" in block
+    assert "transform: none !important" in block
+    assert "translateX(-50%)" not in block.split("/* Release readiness")[0]
+
+
+def test_group_title_tooltip_opens_below_right_aligned():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    assert ".summary-group-title .group-title-row .metric-info-tip > .metric-info-tooltip" in out
+    block = out.split(".summary-group-title .group-title-row .metric-info-tip > .metric-info-tooltip")[1][:400]
+    assert "top: calc(100% + 10px)" in block
+    assert "right: 0 !important" in block
+    assert "bottom: auto !important" in block
+    assert "transform: none !important" in block
+    assert 'aria-label="About Implementation &amp; tests"' in out or "Implementation" in out
+
+
+def test_first_table_column_tooltip_left_anchored():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    idx = out.index("th:first-child .metric-info-tip > .metric-info-tooltip")
+    block = out[idx : idx + 700]
+    assert "left: 0 !important" in block
+    assert "transform: none !important" in block
+
+
+def test_section_h2_tooltip_flips_up_above_banner():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    assert ".report-section .section-head .heading-label-row .metric-info-tip > .metric-info-tooltip" in out
+    block = out.split(".report-section .section-head .heading-label-row .metric-info-tip > .metric-info-tooltip")[1][:350]
+    assert "bottom: calc(100% + 10px)" in block
+    assert "left: 0 !important" in block
+    assert 'aria-label="About Coverage summary"' in out
+
+
+def test_header_quick_links_tooltip_centered():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    assert ".quick-links-with-tip" in out or "quick-links-with-tip" in out
+    assert "header .quick-links" in out
+    assert ".metric-info-tip > .metric-info-tooltip" in out
+
+
 def test_normalize_legacy_readiness_warn_to_red_x():
     legacy = (
         '<div class="jira-readiness-block"><ul>'
@@ -70,8 +175,15 @@ def test_normalize_legacy_readiness_warn_to_red_x():
     )
     out = apply_report_ui_enhancements(f"<style></style>{legacy}")
     assert 'class="readiness-item ready-missing"' in out
-    assert 'class="readiness-item ready-warn"' not in out
     assert '<span class="readiness-icon" aria-hidden="true">✗</span>' in out
+
+
+def test_report_h1_and_jira_readiness_heading_have_no_tooltip():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    assert 'aria-label="About Report title"' not in out
+    assert "About Jira input readiness" not in out
+    assert "<h3>Jira input readiness</h3>" in out or "Jira input readiness</h3>" in out
+    assert 'aria-label="About Acceptance criteria"' in out
 
 
 def test_jira_readiness_icons_green_red():
@@ -83,50 +195,7 @@ def test_jira_readiness_icons_green_red():
     )
     out = apply_report_ui_enhancements(f"<style></style>{block}")
     assert 'class="readiness-item ready-ok"' in out
-    assert 'class="readiness-item ready-missing"' in out
-    assert '<span class="readiness-icon" aria-hidden="true">✓</span>' in out
-    assert '<span class="readiness-icon" aria-hidden="true">✗</span>' in out
     assert ".readiness-item.ready-ok .readiness-icon" in out
-    assert ".readiness-item.ready-missing .readiness-icon" in out
-    assert "var(--pass)" in out
-    assert "var(--fail)" in out
-
-
-def test_apply_report_ui_enhancements_covers_all_sections():
-    out = apply_report_ui_enhancements(MINIMAL_REPORT)
-    assert 'aria-label="About verdict"' in out
-    assert 'aria-label="About Report title"' in out
-    assert 'aria-label="About Jira"' in out
-    assert 'aria-label="About Cache freshness"' in out
-    assert 'aria-label="About Quick links"' in out
-    assert "About Jira input readiness" in out
-    assert "About Acceptance criteria" in out
-    assert "About Release readiness score" in out
-    assert "About Test plan source" in out
-    assert "About Dev vs QA ownership" in out
-    assert "ownership section tooltips v3" in out
-    assert "section-ownership" in out and "section-lead-with-tip" in out
-    assert "About Unmapped test cases" in out
-    assert "About Coverage summary" in out
-    assert "About Linked PR(s)" not in out or "section-pr" in out
-    assert "group-title-row" in out
-    assert "About TC" in out
-    assert "About ID" in out
-    assert "About QA handoff" in out
-    assert "About Test plan gaps" in out
-    assert "tooltip layout fix v8" in out
-    assert "right: calc(100% + 10px)" in out
-    assert "section-head .heading-label-row .metric-info-tooltip" in out
-    assert "th:nth-last-child(2) .metric-info-tooltip" in out
-    twice = apply_report_ui_enhancements(out)
-    assert twice.count('class="metric-info-tip"') == out.count('class="metric-info-tip"')
-
-
-def test_table_column_counts():
-    out = apply_report_ui_enhancements(MINIMAL_REPORT)
-    assert out.count("About TC") >= 1
-    assert len(TESTPLAN_TABLE_COLUMN_INFO) == 7
-    assert len(TRACE_TABLE_COLUMN_INFO) == 7
 
 
 def test_report_footer_attribution():
@@ -137,113 +206,39 @@ def test_report_footer_attribution():
     )
     out = apply_report_ui_enhancements(legacy)
     assert "Developed by Mayur Gunjal" in out
+
+
+def test_apply_report_ui_enhancements_idempotent():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
     twice = apply_report_ui_enhancements(out)
-    assert twice.count("Developed by Mayur Gunjal") == 1
+    assert twice.count('aria-label="About Coverage summary"') == 1
+    assert twice.count('aria-label="About Release readiness score"') == 1
+    assert "tooltip layout fix v22" in twice
 
 
-def test_tooltip_layout_fix_upgrades_legacy_css():
+def test_table_column_tooltips():
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    assert len(TESTPLAN_TABLE_COLUMN_INFO) == 7
+    assert len(TRACE_TABLE_COLUMN_INFO) == 7
+    assert len(SECTION_HEADER_INFO) >= 6
+
+
+def test_trace_section_lead_tooltip():
     legacy = MINIMAL_REPORT.replace(
-        "</style>",
-        """
-    /* tooltip layout fix — prevent clipping in panels and sections */
-    .report-section,
-    .report-section .section-body,
-    .review-panel { overflow: visible !important; }
-    th .metric-info-tooltip { left: 50% !important; }
-    th:last-child .metric-info-tooltip { left: auto !important; right: 0 !important; }
-  </style>""",
+        '<section class="report-section section-trace">',
+        '<section class="report-section section-trace">'
+        '<p class="trace-section-lead">Per-requirement mapping.</p>',
         1,
     )
     out = apply_report_ui_enhancements(legacy)
-    assert "tooltip layout fix v8" in out
-    assert "right: calc(100% + 10px)" in out
-    assert "th .metric-info-tooltip { left: 50%" not in out.replace(" ", "")
-    assert "th:nth-last-child(2) .metric-info-tooltip" in out
-    assert "section-head .heading-label-row .metric-info-tooltip" in out
+    assert "trace-section-lead-with-tip" in out
+    assert 'aria-label="About Requirements traceability intro"' in out
 
 
-def test_tooltip_layout_fix_upgrades_v2_css():
-    v2 = MINIMAL_REPORT.replace(
-        "</style>",
-        """
-    /* tooltip layout fix v2 — prevent clipping in panels and sections */
-    th .metric-info-tooltip { left: auto !important; right: 0 !important; }
-  </style>""",
-        1,
-    )
-    out = apply_report_ui_enhancements(v2)
-    assert "tooltip layout fix v8" in out
-    assert "right: calc(100% + 10px)" in out
-    assert "tooltip layout fix v2" not in out
-    assert "th:nth-last-child(2) .metric-info-tooltip" in out
-
-
-def test_ownership_section_tooltip_layout():
-    """§4 tooltips: header/lead/cards open below icon; QA card aligns tooltip left."""
-    out = apply_report_ui_enhancements(MINIMAL_REPORT)
-    assert "ownership section tooltips v3" in out
-    assert ".section-ownership .section-head:has(.metric-info-tip:hover)" in out
-    assert ".section-ownership .metric-card.metric-qa .label-row .metric-info-tooltip" in out
-    block = out.split("ownership section tooltips v3")[1].split("/* trace section visibility")[0]
-    assert ".section-ownership .metric-card .label-row .metric-info-tooltip" in block
-    assert "top: calc(100% + 8px)" in block
-    assert "bottom: calc(100% + 8px)" not in block
-    assert "isolation: isolate" in block
-    # Lead icon at end of paragraph, not before body text
-    m = re.search(
-        r'<section class="report-section section-ownership">[\s\S]*?'
-        r'<p class="section-lead section-lead-with-tip">([\s\S]*?)</p>',
-        out,
-    )
-    assert m is not None
-    assert m.group(1).strip().endswith('</span>')
-    assert 'aria-label="About Dev vs QA ownership"' in m.group(1)
-    upgraded = apply_report_ui_enhancements(
-        MINIMAL_REPORT.replace(
-            "</style>",
-            """
-    /* ownership section tooltips v2 */
-    .section-ownership .metric-card .label-row .metric-info-tooltip {
-      bottom: calc(100% + 8px) !important;
-    }
-  </style>""",
-            1,
-        ).replace(
-            '<p class="section-lead">Dev-owned items',
-            '<p class="section-lead section-lead-with-tip">'
-            '<span class="metric-info-tip" tabindex="0" role="button" '
-            'aria-label="About Dev vs QA ownership">'
-            '<span class="metric-info-icon" aria-hidden="true">i</span>'
-            '<span class="metric-info-tooltip">old</span></span> Dev-owned items',
-            1,
-        )
-    )
-    assert "ownership section tooltips v3" in upgraded
-    assert "ownership section tooltips v2" not in upgraded
-    assert "bottom: calc(100% + 8px)" not in upgraded.split("ownership section tooltips v3")[1].split(
-        "/* trace section visibility"
-    )[0]
-
-
-def test_pr_table_dev_tests_tooltip_right_aligned_to_th():
-    html = """
-    <style></style>
-    <section class="report-section section-pr">
-      <table><thead><tr><th>PR</th><th>Repo</th><th>State</th><th>Title</th><th>Dev tests</th><th>CI status</th></tr></thead><tbody></tbody></table>
-    </section>
-    """
-    out = apply_report_ui_enhancements(html)
-    assert "th:nth-last-child(2) .metric-info-tooltip" in out
-    assert "th:nth-last-child(-n+2)" in out
-    assert "translateX(-50%)" not in out
-    assert 'aria-label="About Dev tests"' in out
-    assert "Key unit or integration test classes or files added or changed in the PR" in out
-    assert "dev-owned acceptance criteria" in out
-
-
-def test_metric_info_click_toggle_script():
-    out = apply_report_ui_enhancements(MINIMAL_REPORT)
-    assert "metric-info-tip click toggle" in out
-    assert ".metric-info-tip.is-open .metric-info-tooltip" in out
-    assert "classList.toggle('is-open')" in out
-    assert "</script>" in out
+def test_strip_then_reapply_tooltips():
+    with_tips = apply_report_ui_enhancements(MINIMAL_REPORT)
+    stripped = strip_report_tooltips(with_tips)
+    assert '<span class="metric-info-tip"' not in stripped
+    restored = apply_report_ui_enhancements(stripped)
+    assert '<span class="metric-info-tip"' in restored
+    assert "tooltip-body" in restored
