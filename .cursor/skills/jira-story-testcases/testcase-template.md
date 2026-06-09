@@ -66,12 +66,12 @@ Example: `MSC-191511_Trigger FF-2.0 workflow of Acquired job with OPL audio 2.0 
 | File | Purpose |
 |------|---------|
 | `testcases/<ISSUE-KEY>-testcases.xlsx` | **Primary** — QMetry import (merged cells, sheet name `QMetry Template`) |
-| `testcases/<ISSUE-KEY>-testcases.tsv` | Source data |
-| `testcases/<ISSUE-KEY>-testcases.md` | Review mirror |
+| `reports/.cache/<ISSUE-KEY>-testcases-source.tsv` | Internal source (not in `testcases/`) |
+| `testcases/<ISSUE-KEY>-testcases.xlsx` | Deliverable |
 
 ```bash
 pip install -r requirements.txt
-python scripts/generate_qmetry_excel.py testcases/<ISSUE-KEY>-testcases.tsv
+python scripts/write_testcase_excel.py <ISSUE-KEY>
 ```
 
 ---

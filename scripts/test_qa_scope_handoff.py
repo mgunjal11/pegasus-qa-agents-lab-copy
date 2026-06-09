@@ -14,6 +14,7 @@ from map_requirements_to_diff import derive_owner_and_qa_scope  # noqa: E402
 from coverage_report_helpers import (  # noqa: E402
     _qa_scope_needs_qa_execution,
     build_qa_ownership_fields,
+    build_recommended_actions_list,
 )
 
 
@@ -76,3 +77,56 @@ def test_build_qa_handoff_excludes_dev_covered_from_execute_bullet(tmp_path: Pat
     assert "TC1" not in fields["qaHandoffList"]
     assert "0 items" not in fields["qaScopeSummary"]
     assert "skip scenarios" in fields["qaHandoffList"].lower() or "QA-scoped" in fields["qaHandoffList"]
+    assert "<h3 class=\"actions-group-title\">Dev</h3>" in fields["actionsList"]
+    assert "<h3 class=\"actions-group-title\">QA</h3>" in fields["actionsList"]
+
+
+def test_recommended_actions_dev_and_qa_sections(tmp_path: Path):
+    cache = tmp_path / "reports" / ".cache"
+    cache.mkdir(parents=True)
+    mapping = {
+        "requirements": [
+            {
+                "id": "R1",
+                "text": "Feature works",
+                "codeStatus": "missing",
+                "devTestStatus": "missing",
+                "owner": "dev",
+                "qaScope": "e2e",
+            },
+        ]
+    }
+    testplan = {"testCases": [{"id": "TC1", "mapped_requirements": ["R1"]}], "coverage": {}}
+    prefetch = {
+        "prs": [
+            {
+                "org": "wbd-msc",
+                "repo": "demo",
+                "number": 42,
+                "view": {"state": "OPEN", "title": "Fix feature"},
+                "checks": "build fail",
+            }
+        ]
+    }
+    (cache / "MSC-ACT-mapping.json").write_text(json.dumps(mapping), encoding="utf-8")
+    (cache / "MSC-ACT-testplan.json").write_text(json.dumps(testplan), encoding="utf-8")
+    (cache / "MSC-ACT-prefetch.json").write_text(json.dumps(prefetch), encoding="utf-8")
+
+    html = build_recommended_actions_list("MSC-ACT", root=tmp_path)
+    assert "Implement R1" in html
+    assert "Merge PR" in html
+    assert "Fix CI" in html
+    assert "Verify R1" in html
+    assert "Execute test plan" in html
+
+
+def test_auto_gaps_list_uses_utf8_em_dash_not_mojibake():
+    from build_coverage_report import _auto_gaps
+
+    gaps, summary, _ = _auto_gaps(
+        {"requirements": []},
+        {"coverage": {"uncoveredJiraRequirements": ["R4"]}},
+    )
+    assert "— no mapped test case in test plan" in gaps
+    assert "â€" not in gaps
+    assert "·" in summary or summary == "None"

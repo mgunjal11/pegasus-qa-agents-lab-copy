@@ -1,5 +1,6 @@
 ---
-name: msc-dev-code-and-qa-test-coverage-validator
+name: coverage-validator
+disable-model-invocation: true
 author: Mayur Gunjal
 description: >-
   Validates MSC Jira story implementation against linked GitHub PRs and attached
@@ -89,6 +90,7 @@ When invoked via slash command with issue key in `$ARGUMENTS`, run **end-to-end*
 | 2 | **Parallel MCP:** `getJiraIssue` (`attachment`, `comment`, `issuelinks`) + `getJiraIssueRemoteIssueLinks` (+ `getConfluencePage` when wiki links); write `{KEY}-jira.json` with `pageId` on remote/confluence links |
 | 3 | `fetch_confluence_requirements.py {KEY} --from-jira-cache` |
 | 4 | `fetch_jira_testplan.py {KEY} --from-jira-cache` |
+| 4b | If `status` is **`no_testplan`** → `/msc-testcase-writer {KEY}` (see [testplan-missing-fallback.md](references/testplan-missing-fallback.md)); re-run `fetch_jira_testplan.py` |
 | 5 | **One shell:** `prefetch_coverage_inputs.py {KEY} --pr URL …` (multiple `--pr`) or `--from-cache`; branch-only: `fetch_coverage_github.py {KEY} --repo org/repo --compare develop` |
 | 6 | `map_requirements_to_diff.py {KEY}` |
 | 7 | `build_coverage_report.py {KEY}` [`--analysis` optional] |
@@ -107,6 +109,7 @@ Task Progress:
 - [ ] Step 3: Resolve linked GitHub PR(s)
 - [ ] Step 4: Fetch PR changes and CI status
 - [ ] Step 5: Fetch and parse attached QMetry test plan (unless `--skip-testplan`)
+- [ ] Step 5a: If `no_testplan` → `/msc-testcase-writer` + re-fetch (unless `skipTestcaseGeneration`)
 - [ ] Step 6: Map requirements to code, tests, test plan cases, and dev/QA ownership
 - [ ] Step 7: Compute coverage percentages (including dev test and test plan coverage)
 - [ ] Step 8: Build HTML report with dev vs QA and test plan sections; run `apply_report_ui_enhancements()`
@@ -240,9 +243,25 @@ Parse output: `testCases` (include `section`, `summary`, `mascot_links`, `eviden
 
 **Jira attachment (Option C):** When `ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN` are set, download the Excel from the issue attachment first. Resolve the sheet from Jira comment text (e.g. *Inc as full* → Excel tab *Inc as Fulll*). Parse **high-level scenarios** from Domino sheets: **Section** + **Summary**, Given/When/Then steps, **Mascot links** from QA/SIT mascot columns, and **`evidence_text`** from **SIT Jobs**, **QA Jobs**, **Comments**, and similar columns (Caption Monitoring stores Edit ID / Caption Group ID / Pegasus ID there). When Mascot links are absent, **`testplan_evidence.py`** extracts labeled IDs and UUIDs from `evidence_text` and mapped Jira acceptance criteria — rendered via **`render_testplan_evidence()`**.
 
-**Report wording:** In Coverage summary use **acceptance criteria** (not AC) and **Given When Then** (not GWT). **GWT completeness is content-based** — detect `Given` / `When` / `Then` inside any step column (`Step Summary`, `Test Steps`, etc.) via `scripts/testplan_gwt.py` (optional colons; common typos like `Than:` normalized to `Then`); do not require QMetry column names. Set `{{TESTPLAN_NOTE}}` from cache `testPlanSummaryNote` when present. Build test plan placeholders with **`scripts/coverage_report_helpers.build_testplan_report_fields()`** — includes `{{TESTPLAN_ROWS}}` (Evidence via `render_testplan_evidence()`), `{{LADR_TRACEABILITY_BLOCK}}`, and `{{TESTPLAN_GAPS_LIST}}`. Always call **`apply_report_ui_enhancements(html)`** before write.
+**Report wording:** In Coverage summary use **acceptance criteria** (not AC) and **Given When Then** (not GWT). **GWT completeness is content-based** — detect `Given` / `When` / `Then` inside any step column (`Step Summary`, `Test Steps`, etc.) via `scripts/testplan_gwt.py` (optional colons; common typos like `Than:` normalized to `Then`); do not require QMetry column names. Set `{{TESTPLAN_NOTE}}` from cache `testPlanSummaryNote` (`build_testplan_summary_note()` — honest source text; no Domino/SharePoint defaults on `workspace_generated` plans). Build test plan placeholders with **`scripts/coverage_report_helpers.build_testplan_report_fields()`** — includes `{{TESTPLAN_ROWS}}` (Evidence via `render_testplan_evidence()`; **`testPlanSource: workspace_generated`** → badge **No execution evidence** — `testplan_evidence.py` uses `include_steps=False`), `{{LADR_TRACEABILITY_BLOCK}}`, and `{{TESTPLAN_GAPS_LIST}}`. Always call **`apply_report_ui_enhancements(html)`** before write (tooltip copy unchanged — see [content-vs-tooltips.md](references/content-vs-tooltips.md)).
 
-When `status` is `referenced_not_local`, set `{{TESTPLAN_COVERAGE_PCT}}` to **Pending**, populate `{{TESTPLAN_NOTE}}` with the referenced filename and sheet (not "no QMetry attachment"). When `status` is `no_testplan`, use **`NA`**.
+When `status` is `referenced_not_local`, set `{{TESTPLAN_COVERAGE_PCT}}` to **Pending**, populate `{{TESTPLAN_NOTE}}` with the referenced filename and sheet (not "no QMetry attachment"). When `status` is `no_testplan`, use **`NA`** until Step 5a generates a local plan.
+
+### Step 5a: Missing Jira test plan → `/msc-testcase-writer`
+
+Read [references/testplan-missing-fallback.md](references/testplan-missing-fallback.md).
+
+After the first `fetch_jira_testplan.py` run, if `reports/.cache/{KEY}-testplan.json` has **`status: "no_testplan"`** (no Jira attachment, no comment/SharePoint reference, no existing `testcases/{KEY}-testcases.xlsx`):
+
+1. **Do not** invoke testcase writer when `status` is `referenced_not_local` — user must add `testplans/{filename}` per [jira-testplan-validation.md](references/jira-testplan-validation.md).
+2. When manifest/defaults **`generateTestPlanIfMissing`** is true (default in `--auto --write`) and **`skipTestcaseGeneration`** is false:
+   - Run **`/msc-testcase-writer {KEY}`** using `.cursor/skills/jira-story-testcases/SKILL.md` and `.cursor/agents/msc-testcase-writer.md`.
+   - In **`--auto --write`**, skip testcase-writer approval (Step 6) — write `reports/.cache/{KEY}-testcases-source.tsv`, run `python scripts/write_testcase_excel.py {KEY}` (only `testcases/{KEY}-testcases.xlsx` in `testcases/`).
+   - Cover Jira **R1…Rn** and linked LADR scenarios where Confluence cache exists.
+3. Re-run: `python scripts/fetch_jira_testplan.py {KEY} --from-jira-cache` (loads generated `testcases/` files).
+4. Set `{{TESTPLAN_NOTE}}` to mention **generated via msc-testcase-writer (not on Jira)** when reporting — data/note only; **do not** edit tooltip HTML/CSS in `coverage_report_helpers.py` or `apply_report_ui_enhancements()`.
+
+In **interactive** mode (no `--auto`), offer `/msc-testcase-writer {KEY}` with normal user approval before writing files.
 
 ### Step 5b: Map requirements to PR diff (automated)
 
@@ -432,7 +451,7 @@ Optional narrative overrides: `python scripts/build_coverage_report.py {ISSUE-KE
 
 Analysis JSON keys (optional): `verdict`, `verdictClass`, `verdictRationale`, `reqCoveragePct`, `reqCoverageDetail`, `devCoveragePct`, `devCoverageDetail`, `qaScopeSummary`, `openGapsSummary`, `openGapsClass`, `openGapsDetail`, `gapsList`, `devCoveredList`, `qaHandoffList`, `correctlyImplementedList`, `assumptionsList`, `actionsList`, `requirementRows`, `prNote`, `storyTitle`.
 
-The builder fills: **Jira readiness block** (`build_jira_readiness_block()` — ✓ green / ✗ red per checklist row), **quick links** (`build_quick_links()` — Jira, SharePoint test plan, PR(s), **LADR Confluence** via `collect_ladr_page_links()` only when a LADR or design-requirements page exists), release score, split test plan metrics, **§4 Dev vs QA ownership** via `build_qa_ownership_fields()` — requirements with **QA scope None** (dev unit/integration **Covered**) are **not** listed for QA test-plan execution; only TCs mapped to QA-scoped `R*` appear in handoff, **Linked PR rows** (file counts + **auto Dev tests** from prefetch/mapping), **branch-compare rows** when no PRs, **CI pipeline cards** via `ci_coverage_report_fields()` (re-extracts Sonar/Codecov/pytest-cov; `finalize_ci_coverage()` for branch display), auto traceability rows from mapping cache (unless `requirementRows` in analysis), unmapped TCs, suggested mappings. **`{{PR_NOTE}}`** from analysis or `build_branch_compare_pr_note()`. Always runs `apply_report_ui_enhancements()` before write (idempotent if called twice).
+The builder fills: **Jira readiness block** (`build_jira_readiness_block()` — ✓ green / ✗ red per checklist row), **quick links** (`build_quick_links()` — Jira, SharePoint test plan, PR(s), **LADR Confluence** via `collect_ladr_page_links()` only when a LADR or design-requirements page exists), release score, split test plan metrics, **§4 Dev vs QA ownership** via `build_qa_ownership_fields()` — requirements with **QA scope None** (dev unit/integration **Covered**) are **not** listed for QA test-plan execution; only TCs mapped to QA-scoped `R*` appear in handoff, **§8 Recommended actions** via `build_recommended_actions_list()` inside `build_qa_ownership_fields()` — separate **Dev** and **QA** `<ul>` groups (layout CSS via `inject_recommended_actions_styles()` / `inject_recommended_actions_markup()` only), **Linked PR rows** (file counts + **auto Dev tests** from prefetch/mapping), **branch-compare rows** when no PRs, **CI pipeline cards** via `ci_coverage_report_fields()` (re-extracts Sonar/Codecov/pytest-cov; `finalize_ci_coverage()` for branch display), auto traceability rows from mapping cache (unless `requirementRows` in analysis), unmapped TCs, suggested mappings. **`{{PR_NOTE}}`** from analysis or `build_branch_compare_pr_note()`. Always runs `apply_report_ui_enhancements()` before write (idempotent if called twice; do not edit tooltip bodies in the same change).
 
 **Manual / agent-refined:** Read [report-template.html](report-template.html) and replace all `{{PLACEHOLDER}}` tokens. New placeholders: `{{CACHE_META}}`, `{{QUICK_LINKS}}`, `{{JIRA_READINESS_BLOCK}}`, `{{RELEASE_SCORE_BLOCK}}`, `{{TESTPLAN_SPLIT_METRICS}}`, `{{UNMAPPED_TC_BLOCK}}`, `{{SUGGESTED_MAPPING_BLOCK}}`.
 
@@ -507,7 +526,9 @@ The helper adds (idempotent — safe on template or post-builder HTML):
 
 Always call the helper once before write. Do not hand-roll tooltip HTML in reports.
 
-**Regression tests:** `python -m pytest scripts/test_report_ui_enhancements.py scripts/test_quick_links.py scripts/test_qa_scope_handoff.py scripts/test_confluence_requirements.py -q`
+**Regression tests:** `python -m pytest scripts/test_report_ui_enhancements.py scripts/test_quick_links.py scripts/test_qa_scope_handoff.py scripts/test_confluence_requirements.py scripts/test_fetch_jira_testplan_summary.py scripts/test_testplan_evidence.py -q`
+
+**Content vs tooltips:** When updating §3/§8 or testcase-writer integration, edit data builders only — see [references/content-vs-tooltips.md](references/content-vs-tooltips.md). Do not change `SUMMARY_METRIC_INFO` or tooltip injection unless the user requests a UI/tooltip change.
 
 ```python
 from coverage_report_helpers import apply_report_ui_enhancements, render_pr_rows_from_prefetch
@@ -519,7 +540,8 @@ html = apply_report_ui_enhancements(html)
 | `{{REQUIREMENT_ROWS}}` | HTML `<tr>` rows — Code, Dev tests, Owner, QA scope, Evidence (see below) |
 | `{{CORRECTLY_IMPLEMENTED_LIST}}` | `<li>` items |
 | `{{GAPS_LIST}}` | `<li class="critical|high|medium">` items |
-| `{{ASSUMPTIONS_LIST}}`, `{{ACTIONS_LIST}}` | `<li>` items |
+| `{{ASSUMPTIONS_LIST}}` | `<li>` items |
+| `{{ACTIONS_LIST}}` | §8 — `build_recommended_actions_list()` → Dev + QA action groups |
 
 **Status badges** (requirement table):
 
@@ -597,6 +619,8 @@ Optional: add a Jira comment summary via `addCommentToJiraIssue` when `--post-ji
 - GitHub / CI coverage commands: [references/github-coverage.md](references/github-coverage.md)
 - Dev vs QA test scope rules: [references/dev-qa-test-scope.md](references/dev-qa-test-scope.md)
 - Jira test plan validation: [references/jira-testplan-validation.md](references/jira-testplan-validation.md)
+- Content vs tooltips (do not mix): [references/content-vs-tooltips.md](references/content-vs-tooltips.md)
+- Missing test plan → testcase writer: [references/testplan-missing-fallback.md](references/testplan-missing-fallback.md)
 - Confluence / LADR requirements: [references/confluence-ladr-requirements.md](references/confluence-ladr-requirements.md)
 - Run modes, flags, cache, prefetch: [references/run-options.md](references/run-options.md)
 - Auto-approve Allow/Run prompts: [references/auto-approve-setup.md](references/auto-approve-setup.md)

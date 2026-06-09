@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Regenerate MSC-204417 report with local-timezone timestamped filename."""
 import json
 import re
@@ -14,7 +14,7 @@ from coverage_report_helpers import (  # noqa: E402
 )
 from coverage_report_timestamp import report_paths  # noqa: E402
 
-template = (ROOT / ".cursor/skills/msc-dev-code-and-qa-test-coverage-validator/report-template.html").read_text(encoding="utf-8")
+template = (ROOT / ".cursor/skills/coverage-validator/report-template.html").read_text(encoding="utf-8")
 
 candidates = sorted(ROOT.glob("reports/MSC-204417*.html"), key=lambda p: p.stat().st_mtime, reverse=True)
 if not candidates:
@@ -42,8 +42,8 @@ replacements = {
     "{{QA_SCOPE_SUMMARY}}": "2 items",
     "{{REQ_MAPPED_SUMMARY}}": "3/3 AC",
     "{{REQ_MAPPED_CLASS}}": "metric-good",
-    "{{REQ_MAPPED_DETAIL}}": "R1–R3",
-    "{{OPEN_GAPS_SUMMARY}}": "2 High · 2 Med",
+    "{{REQ_MAPPED_DETAIL}}": "R1â€“R3",
+    "{{OPEN_GAPS_SUMMARY}}": "2 High Â· 2 Med",
     "{{OPEN_GAPS_CLASS}}": "metric-warn",
     "{{OPEN_GAPS_DETAIL}}": "No linked PR; Monitor E2E; STATUS_ERROR 9000 (L14) test gap",
     "{{CI_LINE_COVERAGE}}": "NA",
@@ -59,7 +59,7 @@ cov = tp.get("coverage") or {}
 replacements.update(build_testplan_report_fields("MSC-204417", ROOT))
 if not replacements.get("{{TESTPLAN_GAPS_LIST}}"):
     replacements["{{TESTPLAN_GAPS_LIST}}"] = (
-        '<li class="medium">Review test plan ↔ PR alignment for Monitor E2E scenarios</li>'
+        '<li class="medium">Review test plan â†” PR alignment for Monitor E2E scenarios</li>'
     )
 tc_count = cov.get("testCaseCount") or 0
 gwt_complete = cov.get("completeGwtCount") or 0
@@ -90,22 +90,22 @@ if cov.get("testplanCoveragePct") is not None and cov.get("testplanCoveragePct")
 def ul_content(old_html: str, heading: str) -> str:
     idx = old_html.find(heading)
     if idx < 0:
-        return "<li>—</li>"
+        return "<li>â€”</li>"
     m = re.search(r"<ul[^>]*>(.*?)</ul>", old_html[idx:], re.S)
-    return m.group(1).strip() if m else "<li>—</li>"
+    return m.group(1).strip() if m else "<li>â€”</li>"
 
 
 def ol_content(old_html: str, heading: str) -> str:
     idx = old_html.find(heading)
     if idx < 0:
-        return "<li>—</li>"
+        return "<li>â€”</li>"
     m = re.search(r"<ol[^>]*>(.*?)</ol>", old_html[idx:], re.S)
-    return m.group(1).strip() if m else "<li>—</li>"
+    return m.group(1).strip() if m else "<li>â€”</li>"
 
 
 def tbody_rows(old_html: str) -> str:
     m = re.search(r"Requirements traceability.*?<tbody>\s*(.*?)\s*</tbody>", old_html, re.S)
-    return m.group(1).strip() if m else '<tr><td colspan="7">—</td></tr>'
+    return m.group(1).strip() if m else '<tr><td colspan="7">â€”</td></tr>'
 
 
 pr_note = re.search(r'<div class="note-box">.*?</div>', old, re.S)
@@ -120,13 +120,13 @@ replacements["{{REQUIREMENT_ROWS}}"] = tbody_rows(old)
 impl = ul_content(old, "Correctly implemented")
 impl += (
     "<li><strong>Test plan:</strong> Jira attachment "
-    "<code>Promo Caption Monitoring.xlsx</code> — Caption Monitoring sheet, 12 caption status scenarios (TC1–TC12)</li>"
+    "<code>Promo Caption Monitoring.xlsx</code> â€” Caption Monitoring sheet, 12 caption status scenarios (TC1â€“TC12)</li>"
 )
 replacements["{{CORRECTLY_IMPLEMENTED_LIST}}"] = impl
 gaps = ul_content(old, "Gaps and concerns")
 tp_pct = cov.get("testplanCoveragePct")
 if tp_pct == 0 or tp_pct == 0.0:
-    gaps += '<li class="medium"><strong>Medium:</strong> Test plan scenarios not mapped to acceptance criteria — re-run fetch with Confluence/LADR cache</li>'
+    gaps += '<li class="medium"><strong>Medium:</strong> Test plan scenarios not mapped to acceptance criteria â€” re-run fetch with Confluence/LADR cache</li>'
 elif incomplete_gwt:
     gaps += f'<li class="medium"><strong>Medium:</strong> {incomplete_gwt} test case(s) missing full Given/When/Then</li>'
 replacements["{{GAPS_LIST}}"] = gaps

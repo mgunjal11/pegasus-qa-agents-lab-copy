@@ -14,7 +14,7 @@ Always attempt test plan validation in **`--auto`** and **interactive** modes un
 1. **Jira attachments** — `.xlsx` / `.tsv` on the issue (`attachment` field).
 2. **Jira comment / description references** — SharePoint Excel links and sheet names (e.g. *Refer **Inc as full** sheet for Test plan and evidence* → `Domino Test Plan.xlsx`).
 3. **Workspace local file** — `testplans/{filename}`, `testplans/{KEY}/`, or `testPlanPath` in manifest/defaults.
-4. **QMetry fallback** — `testcases/{KEY}-testcases.xlsx` or `.tsv`.
+4. **QMetry fallback** — `testcases/{KEY}-testcases.xlsx` only.
 
 The agent must persist in `reports/.cache/{KEY}-jira.json`:
 
@@ -75,8 +75,19 @@ Cache: `reports/.cache/{KEY}-testplan.json`
 |--------|---------|--------|
 | `ok` | Test cases parsed | Show coverage % and rows |
 | `referenced_not_local` | Jira comment references Excel + sheet; file not in `testplans/` | Show reference details + setup hint; **not** "no attachment" |
-| `no_testplan` | No attachment and no comment reference found | `NA` |
+| `no_testplan` | No attachment and no comment reference found | **`NA`** until generated — see [testplan-missing-fallback.md](testplan-missing-fallback.md) |
 | `parse_failed` | File found but sheet/parse error | Warn with parse errors |
+
+## No Jira attachment — generate test cases
+
+When `status` is **`no_testplan`** (not `referenced_not_local`):
+
+1. Coverage validator invokes **`/msc-testcase-writer {KEY}`** when `generateTestPlanIfMissing` is true (default in `--auto --write`).
+2. Writes `reports/.cache/{KEY}-testcases-source.tsv` + `testcases/{KEY}-testcases.xlsx` via `write_testcase_excel.py`.
+3. Re-runs `fetch_jira_testplan.py` — script priority **4** loads `testcases/{KEY}-testcases.xlsx`.
+4. Report §3 note should state plan was **generated locally** (not attached on Jira). Does not change report tooltip markup.
+
+Opt out: manifest `skipTestcaseGeneration: true` or `--skip-testplan`.
 
 ## Sheet formats
 
@@ -119,7 +130,17 @@ For each mapped pair (`R{n}` ↔ `TC{x}`):
 
 **Test plan completeness** — e.g. `12 test cases · 12/12 full Given When Then · 13/14 LADR scenarios covered · 3/3 Jira acceptance criteria covered` or `Referenced: Domino Test Plan.xlsx · Inc as full · 0 parsed (local file missing)`.
 
-**Attachment fields parsed:** `section`, `summary` (high-level scenario), Given/When/Then steps (from **any** step column — `Step Summary`, `Test Steps`, etc.; split combined blobs via `testplan_gwt.py`), `mascot_links` (QA/SIT Mascot link columns and hyperlinks), `evidence_text` (SIT Jobs, QA Jobs, Comments, Evidence, and similar columns — Edit ID, Caption Group ID, Pegasus ID, Job ID, or bare UUID), `evidence_ids` (parsed from `evidence_text` + mapped Jira AC), Story. **Given When Then completeness** counts test cases with all three markers in step **content** (including common typos e.g. `Than:` → `Then`), not whether columns are named Given/When/Then. Report Evidence column uses `render_testplan_evidence()` (Mascot first, then IDs). Report note from `testPlanSummaryNote`.
+**Attachment fields parsed:** `section`, `summary` (high-level scenario), Given/When/Then steps (from **any** step column — `Step Summary`, `Test Steps`, etc.; split combined blobs via `testplan_gwt.py`), `mascot_links` (QA/SIT Mascot link columns and hyperlinks), `evidence_text` (SIT Jobs, QA Jobs, Comments, Evidence, and similar columns — Edit ID, Caption Group ID, Pegasus ID, Job ID, or bare UUID), `evidence_ids` (parsed from `evidence_text` + mapped Jira AC), Story. **Given When Then completeness** counts test cases with all three markers in step **content** (including common typos e.g. `Than:` → `Then`), not whether columns are named Given/When/Then.
+
+**Report Evidence column** — `render_testplan_evidence()`:
+
+| `testPlanSource` | Evidence display |
+|----------------|------------------|
+| `jira_attachment`, `local_testplans`, `sharepoint_local` | Mascot links first, then parsed SIT/QA job IDs |
+| `workspace_generated` | **No execution evidence** — `testplan_evidence.py` skips step extraction (`include_steps=False`) |
+| `referenced_not_local` | Pending / setup hint until local file added |
+
+**Report note** — `testPlanSummaryNote` from `build_testplan_summary_note()` — filename/sheet only when actually parsed; generated plans state local msc-testcase-writer origin (not Domino defaults).
 
 ## Report placeholders
 

@@ -1,5 +1,5 @@
 {
-  "_comment": "Merge into ~/.cursor/permissions.json. Cursor Settings \u2192 Agents \u2192 Auto-Run \u2192 Allowlist.",
+  "_comment": "Merge into ~/.cursor/permissions.json. Cursor Settings \u00e2\u2020\u2019 Agents \u00e2\u2020\u2019 Auto-Run \u00e2\u2020\u2019 Allowlist.",
   "mcpAllowlist": [
     "user-atlassian:getJiraIssue",
     "user-atlassian:getJiraIssueRemoteIssueLinks",
@@ -20,6 +20,7 @@
     "python scripts/map_requirements_to_diff.py",
     "python scripts/build_coverage_report.py",
     "python scripts/generate_qmetry_excel.py",
+    "python scripts/write_testcase_excel.py",
     "python scripts/install_coverage_validator_permissions.py",
     "mkdir"
   ]

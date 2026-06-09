@@ -94,24 +94,17 @@ def build() -> Document:
 ├── .coverage-validator.defaults.json  # Optional repo defaults (not committed)
 ├── .cursor/
 │   ├── agents/
-│   │   └── msc-dev-code-and-qa-test-coverage-validator.md
-│   ├── commands/
-│   │   └── msc-dev-code-and-qa-test-coverage-validator.md
+│   │   ├── msc-dev-code-and-qa-test-coverage-validator.md
+│   │   ├── msc-testcase-writer.md
+│   │   └── msc-jira-bug.md
 │   ├── permissions.json               # MCP + terminal allowlist (after install)
 │   └── skills/
-│       └── msc-dev-code-and-qa-test-coverage-validator/
-│           ├── SKILL.md               # Primary workflow (Steps 0–9)
-│           ├── report-template.html   # HTML shell with {{PLACEHOLDER}} tokens
-│           ├── report-template.md     # Placeholder documentation
-│           ├── examples.md
-│           ├── validator.defaults.example.json
-│           └── references/
-│               ├── auto-approve-setup.md
-│               ├── run-options.md
-│               ├── dev-qa-test-scope.md
-│               ├── jira-testplan-validation.md
-│               ├── confluence-ladr-requirements.md
-│               └── github-coverage.md
+│       ├── coverage-validator/        # Validator workflow (Steps 0–9)
+│       │   ├── SKILL.md
+│       │   ├── report-template.html
+│       │   └── references/            # auto-approve, test plan, content-vs-tooltips, …
+│       ├── jira-story-testcases/      # QMetry testcase writer
+│       └── bug-filing/                # MSC bug filing (agent: msc-jira-bug)
 ├── scripts/                           # Python pipeline (see Section 4)
 ├── docs/
 │   ├── MSC-Dev-Code-and-QA-Test-Coverage-Validator-Jira-Template.docx
@@ -135,16 +128,16 @@ def build() -> Document:
         ["File", "Role"],
         [
             [
-                ".cursor/commands/msc-dev-code-and-qa-test-coverage-validator.md",
-                "Slash command definition: pipeline steps 0–11, --auto --write behavior.",
-            ],
-            [
                 ".cursor/agents/msc-dev-code-and-qa-test-coverage-validator.md",
-                "Subagent definition: auto-run rules, report builder notes, hard rules.",
+                "Agent: one-shot pipeline, auto-run rules, report builder notes.",
             ],
             [
-                ".cursor/skills/.../SKILL.md",
-                "Full skill: metrics, workflow, MCP usage, cache paths, HTML placeholders.",
+                ".cursor/agents/msc-testcase-writer.md",
+                "Agent: QMetry Excel via write_testcase_excel.py; LADR-aware drafting.",
+            ],
+            [
+                ".cursor/skills/coverage-validator/SKILL.md",
+                "Workflow skill: metrics, MCP, caches, HTML placeholders, §8 Dev/QA actions.",
             ],
             [
                 "AGENTS.md",

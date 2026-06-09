@@ -60,6 +60,26 @@ def test_render_ids_when_no_mascot():
     assert "badge-not-verified" not in html
 
 
+def test_generated_plan_does_not_treat_step_uuids_as_evidence():
+    tc = {
+        "id": "TC1",
+        "summary": "MSC-209330_Verify house format promo",
+        "steps": {
+            "given": "Given: dev acquire job 9499bc64-fa49-4b19-849b-c7ecdf3da15c",
+            "when": "When: workflow runs",
+            "then": "Then: normalization skipped",
+        },
+        "evidence_text": "",
+        "mascot_links": [],
+        "mapped_requirements": ["R1"],
+    }
+    ids = extract_testcase_evidence_ids(tc, include_steps=False)
+    assert ids == []
+    html = render_testplan_evidence(tc, generated_local=True)
+    assert "9499bc64" not in html
+    assert "No execution evidence" in html
+
+
 def test_sit_jobs_column_evidence_text():
     from testplan_evidence import extract_testcase_evidence_ids, row_evidence_text
 

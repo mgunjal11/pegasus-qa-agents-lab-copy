@@ -45,6 +45,7 @@ Modes combine: `--fetch-only` takes precedence; `--from-cache` skips gh when cac
 | `--skip-pr-search` | | Do not search Jira/heuristics when `--pr` provided |
 | `--skip-jira` | | Use cached Jira markdown only (fetch-only must have run first) |
 | `--skip-testplan` | | Skip attached test plan fetch and validation |
+| `--skip-testcase-generation` | | Do not invoke `/msc-testcase-writer` when Jira has no test plan |
 | `--sheet NAME` | `--sheet "Inc as full"` | Excel sheet for comment-referenced / Domino test plans |
 | `--post-jira` | | Post summary comment to Jira (default off) |
 | `--cache-max-age H` | `--cache-max-age 48` | Hours before cache is stale (default 24) |

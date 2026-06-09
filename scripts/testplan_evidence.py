@@ -136,7 +136,7 @@ def row_evidence_text(header: list[str], row: list[str], extra_indices: list[int
     return "\n".join(parts)
 
 
-def testcase_haystack(tc: Any) -> str:
+def testcase_haystack(tc: Any, *, include_steps: bool = True) -> str:
     if isinstance(tc, dict):
         parts = [
             tc.get("summary") or "",
@@ -145,8 +145,9 @@ def testcase_haystack(tc: Any) -> str:
             tc.get("section") or "",
             tc.get("story") or "",
         ]
-        steps = tc.get("steps") or {}
-        parts.extend(str(v) for v in steps.values() if v)
+        if include_steps:
+            steps = tc.get("steps") or {}
+            parts.extend(str(v) for v in steps.values() if v)
         return " ".join(parts)
     parts = [
         getattr(tc, "summary", "") or "",
@@ -155,22 +156,26 @@ def testcase_haystack(tc: Any) -> str:
         getattr(tc, "section", "") or "",
         getattr(tc, "story", "") or "",
     ]
-    steps = getattr(tc, "steps", None) or {}
-    parts.extend(str(v) for v in steps.values() if v)
+    if include_steps:
+        steps = getattr(tc, "steps", None) or {}
+        parts.extend(str(v) for v in steps.values() if v)
     return " ".join(parts)
 
 
 def extract_testcase_evidence_ids(
     tc: Any,
     jira_requirements: list[dict[str, str]] | None = None,
+    *,
+    include_steps: bool = True,
 ) -> list[dict[str, str]]:
     """
-    Evidence IDs from test case text, then from mapped Jira acceptance criteria text.
-    Used when Mascot hyperlinks are not present in the Excel row.
+    Evidence IDs from test plan evidence columns / text, then mapped Jira AC text.
+    When include_steps is False (locally generated QMetry plans), step/summary UUIDs
+    are ignored — only evidence_text, comment, and Jira AC fallback apply.
     """
     items: list[dict[str, str]] = []
     seen: set[str] = set()
-    haystack = testcase_haystack(tc)
+    haystack = testcase_haystack(tc, include_steps=include_steps)
     for item in extract_labeled_ids(haystack):
         _add_item(items, seen, item["label"], item["value"])
     for item in extract_bare_uuids(haystack):

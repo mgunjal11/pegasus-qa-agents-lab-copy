@@ -1,14 +1,15 @@
----
+﻿---
 name: msc-dev-code-and-qa-test-coverage-validator
 description: >-
   MSC Jira-to-PR and QMetry test plan validator for WBD Streaming. Auto-run friendly:
   use permissions allowlist, --auto --write, single-shell GitHub fetch, parallel
-  Jira MCP. Differentiates dev unit/integration from QA scope. Use via
-  /msc-dev-code-and-qa-test-coverage-validator MSC-1234.
+  Jira MCP. Differentiates dev unit/integration from QA scope. Invoke via
+  @msc-dev-code-and-qa-test-coverage-validator MSC-1234 (not the deprecated
+  msc-code-coverage-validator name).
 model: inherit
 ---
 
-You validate **MSC Jira stories** against **linked GitHub PRs** (or **branch compare** when no PR) and **attached Excel test plans**. Follow skill `.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/SKILL.md` and **references/auto-approve-setup.md**.
+You validate **MSC Jira stories** against **linked GitHub PRs** (or **branch compare** when no PR) and **attached or locally generated Excel test plans**. Follow skill `.cursor/skills/coverage-validator/SKILL.md` and **references/auto-approve-setup.md**.
 
 **Developed by:** Mayur Gunjal
 
@@ -23,7 +24,8 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 | **2** | **One MCP turn (parallel):** `getJiraIssue` (fields include `attachment`, `comment`, `issuelinks`) + `getJiraIssueRemoteIssueLinks`; call `getConfluencePage` when wiki/LADR links present. Persist `reports/.cache/{KEY}-jira.json` with `remoteLinks` / `confluenceLinks` (`pageId`) |
 | **3** | `python scripts/fetch_confluence_requirements.py {KEY} --from-jira-cache` |
 | **4** | `python scripts/fetch_jira_testplan.py {KEY} --from-jira-cache` (optional `--sheet "…"`) |
-| **5** | **One shell:** `python scripts/prefetch_coverage_inputs.py {KEY} --pr {URL} …` (repeat `--pr` per PR) **or** `--from-cache` if prefetch fresh; else `fetch_coverage_github.py` with `--repo` / `--compare` for branch-only stories |
+| **4b** | If testplan cache `status` is **`no_testplan`** → `/msc-testcase-writer {KEY}`: cache `reports/.cache/{KEY}-testcases-source.tsv` + `python scripts/write_testcase_excel.py {KEY}` → `testcases/{KEY}-testcases.xlsx` only; re-fetch test plan (see [testplan-missing-fallback.md](.cursor/skills/coverage-validator/references/testplan-missing-fallback.md)). If xlsx missing on re-run, rebuild from cache TSV before re-fetch. |
+| **5** | **One shell:** `python scripts/prefetch_coverage_inputs.py {KEY} --pr {URL}` (repeat `--pr` per PR) or `--mode from-cache` when prefetch is fresh; branch-only: `fetch_coverage_github.py {KEY} --repo org/repo --compare develop` |
 | **6** | `python scripts/map_requirements_to_diff.py {KEY}` → `{KEY}-mapping.json` |
 | **7** | `python scripts/build_coverage_report.py {KEY}` (optional `--analysis reports/.cache/{KEY}-analysis.json`) |
 | **8** | Manifest `lastReportFile` updated by builder |
@@ -34,25 +36,26 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 |------|---------|
 | Jira | **One turn**, parallel: `getJiraIssue` + `getJiraIssueRemoteIssueLinks` (+ `getConfluencePage` when needed) |
 | Confluence | **One shell:** `fetch_confluence_requirements.py {KEY} --from-jira-cache` |
-| Test plan | **One shell:** `fetch_jira_testplan.py {KEY} --from-jira-cache` |
+| Test plan | **One shell:** `fetch_jira_testplan.py {KEY} --from-jira-cache`; if **`no_testplan`** → `/msc-testcase-writer {KEY}` + `write_testcase_excel.py` + re-fetch (not for `referenced_not_local`) |
 | GitHub | **One shell:** prefetch with all `--pr` URLs, or read fresh cache — **never** N separate `gh` calls |
 | Mapping | **One shell:** `map_requirements_to_diff.py {KEY}` |
-| Report | **One shell:** `build_coverage_report.py {KEY}` — then `apply_report_ui_enhancements()` (builder calls it) |
-| Never | Hand-set `lineCoverage` instead of `{{CI_LINE_COVERAGE}}`; skip tooltips on manual HTML edits |
+| Report | **One shell:** `build_coverage_report.py {KEY}` — builder calls `apply_report_ui_enhancements()` |
+| Never | Hand-set `lineCoverage` instead of `{{CI_LINE_COVERAGE}}`; edit `SUMMARY_METRIC_INFO` or tooltip CSS when changing §3/§8 **content** |
 
 ## Report builder (required)
 
 - **CI:** `ci_coverage_report_fields()` → `{{CI_LINE_COVERAGE}}`, `{{CI_BRANCH_COVERAGE}}`, notes/classes; **NA** when no PR / branch-only; Sonar PR comment fallback when job logs 410 / artifacts expired (`ci_coverage.py`)
 - **LADR / test plan %:** `dedupe_ladr_requirements()` + unique requirement ids in `compute_testplan_coverage()` — metric data only; **do not** change tooltip HTML/CSS
-- **Linked PR(s):** `render_pr_rows_from_prefetch()` — Files, **Dev tests** (from mapping `prs[].devTests` + `diffNames`), CI status
+- **Linked PR(s):** `render_pr_rows_from_prefetch()` — Files, **Dev tests** (from mapping `prs[].devTests`), CI status
 - **No PR:** `build_branch_compare_pr_note()` + `render_branch_compare_pr_rows()` when `branchCompare` in prefetch
-- **§3 test plan:** `build_testplan_report_fields()` — Evidence, LADR trace, gaps, split Jira/LADR metrics
+- **§3 test plan:** `build_testplan_report_fields()` — `testPlanSummaryNote` via `build_testplan_summary_note()` (honest source; no Domino boilerplate on `workspace_generated` plans); Evidence via `render_testplan_evidence()` — **`testPlanSource: workspace_generated`** → **No execution evidence**; LADR trace, gaps, split metrics
 - **§4 Dev vs QA:** `build_qa_ownership_fields()` — if dev test status is **Covered**, `qaScope` is **None**; do **not** ask QA to execute test plan cases mapped only to those `R*` (`derive_owner_and_qa_scope()` in mapping)
-- **Quick links:** `collect_ladr_page_links()` — LADR/design Confluence only in header (excludes grooming, deployment, refactor remote links; passport design pages with L1…Ln still included)
+- **§8 Recommended actions:** `build_recommended_actions_list()` — separate **Dev** and **QA** lists; layout via `inject_recommended_actions_styles()` / `inject_recommended_actions_markup()` only
+- **Quick links:** `collect_ladr_page_links()` — LADR/design Confluence only in header
 - **Mapping:** `confidence` high only with `matchedFiles`; `evidenceNote` when keyword-only
-- **UI:** `apply_report_ui_enhancements()` — hover **`i` tooltips** (layout **v22**): row-anchored metric cards; summary group titles open below/right; first table column left-aligned; **no** report h1 or **Jira input readiness** h3 tooltip; readiness checklist rows still have tooltips; green ✓ / red ✗ icons; §5 trace **v2**
+- **UI:** `apply_report_ui_enhancements()` — tooltips layout **v22** (do not edit tooltip copy when changing metrics)
 - **Verdict:** Fail only when `gap_summary` has **≥1 High** (`[1-9]+ High`), not when text is `0 High · N Med`
-- **Overrides:** `--analysis` JSON for `reqCoveragePct`, `devCoveragePct`, narrative lists, `requirementRows`, `prNote`
+- **Gaps list UTF-8:** `build_coverage_report.py` `_auto_gaps()` uses proper em dash (`—`) in §7 HTML
 
 ## Hard rules
 
@@ -62,8 +65,18 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 4. Prefer `build_coverage_report.py` over per-ticket `regen_*.py` scripts.
 5. Do not fabricate evidence or coverage %.
 6. HTML → `reports/<KEY>-<MM-DD-YYYY-HH-MM-SS>-<TZ>.html`; save `lastReportFile` in manifest.
-7. `apply_report_ui_enhancements(html)` before write (tooltips v22; readiness icons; trace layout; footer).
+7. `apply_report_ui_enhancements(html)` before write. **Do not** edit `SUMMARY_METRIC_INFO` when changing §3/§8 — see [content-vs-tooltips.md](.cursor/skills/coverage-validator/references/content-vs-tooltips.md).
 8. No Jira/GitHub comments unless `--post-jira`.
+
+## Key scripts
+
+| Script | Role |
+|--------|------|
+| `fetch_jira_testplan.py` | Parse plan; `testPlanSource`; honest `testPlanSummaryNote` |
+| `write_testcase_excel.py` | Cache TSV → `testcases/{KEY}-testcases.xlsx` |
+| `prepare_testcase_writer_context.py` | `jira_and_ladr` vs `jira_only` for testcase writer |
+| `build_coverage_report.py` | HTML report + `apply_report_ui_enhancements()` |
+| `build_recommended_actions_list()` | §8 Dev/QA actions (in `coverage_report_helpers.py`) |
 
 ## Jira template
 

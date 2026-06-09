@@ -19,6 +19,7 @@
     "python scripts/map_requirements_to_diff.py",
     "python scripts/build_coverage_report.py",
     "python scripts/generate_qmetry_excel.py",
+    "python scripts/write_testcase_excel.py",
     "python scripts/install_coverage_validator_permissions.py",
     "mkdir"
   ]

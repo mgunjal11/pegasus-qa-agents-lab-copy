@@ -10,9 +10,11 @@ A centralized lab for **AI-driven QA agents** on the WBD Media Supply Chain (MSC
 
 | # | Agent | What it does | How to invoke |
 |---|--------|--------------|---------------|
-| 1 | **msc-testcase-writer** | Reads Jira user stories → QMetry FF2.0 test cases (Excel, Given/When/Then) | `@msc-testcase-writer MSC-204417` |
-| 2 | **msc-dev-code-and-qa-test-coverage-validator** | Jira AC + Confluence LADR (deduped) + Excel test plan vs GitHub PR; unique-id test plan %; LADR ↔ test case traceability; CI from Codecov/Sonar/pytest or Sonar PR comment; tooltips v22 | `/msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
+| 1 | **msc-testcase-writer** | Jira (+ LADR when linked) → QMetry FF2.0 Excel, Given/When/Then | `@msc-testcase-writer MSC-204417` |
+| 2 | **msc-dev-code-and-qa-test-coverage-validator** | Jira AC + LADR + test plan vs PR; §8 Dev/QA actions; honest §3 note; generated-plan evidence rules; tooltips v22 | `@msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
 | 3 | **msc-jira-bug** | Drafts MSC Bug tickets; creates only after your approval | `@msc-jira-bug` + describe the defect |
+
+**One registration per agent** — workflow skills live under `.cursor/skills/coverage-validator/` and `bug-filing/` (not duplicate slash entries).
 
 **Coverage validator guide deck:** `python scripts/generate_coverage_validator_ppt.py` → `docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx`
 
@@ -28,24 +30,20 @@ cd pegasus-qa-agents-lab
 cursor .
 ```
 
-You must open **this repo** as the workspace — slash commands and scripts live under `.cursor/` and `scripts/` here.
+Open **this repo** as the workspace root.
 
 ### 2. Python
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate          # Windows
-# source .venv/bin/activate       # macOS/Linux
 pip install -r requirements.txt
-pip install python-pptx           # optional — coverage validator PPT only
+pip install python-pptx         # optional — coverage validator PPT only
 ```
 
 ### 3. Atlassian MCP (all three agents)
 
-1. Cursor **Settings → MCP** → enable **Atlassian** (`user-atlassian`).
-2. Sign in for `wbdstreaming.atlassian.net`.
-
-If `@msc-jira-bug` works, this step is already done.
+Cursor **Settings → MCP** → enable **Atlassian** (`user-atlassian`) and sign in for `wbdstreaming.atlassian.net`.
 
 ### 4. GitHub CLI (coverage validator only)
 
@@ -54,62 +52,45 @@ gh auth login
 gh auth status
 ```
 
-Required for PR diff, CI checks, and Codecov/Sonar metrics. Not needed for testcase writer or jira-bug.
-
 ### 5. Auto-run permissions (coverage validator — recommended)
-
-The slash command `/msc-dev-code-and-qa-test-coverage-validator` runs end-to-end (`--auto --write`). To avoid repeated **Allow** / **Run** prompts:
 
 ```bash
 python scripts/install_coverage_validator_permissions.py
 ```
 
-Then in Cursor: **Settings → Agents → Auto-Run → Allowlist** (not “Ask every time”).
+Cursor **Settings → Agents → Auto-Run → Allowlist**.
 
-Details: [.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/references/auto-approve-setup.md](.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/references/auto-approve-setup.md)
+Details: [.cursor/skills/coverage-validator/references/auto-approve-setup.md](.cursor/skills/coverage-validator/references/auto-approve-setup.md)
 
 ### 6. Jira API credentials (test plan download — recommended)
 
-For stories with **QMetry / Domino test plans attached in Jira**, copy credentials once:
-
 ```bash
 cp .env.example .env
-# Edit .env: ATLASSIAN_EMAIL + ATLASSIAN_API_TOKEN
 python scripts/verify_jira_credentials.py MSC-204417
 ```
-
-Create a token at [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens). Never commit `.env`.
 
 ### 7. Workspace defaults (optional)
 
 ```bash
-cp .cursor/skills/msc-dev-code-and-qa-test-coverage-validator/validator.defaults.example.json .coverage-validator.defaults.json
+cp .cursor/skills/coverage-validator/validator.defaults.example.json .coverage-validator.defaults.json
 ```
 
-Set `repo` (e.g. `wbd-msc/pegasus-ess`), `timezone` / `timezoneLabel`, and test plan paths. This file is gitignored.
+### 8. Local test plans (SharePoint references)
 
-### 8. Local test plans (when Jira references SharePoint)
-
-Some stories say *“Refer Inc as full sheet”* and point to SharePoint. Place the Excel locally:
-
-```
-testplans/Domino Test Plan.xlsx
-```
-
-See [testplans/README.md](testplans/README.md).
+Place Excel under `testplans/` when Jira comments reference SharePoint — see [testplans/README.md](testplans/README.md).
 
 ---
 
 ## Agent setup comparison
 
-| Requirement | testcase-writer | jira-bug | msc-dev-code-and-qa-test-coverage-validator |
-|-------------|-----------------|----------|-------------------------|
+| Requirement | testcase-writer | jira-bug | coverage-validator |
+|-------------|-----------------|----------|-------------------|
 | Atlassian MCP | Yes | Yes | Yes |
 | `gh` CLI | No | No | **Yes** |
 | Python + `openpyxl` | Yes | No | Yes |
 | Permissions allowlist | Optional | Optional | **Recommended** |
 | `.env` Jira token | No | No | **Recommended** (attachments) |
-| `testplans/` Excel | No | No | **Sometimes** (SharePoint refs) |
+| `testplans/` Excel | No | No | **Sometimes** |
 
 ---
 
@@ -120,33 +101,29 @@ See [testplans/README.md](testplans/README.md).
 | HTML report | `reports/{ISSUE-KEY}-{MM-DD-YYYY-HH-MM-SS}-{TZ}.html` |
 | Cache (reuse runs) | `reports/.cache/{ISSUE-KEY}-*.json` |
 | Guide PPT | `docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx` |
+| Directory guide (Word) | `docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Directory-Guide.docx` |
 
-Reports use **your laptop local timezone** (e.g. `IST`, `EST`) in the filename and header.
+### Report highlights (HTML)
 
-### Coverage summary (8 cards)
+- **§3** — Honest `testPlanSummaryNote`; Evidence **No execution evidence** for locally generated QMetry plans (`workspace_generated`)
+- **§4** — QA handoff skips dev-covered R* (`qaScope: none`)
+- **§8** — Separate **Dev** and **QA** recommended action lists
+- **Tooltips v22** — hover `i` on labels; metric/content changes do **not** require tooltip edits (see `references/content-vs-tooltips.md`)
 
-The HTML report includes three groups:
+Full workflow: [.cursor/skills/coverage-validator/SKILL.md](.cursor/skills/coverage-validator/SKILL.md)
 
-**Implementation & tests**
+---
 
-- Dev code coverage %
-- Dev unit/integration test coverage %
-- Requirements mapped (acceptance criteria count)
+## Testcase writer outputs
 
-**QA & release risk**
+| Output | Path |
+|--------|------|
+| Deliverable | `testcases/{KEY}-testcases.xlsx` only |
+| Internal source | `reports/.cache/{KEY}-testcases-source.tsv` |
 
-- Test plan acceptance criteria coverage % (unique Jira + LADR ids; duplicate L1…Ln from multiple Confluence pages deduped)
-- QA scope remaining
-- Open gaps
+Skill: [.cursor/skills/jira-story-testcases/SKILL.md](.cursor/skills/jira-story-testcases/SKILL.md)
 
-**CI pipeline**
-
-- CI line coverage %
-- CI branch coverage % (Sonar/Codecov/pytest-cov; Sonar PR comment `estimated after PR merge` when logs expired)
-
-Full workflow: [.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/SKILL.md](.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/SKILL.md)
-
-**Report UI:** `apply_report_ui_enhancements()` layout **v22** — hover `i` on metric labels; tooltips are data-independent (metric fixes do not change tooltip markup).
+When coverage validator finds **no Jira test plan**, it auto-invokes testcase writer (`write_testcase_excel.py`) in `--auto --write` mode.
 
 ---
 
@@ -155,22 +132,23 @@ Full workflow: [.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/SKILL
 ```text
 @msc-testcase-writer MSC-204417
 
-/msc-dev-code-and-qa-test-coverage-validator MSC-204417
+@msc-dev-code-and-qa-test-coverage-validator MSC-204417
 
-@msc-jira-bug Caption status not updating in Monitor after ESS V2 deploy — staging
+@msc-jira-bug Promo normalization fails on DN HD ingest — QA
 ```
 
-Reuse cached Jira/GitHub data (faster, fewer prompts):
+Reuse cached data:
 
 ```text
-/msc-dev-code-and-qa-test-coverage-validator MSC-204417 --from-cache --auto
+@msc-dev-code-and-qa-test-coverage-validator MSC-204417 --from-cache --auto
 ```
 
-Warm cache only:
+Prefetch GitHub (one shell, multiple PRs):
 
 ```bash
-python scripts/prefetch_coverage_inputs.py MSC-204417 --repo wbd-msc/your-service --search-pr
-python scripts/fetch_jira_testplan.py MSC-204417 --from-jira-cache
+python scripts/prefetch_coverage_inputs.py MSC-204417 \
+  --pr https://github.com/wbd-msc/org-repo/pull/1 \
+  --pr https://github.com/wbd-msc/other-repo/pull/2
 ```
 
 ---
@@ -180,25 +158,21 @@ python scripts/fetch_jira_testplan.py MSC-204417 --from-jira-cache
 ```
 .cursor/
   agents/              # msc-testcase-writer, msc-dev-code-and-qa-test-coverage-validator, msc-jira-bug
-  commands/            # Slash commands (/msc-dev-code-and-qa-test-coverage-validator, …)
-  skills/              # Detailed workflows per agent
-  permissions.json     # Project MCP + terminal allowlist
-  permissions.example.json
+  skills/
+    jira-story-testcases/     # QMetry testcase workflow
+    coverage-validator/       # Coverage validator workflow (not a duplicate slash command)
+    bug-filing/               # MSC bug filing workflow (agent: msc-jira-bug)
+  permissions.json
 scripts/
-  generate_qmetry_excel.py
-  fetch_jira_testplan.py       # Jira attachment + QMetry/Domino parse
-  jira_env.py                  # .env loader for Jira REST
-  coverage_report_helpers.py   # HTML test plan rows
-  prefetch_coverage_inputs.py  # Single-shot GitHub prefetch
-  fetch_coverage_github.py
-  install_coverage_validator_permissions.py
-  verify_jira_credentials.py
+  write_testcase_excel.py     # Cache TSV → QMetry FF2.0 xlsx
+  fetch_jira_testplan.py
+  build_coverage_report.py
   generate_coverage_validator_ppt.py
-testcases/             # Generated QMetry TSV/XLSX (gitignored contents)
+  generate_coverage_validator_directory_guide.py
+testcases/             # Generated xlsx (gitignored contents)
 testplans/             # Local Excel when Jira references SharePoint
 reports/               # HTML reports + .cache/
-docs/                  # Generated PPT and guides
-.env.example           # Template for Jira API (copy → .env)
+docs/                  # Generated PPT and Word guides
 ```
 
 ---
@@ -207,14 +181,14 @@ docs/                  # Generated PPT and guides
 
 | Script | Purpose |
 |--------|---------|
-| `generate_qmetry_excel.py` | TSV → QMetry FF2.0 `.xlsx` |
-| `fetch_jira_testplan.py` | Download/parse test plan; write `reports/.cache/{KEY}-testplan.json` |
-| `prefetch_coverage_inputs.py` | Batch `gh` PR view/diff/checks → cache |
-| `fetch_coverage_github.py` | GitHub-only fetch |
-| `coverage_report_timestamp.py` | Local TZ filename for reports |
+| `write_testcase_excel.py` | `reports/.cache/{KEY}-testcases-source.tsv` → `testcases/{KEY}-testcases.xlsx` |
+| `prepare_testcase_writer_context.py` | `jira_and_ladr` vs `jira_only` mode |
+| `fetch_jira_testplan.py` | Download/parse test plan; honest summary note |
+| `prefetch_coverage_inputs.py` | Batch `gh` PR view/diff/checks → cache (`--mode from-cache` to reuse) |
+| `build_coverage_report.py` | HTML report + §8 Dev/QA actions |
 | `install_coverage_validator_permissions.py` | Merge allowlist into `~/.cursor/permissions.json` |
-| `verify_jira_credentials.py` | Test `.env` against a Jira issue |
 | `generate_coverage_validator_ppt.py` | Management guide deck |
+| `generate_coverage_validator_directory_guide.py` | Word directory guide |
 
 ---
 
@@ -222,37 +196,22 @@ docs/                  # Generated PPT and guides
 
 | Symptom | Fix |
 |---------|-----|
-| `/msc-dev-code-and-qa-test-coverage-validator` not found | Open this repo in Cursor (not another folder) |
-| Many Allow/Run prompts | Run `install_coverage_validator_permissions.py`; set Auto-Run → **Allowlist** |
-| Test plan shows **Pending** / `referenced_not_local` | Add Excel under `testplans/` or set `testPlanPath` in `.coverage-validator.defaults.json` |
-| Cannot download Jira attachment | Set `ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN` in `.env` |
-| CI coverage **NA** | Link a PR; `gh auth status` OK; re-run prefetch. If an **older report had CI %** but a new one shows NA, GitHub job logs may be **HTTP 410** and `unit-coverage-report-ci` artifacts **expired** — re-trigger CI or rely on Sonar PR comment (estimated-after-merge %) in cache |
-| Test plan % too low with full LADR trace | Re-run `fetch_confluence_requirements.py` + `fetch_jira_testplan.py` (LADR dedupe across Confluence pages) |
-| `@msc-jira-bug` works but validator does not | Add `gh`, Python, and steps 5–7 above |
+| Duplicate `/msc-*` suggestions | Use agents only; skills are `coverage-validator` / `bug-filing` folders |
+| Test plan 0% but xlsx existed | Re-run `write_testcase_excel.py {KEY}` then `fetch_jira_testplan.py` |
+| `â€"` garbled text in §7 Gaps | Regenerate report after `build_coverage_report.py` UTF-8 fix |
+| Test plan **Pending** / `referenced_not_local` | Add Excel under `testplans/` |
+| CI coverage **NA** | Link PR; re-run prefetch; Sonar PR comment fallback when logs expired |
 
 ---
 
-## Prerequisites checklist
-
-- [ ] Cursor IDE with Agents enabled
-- [ ] This repo cloned and opened as workspace
-- [ ] Atlassian MCP authenticated (`wbdstreaming.atlassian.net`)
-- [ ] `gh` CLI authenticated (coverage validator)
-- [ ] Python 3.10+ with `openpyxl` (`pip install -r requirements.txt`)
-- [ ] `python scripts/install_coverage_validator_permissions.py` + Auto-Run **Allowlist**
-- [ ] `.env` from `.env.example` (if stories use Jira test plan attachments)
-- [ ] `.coverage-validator.defaults.json` with your default `repo` (optional)
-
----
-
-## Maintainers (publish updates from TestCursor)
-
-From the parent `TestCursor` workspace:
+## Maintainers (publish from TestCursor)
 
 ```bash
-python scripts/sync_pegasus_qa_agents_lab.py
+python scripts/sync_pegasus_qa_agents_lab.py --publish
 cd pegasus-qa-agents-lab
-git add -A && git commit -m "Sync agents, skills, README" && git push origin main
+python scripts/generate_coverage_validator_ppt.py
+python scripts/generate_coverage_validator_directory_guide.py
+git add -A && git commit -m "Sync agents, skills, docs" && git push origin main
 ```
 
 ---

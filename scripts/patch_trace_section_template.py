@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
-"""Patch report-template.html §5 traceability section visibility."""
+﻿#!/usr/bin/env python3
+"""Patch report-template.html Â§5 traceability section visibility."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-p = ROOT / ".cursor/skills/msc-dev-code-and-qa-test-coverage-validator/report-template.html"
+p = ROOT / ".cursor/skills/coverage-validator/report-template.html"
 t = p.read_text(encoding="utf-8")
 
 old_css = """    .section-trace { border: 1px solid #c4b5fd; }

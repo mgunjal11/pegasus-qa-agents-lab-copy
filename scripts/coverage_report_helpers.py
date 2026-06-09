@@ -46,18 +46,28 @@ def render_evidence_ids(evidence_ids: list[dict[str, str]]) -> str:
     return "<br>".join(parts) if parts else ""
 
 
+def is_generated_testplan(testplan_cache: dict[str, Any]) -> bool:
+    return testplan_cache.get("testPlanSource") == "workspace_generated"
+
+
 def render_testplan_evidence(
     tc: dict[str, Any],
     jira_requirements: list[dict[str, str]] | None = None,
+    *,
+    generated_local: bool = False,
 ) -> str:
     """Evidence column: Mascot links when present; else Edit/Job/Request UUIDs from plan or Jira AC."""
     mascot_html = render_mascot_links(tc.get("mascot_links") or [])
     if mascot_html:
         return mascot_html
-    evidence_ids = tc.get("evidence_ids") or extract_testcase_evidence_ids(tc, jira_requirements)
+    evidence_ids = list(tc.get("evidence_ids") or [])
+    if not evidence_ids and not generated_local:
+        evidence_ids = extract_testcase_evidence_ids(tc, jira_requirements)
     id_html = render_evidence_ids(evidence_ids)
     if id_html:
         return id_html
+    if generated_local:
+        return '<span class="badge badge-not-verified">No execution evidence</span>'
     return '<span class="badge badge-not-verified">No Mascot links or IDs in test plan</span>'
 
 
@@ -214,7 +224,11 @@ def build_testplan_report_fields(issue_key: str, root: Path | None = None) -> di
         "{{TESTPLAN_COVERAGE_PCT}}": "NA" if tp_pct is None else f"{tp_pct}%",
         "{{TESTPLAN_COVERAGE_CLASS}}": testplan_coverage_class(tp_pct),
         "{{TESTPLAN_COVERAGE_DETAIL}}": cov.get("coverageDetail") or "No test plan",
-        "{{TESTPLAN_ROWS}}": render_testplan_rows(tp.get("testCases") or [], jira_reqs),
+        "{{TESTPLAN_ROWS}}": render_testplan_rows(
+            tp.get("testCases") or [],
+            jira_reqs,
+            generated_local=is_generated_testplan(tp),
+        ),
         "{{LADR_TRACEABILITY_BLOCK}}": render_ladr_traceability_block(tp),
         "{{TESTPLAN_GAPS_LIST}}": build_testplan_gaps_html(cov),
         "{{TESTPLAN_SPLIT_METRICS}}": render_testplan_split_metrics(cov),
@@ -524,9 +538,6 @@ def build_qa_ownership_fields(issue_key: str, root: Path | None = None) -> dict[
             "dev unit/integration tests in the PR cover the scored requirements.</li>"
         )
 
-    if not dev_items:
-        dev_items.append("<li>See requirements traceability (§5) for dev test file evidence.</li>")
-
     n_qa = len(reqs_needing_qa)
     n_none = sum(
         1
@@ -543,10 +554,18 @@ def build_qa_ownership_fields(issue_key: str, root: Path | None = None) -> dict[
     if n_qa and tc_ids:
         detail += f" · {len(set(tc_ids))} test plan case(s) for QA"
 
-    actions = (
-        "<li>Review §5 traceability and run QA-scoped test plan cases only (see §4).</li>"
-        if n_qa
-        else "<li>Confirm dev test evidence in §5; no separate QA execution required for scored acceptance criteria.</li>"
+    if not dev_items:
+        dev_items.append(
+            "<li>See requirements traceability (§5) for dev test file evidence.</li>"
+        )
+
+    actions = build_recommended_actions_list(
+        issue_key,
+        mapping=mapping,
+        tp=tp,
+        qa_tc_ids=tc_ids,
+        reqs_needing_qa=set(reqs_needing_qa),
+        root=root,
     )
 
     return {
@@ -556,6 +575,148 @@ def build_qa_ownership_fields(issue_key: str, root: Path | None = None) -> dict[
         "qaScopeDetail": detail,
         "actionsList": actions,
     }
+
+
+def _actions_group_ol(items: list[str]) -> str:
+    if not items:
+        return "<li>None — no open items identified for this role.</li>"
+    return "".join(items)
+
+
+def build_recommended_actions_list(
+    issue_key: str,
+    *,
+    mapping: dict[str, Any] | None = None,
+    tp: dict[str, Any] | None = None,
+    qa_tc_ids: list[str] | None = None,
+    reqs_needing_qa: set[str] | None = None,
+    root: Path | None = None,
+) -> str:
+    """§8 Recommended actions — separate Dev and QA action item lists (content only; tooltips unchanged)."""
+    key = issue_key.upper()
+    mapping = mapping or load_mapping_cache(key, root)
+    tp = tp or load_testplan_cache(key, root)
+    prefetch = load_prefetch_cache(key, root)
+    jira = load_jira_cache(key, root)
+    reqs = mapping.get("requirements") or []
+    if reqs_needing_qa is None:
+        reqs_needing_qa = {
+            str(r.get("id") or "")
+            for r in reqs
+            if r.get("id") and _qa_scope_needs_qa_execution(str(r.get("qaScope") or "e2e"))
+        }
+    else:
+        reqs_needing_qa = set(reqs_needing_qa)
+    if qa_tc_ids is None:
+        qa_tc_ids = []
+        for tc in tp.get("testCases") or []:
+            mapped_r = [str(m) for m in (tc.get("mapped_requirements") or []) if str(m).startswith("R")]
+            if any(m in reqs_needing_qa for m in mapped_r):
+                tid = str(tc.get("id") or "")
+                if tid:
+                    qa_tc_ids.append(tid)
+    else:
+        qa_tc_ids = list(qa_tc_ids)
+
+    dev_actions: list[str] = []
+    qa_actions: list[str] = []
+
+    for req in reqs:
+        rid = str(req.get("id") or "")
+        if not rid:
+            continue
+        snippet = esc((req.get("text") or "")[:100])
+        if req.get("codeStatus") == "missing":
+            dev_actions.append(
+                f"<li><strong>Implement {esc(rid)}</strong> — {snippet} — add production code in linked PR.</li>"
+            )
+        if req.get("devTestStatus") == "missing" and str(req.get("owner") or "") != "qa":
+            dev_actions.append(
+                f"<li><strong>Add dev tests for {esc(rid)}</strong> — unit or integration coverage in PR diff.</li>"
+            )
+        suggested = req.get("suggestedTestCases") or []
+        if suggested and req.get("devTestStatus") == "missing":
+            dev_actions.append(
+                f"<li>Consider dev tests: {esc(', '.join(str(s) for s in suggested[:3]))}</li>"
+            )
+
+    for pr in prefetch.get("prs") or []:
+        org = pr.get("org") or ""
+        repo_name = pr.get("repo") or ""
+        full_repo = f"{org}/{repo_name}" if org and repo_name else str(repo_name)
+        number = pr.get("number")
+        view = pr.get("view") or {}
+        state = str(view.get("state") or "").upper()
+        title = esc((view.get("title") or "")[:70])
+        if state == "OPEN":
+            dev_actions.append(
+                f"<li><strong>Merge PR</strong> — {esc(full_repo)}#{number} (open): {title}</li>"
+            )
+        checks = str(pr.get("checks") or "")
+        if checks and re.search(r"\b(?:fail(?:ed|ing|ure)?|failing)\b", checks.lower()):
+            dev_actions.append(
+                f"<li><strong>Fix CI</strong> — failing checks on {esc(full_repo)}#{number}.</li>"
+            )
+
+    if not prefetch.get("prs") and prefetch.get("branchCompare"):
+        bc = prefetch.get("branchCompare") or {}
+        head = bc.get("head") or "branch"
+        dev_actions.append(
+            f"<li><strong>Link or open a PR</strong> — changes on <code>{esc(head)}</code> only (no PR for {key}).</li>"
+        )
+
+    cov = tp.get("coverage") or {}
+    for rid in cov.get("uncoveredJiraRequirements") or cov.get("uncoveredRequirements") or []:
+        if str(rid).startswith("R"):
+            qa_actions.append(
+                f"<li><strong>Test plan gap</strong> — add case(s) for Jira {esc(rid)} in attached Excel.</li>"
+            )
+    for rid in cov.get("uncoveredLadrRequirements") or []:
+        qa_actions.append(
+            f"<li><strong>LADR gap</strong> — add case(s) for {esc(rid)} (Confluence ESS scenario).</li>"
+        )
+
+    if reqs_needing_qa:
+        for rid in sorted(reqs_needing_qa, key=lambda x: (len(x), x)):
+            req = next((r for r in reqs if str(r.get("id")) == rid), {})
+            snippet = esc((req.get("text") or "")[:90])
+            scope = str(req.get("qaScope") or "e2e")
+            qa_actions.append(
+                f"<li><strong>Verify {esc(rid)}</strong> — {snippet} ({esc(scope)}).</li>"
+            )
+        if qa_tc_ids:
+            tc_sorted = ", ".join(sorted(set(qa_tc_ids), key=lambda x: (len(x), x)))
+            qa_actions.append(
+                f"<li><strong>Execute test plan</strong> — run {esc(tc_sorted)} for QA-scoped acceptance criteria only (see §4).</li>"
+            )
+    else:
+        qa_actions.append(
+            "<li>No separate QA execution — dev unit/integration tests cover scored acceptance criteria (§4).</li>"
+        )
+
+    if tp.get("testPlanSource") == "workspace_generated":
+        qa_actions.append(
+            f"<li><strong>Attach test plan on Jira</strong> — upload "
+            f"<code>testcases/{key}-testcases.xlsx</code> (locally generated plan).</li>"
+        )
+
+    if tp.get("status") == "referenced_not_local":
+        hint = tp.get("localSetupHint") or "Place referenced Excel under testplans/ and re-run validator."
+        qa_actions.append(f"<li><strong>Test plan file missing</strong> — {esc(hint)}</li>")
+
+    if not dev_actions:
+        dev_actions.append(
+            "<li>No dev code or CI actions — implementation and PR checks look complete for scored requirements.</li>"
+        )
+
+    return (
+        '<div class="recommended-actions-groups">'
+        '<h3 class="actions-group-title">Dev</h3>'
+        f'<ol class="actions-group-list">{_actions_group_ol(dev_actions)}</ol>'
+        '<h3 class="actions-group-title">QA</h3>'
+        f'<ol class="actions-group-list">{_actions_group_ol(qa_actions)}</ol>'
+        "</div>"
+    )
 
 
 def _render_trace_evidence_cell(
@@ -676,6 +837,8 @@ def build_release_score_block(
 def render_testplan_rows(
     test_cases: list[dict[str, Any]],
     jira_requirements: list[dict[str, str]] | None = None,
+    *,
+    generated_local: bool = False,
 ) -> str:
     rows = []
     for tc in test_cases:
@@ -683,7 +846,11 @@ def render_testplan_rows(
         section = tc.get("section") or ""
         summary = tc.get("summary") or ""
         scenario = f"{section} · {summary}" if section and summary else (section or summary or tc.get("id", ""))
-        ev = evidence_type_badges(tc) + render_testplan_evidence(tc, jira_requirements)
+        ev = evidence_type_badges(tc) + render_testplan_evidence(
+            tc,
+            jira_requirements,
+            generated_local=generated_local,
+        )
         rows.append(
             f"<tr>"
             f"<td>{esc(tc.get('id', ''))}</td>"
@@ -2715,6 +2882,49 @@ def inject_jira_readiness_styles(html: str) -> str:
     return html.replace("</style>", JIRA_READINESS_UI_CSS + "\n  </style>", 1)
 
 
+RECOMMENDED_ACTIONS_UI_MARKER = "recommended-actions-groups v1"
+RECOMMENDED_ACTIONS_UI_CSS = f"""
+    /* {RECOMMENDED_ACTIONS_UI_MARKER} */
+    .section-actions .actions-group-title {{
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #9a3412;
+      margin: 1rem 0 0.5rem;
+      padding-bottom: 0.25rem;
+      border-bottom: 1px solid #fed7aa;
+    }}
+    .section-actions .recommended-actions-groups .actions-group-title:first-child {{
+      margin-top: 0;
+    }}
+    .section-actions .actions-group-list {{
+      list-style: none;
+      padding-left: 0;
+      counter-reset: action;
+      margin-bottom: 0.25rem;
+    }}
+"""
+
+
+def inject_recommended_actions_styles(html: str) -> str:
+    """§8 Dev/QA action group layout (no tooltip changes)."""
+    if RECOMMENDED_ACTIONS_UI_MARKER in html or "recommended-actions-groups" not in html:
+        return html
+    return html.replace("</style>", RECOMMENDED_ACTIONS_UI_CSS + "\n  </style>", 1)
+
+
+def inject_recommended_actions_markup(html: str) -> str:
+    """Unwrap legacy <ol> around Dev/QA action groups (template-safe)."""
+    if "recommended-actions-groups" not in html:
+        return html
+    return re.sub(
+        r"(<div class=\"section-body\">\s*)<ol>\s*(<div class=\"recommended-actions-groups\">.*?</div>)\s*</ol>",
+        r"\1\2",
+        html,
+        count=1,
+        flags=re.DOTALL,
+    )
+
+
 def apply_report_ui_enhancements(html: str) -> str:
     """Info-icon tooltips on all labels, readiness icons, trace layout, footer."""
     html = strip_report_tooltips(html)
@@ -2745,6 +2955,8 @@ def apply_report_ui_enhancements(html: str) -> str:
     html = inject_trace_section_styles(html)
     html = inject_trace_section_markup(html)
     html = inject_lead_paragraph_tooltips(html)
+    html = inject_recommended_actions_styles(html)
+    html = inject_recommended_actions_markup(html)
     html = inject_report_footer(html)
     return html
 

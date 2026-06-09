@@ -1,12 +1,14 @@
 ---
-name: jira-msc-bug
+name: bug-filing
+disable-model-invocation: true
 description: >-
   Files Jira Bug issues in the MSC (Media Supply Chain) project on WBD Streaming
   Jira using Atlassian MCP. Shows a full draft (summary, description, key fields)
   and waits for explicit user approval before creating. Applies MSC QA-style
   description structure and typical field defaults. Use when the user asks to
   create or file a Jira bug, defect, MSC ticket, or wants an issue created in
-  project MSC on wbdstreaming.atlassian.net.
+  project MSC on wbdstreaming.atlassian.net. Invoked by agent msc-jira-bug — not
+  a separate slash command.
 ---
 
 # Jira MSC bug filing

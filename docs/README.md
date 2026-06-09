@@ -3,16 +3,18 @@
 | File | How to generate |
 |------|-----------------|
 | `MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx` | `python scripts/generate_coverage_validator_ppt.py` |
+| `MSC-Dev-Code-and-QA-Test-Coverage-Validator-Directory-Guide.docx` | `python scripts/generate_coverage_validator_directory_guide.py` |
 
-**Management deck (~20 slides)** — WBD QBR brand + executive visuals (KPI cards, workflow pipeline, architecture diagram, personas, metrics dashboard, case-study table):
+**Management deck (~20 slides)** — WBD QBR brand: workflow, personas, 8-section report walkthrough, Dev/QA split, §8 recommended actions.
 
-- Title with KPI strip · Visual agenda · Executive summary
-- Challenge silos · Idea Generation · Personas · 5-step workflow · Architecture
-- Report 8-section grid · Metrics dashboard · Test plan · Dev/QA split
-- Setup checklist · MSC case studies table · Closing
+Also copied to `reports/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx` when generated.
 
-Also written to `reports/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx`. Regenerate after skill updates.
+**Recent report features (deck + HTML):**
 
-**Word directory guide:** `python scripts/generate_coverage_validator_directory_guide.py` → `docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Directory-Guide.docx`
+- §3 honest test-plan note (`build_testplan_summary_note()`); Evidence **No execution evidence** for `workspace_generated` plans
+- §8 **Dev** and **QA** recommended actions (`build_recommended_actions_list()`)
+- Testcase writer fallback: `write_testcase_excel.py` + cache TSV only in `reports/.cache/`
+- LADR dedupe in test-plan %; Sonar PR comment CI fallback
+- Report tooltips layout **v22** — do not edit `SUMMARY_METRIC_INFO` when changing metrics (see `coverage-validator/references/content-vs-tooltips.md`)
 
-Recent metric logic (deck + doc): LADR `dedupe_ladr_requirements()`, unique test-plan coverage %, Sonar PR comment CI fallback, report tooltips v22 (unchanged by metric fixes).
+**Word directory guide** — agent/skill/script tree aligned with `.cursor/agents/` + `.cursor/skills/coverage-validator/`.

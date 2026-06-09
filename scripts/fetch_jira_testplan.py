@@ -6,7 +6,7 @@ Sources (priority order):
   1. --attachment local file(s)
   2. Jira issue attachments (REST API)
   3. SharePoint / comment-referenced Excel in testplans/ (see jira cache testPlanReferences)
-  4. testcases/{KEY}-testcases.xlsx|.tsv
+  4. testcases/{KEY}-testcases.xlsx
   5. .coverage-validator.defaults.json / manifest testPlanPath + testPlanSheet
 
 Supports QMetry sheets and Domino-style evidence sheets (e.g. "Inc as full").
@@ -203,7 +203,7 @@ def format_testplan_summary_note(
     scenario_count: int,
     scenario_filter: str | None = None,
 ) -> str:
-    """Standard note-box text for section 3 when test plan is parsed from Jira attachment."""
+    """Domino / SharePoint comment-referenced test plan note (Jira attachment or testplans/)."""
     sheet_from_comment = comment_sheet or "Inc as full"
     excel_tab = excel_sheet or sheet_from_comment
     filter_note = scenario_filter.strip() if scenario_filter else ""
@@ -212,6 +212,101 @@ def format_testplan_summary_note(
         f"Downloaded {filename} from Jira attachment comment sheet {sheet_from_comment} "
         f"→ Excel tab {excel_tab} · {count_part} scenarios for {issue_key}."
     )
+
+
+def resolve_testplan_source(
+    issue_key: str,
+    attachment_meta: list[dict[str, Any]],
+    primary_ref: dict[str, Any] | None,
+) -> str:
+    """Classify how the test plan was loaded for honest Evidence / summary notes."""
+    key = issue_key.upper()
+    if any(m.get("source") == "jira_attachment" for m in attachment_meta):
+        return "jira_attachment"
+    if primary_ref and primary_ref.get("type") == "sharepoint":
+        return "sharepoint_reference"
+    for meta in attachment_meta:
+        if meta.get("source") != "workspace_fallback":
+            continue
+        filename = str(meta.get("filename") or "")
+        if key in filename.upper() and filename.endswith((".xlsx", ".tsv")):
+            return "workspace_generated"
+        return "workspace_local"
+    return "unknown"
+
+
+def build_testplan_summary_note(
+    issue_key: str,
+    case_count: int,
+    primary_ref: dict[str, Any] | None,
+    attachment_meta: list[dict[str, Any]],
+    files_parsed: list[dict[str, Any]],
+    sheets_used: list[str],
+    scenario_filter: str | None = None,
+) -> str:
+    """Honest §3 / Jira-readiness note from actual parse source — no Domino defaults."""
+    key = issue_key.upper()
+    filter_note = scenario_filter.strip() if scenario_filter else ""
+    count_label = "test case" if case_count == 1 else "test cases"
+    count_part = f"{case_count} {filter_note}".strip() if filter_note else str(case_count)
+
+    active_meta = next(
+        (m for m in attachment_meta if m.get("source") == "jira_attachment"),
+        None,
+    )
+    if not active_meta:
+        active_meta = next(
+            (m for m in attachment_meta if m.get("localFound") or m.get("local")),
+            attachment_meta[0] if attachment_meta else None,
+        )
+
+    filename = (
+        (primary_ref or {}).get("filename")
+        or (active_meta or {}).get("filename")
+        or (files_parsed[0].get("file") if files_parsed else None)
+        or "test plan"
+    )
+    comment_sheet = (primary_ref or {}).get("sheet") or (active_meta or {}).get("sheet")
+    excel_tab = sheets_used[0] if sheets_used else comment_sheet
+    tab_part = f" (tab {excel_tab})" if excel_tab else ""
+
+    source = (active_meta or {}).get("source") or (primary_ref or {}).get("source")
+    ref_type = (primary_ref or {}).get("type")
+
+    if source == "jira_attachment":
+        tab = excel_tab or comment_sheet or "default"
+        return (
+            f"Downloaded {filename} from Jira attachment → Excel tab {tab} · "
+            f"{count_part} {count_label} for {key}."
+        )
+
+    is_generated_local = (
+        source == "workspace_fallback"
+        and key in str(filename).upper()
+        and str(filename).endswith((".xlsx", ".tsv"))
+    )
+    if is_generated_local:
+        return (
+            f"Local QMetry test plan {filename}{tab_part} · {count_part} {count_label} · "
+            f"generated locally via msc-testcase-writer — not attached on Jira."
+        )
+
+    if ref_type == "sharepoint" or (primary_ref and comment_sheet):
+        sheet_from_comment = comment_sheet or "Inc as full"
+        excel_tab = excel_tab or sheet_from_comment
+        return format_testplan_summary_note(
+            key,
+            filename,
+            sheet_from_comment,
+            excel_tab,
+            case_count,
+            scenario_filter,
+        )
+
+    if source == "workspace_fallback":
+        return f"Parsed local test plan {filename}{tab_part} · {count_part} {count_label} for {key}."
+
+    return f"Parsed {filename}{tab_part} · {count_part} {count_label} for {key}."
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
@@ -435,7 +530,6 @@ def resolve_local_file(
         root / "testplans" / f"{issue_key}-testplan.xlsx",
         root / "testplans" / f"{issue_key}-testplan.xls",
         root / "testcases" / f"{issue_key}-testcases.xlsx",
-        root / "testcases" / f"{issue_key}-testcases.tsv",
         root / "testcases" / filename,
         root / "testcases" / "Domino Test Plan.xlsx",
         root / "reports" / ".cache" / f"{issue_key}-testplan-files" / filename,
@@ -1027,12 +1121,12 @@ def resolve_testplan_files(
         root = repo_root()
         fallbacks = [
             (root / "testcases" / f"{issue_key}-testcases.xlsx", sheet_override),
-            (root / "testcases" / f"{issue_key}-testcases.tsv", None),
         ]
         for path, sheet in fallbacks:
             if path.exists():
                 downloaded.append((path, sheet))
                 meta.append({"filename": path.name, "local": True, "source": "workspace_fallback"})
+                break
 
     return downloaded, meta, testplan_refs, auth_error
 
@@ -1115,8 +1209,6 @@ def main() -> int:
         tc.steps = normalize_steps(tc.steps)
     if requirements and all_cases:
         map_testcases_to_requirements(all_cases, requirements)
-    for tc in all_cases:
-        tc.evidence_ids = extract_testcase_evidence_ids(tc, jira_requirements)
 
     coverage = compute_testplan_coverage(
         all_cases,
@@ -1137,12 +1229,24 @@ def main() -> int:
         status = "parse_failed"
 
     primary_ref = testplan_refs[0] if testplan_refs else None
+    test_plan_source = resolve_testplan_source(issue_key, attachment_meta, primary_ref)
+    evidence_from_steps = test_plan_source != "workspace_generated"
+    for tc in all_cases:
+        tc.evidence_ids = extract_testcase_evidence_ids(
+            tc,
+            jira_requirements,
+            include_steps=evidence_from_steps,
+        )
+
     if status == "referenced_not_local":
         coverage["testplanCoveragePct"] = "Pending"
         coverage["uncoveredRequirements"] = []
-    filename = (primary_ref or {}).get("filename") or "Domino Test Plan.xlsx"
-    sheet = (primary_ref or {}).get("sheet") or "Inc as full"
-    excel_sheet = sheets_used[0] if sheets_used else sheet
+    filename = (primary_ref or {}).get("filename")
+    sheet = (primary_ref or {}).get("sheet")
+    if not filename and files:
+        filename = files[0][0].name
+    if not sheet and sheets_used:
+        sheet = sheets_used[0]
     jira_att = next((m for m in attachment_meta if m.get("source") == "jira_attachment"), None)
     source_hint = "Jira attachment" if jira_att else ("local file" if files else "")
     coverage["coverageDetail"] = format_testplan_coverage_detail(coverage, source_hint)
@@ -1154,13 +1258,15 @@ def main() -> int:
         ).lower()
         if "passport" in hay and "incremental" in hay:
             scenario_filter = "passport/incremental-as-full"
+    files_parsed_meta = [{"file": p.name, "sheet": s} for p, s in files]
     summary_note = (
-        format_testplan_summary_note(
+        build_testplan_summary_note(
             issue_key,
-            filename,
-            sheet,
-            excel_sheet,
             len(all_cases),
+            primary_ref,
+            attachment_meta,
+            files_parsed_meta,
+            sheets_used,
             scenario_filter,
         )
         if status == "ok" and all_cases
@@ -1169,6 +1275,7 @@ def main() -> int:
     payload = {
         "issueKey": issue_key,
         "fetchedAt": datetime.now(timezone.utc).isoformat(),
+        "testPlanSource": test_plan_source,
         "attachments": attachment_meta,
         "testPlanReferences": testplan_refs,
         "primaryReference": primary_ref,

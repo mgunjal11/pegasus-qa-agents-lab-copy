@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Copy agents, skills, scripts into pegasus-qa-agents-lab for GitHub publish."""
 from __future__ import annotations
 
@@ -12,15 +12,14 @@ HOME_CURSOR = Path.home() / ".cursor"
 
 COPY_DIRS = [
     (ROOT / ".cursor/skills/jira-story-testcases", LAB / ".cursor/skills/jira-story-testcases"),
-    (ROOT / ".cursor/skills/msc-dev-code-and-qa-test-coverage-validator", LAB / ".cursor/skills/msc-dev-code-and-qa-test-coverage-validator"),
-    (HOME_CURSOR / "skills/jira-msc-bug", LAB / ".cursor/skills/jira-msc-bug"),
+    (ROOT / ".cursor/skills/coverage-validator", LAB / ".cursor/skills/coverage-validator"),
+    (ROOT / ".cursor/skills/bug-filing", LAB / ".cursor/skills/bug-filing"),
 ]
 
 COPY_FILES = [
     (ROOT / ".cursor/agents/msc-testcase-writer.md", LAB / ".cursor/agents/msc-testcase-writer.md"),
     (ROOT / ".cursor/agents/msc-dev-code-and-qa-test-coverage-validator.md", LAB / ".cursor/agents/msc-dev-code-and-qa-test-coverage-validator.md"),
-    (HOME_CURSOR / "agents/msc-jira-bug.md", LAB / ".cursor/agents/msc-jira-bug.md"),
-    (ROOT / ".cursor/commands/msc-dev-code-and-qa-test-coverage-validator.md", LAB / ".cursor/commands/msc-dev-code-and-qa-test-coverage-validator.md"),
+    (ROOT / ".cursor/agents/msc-jira-bug.md", LAB / ".cursor/agents/msc-jira-bug.md"),
     (ROOT / "requirements.txt", LAB / "requirements.txt"),
     (ROOT / "AGENTS.md", LAB / "AGENTS.md"),
     (ROOT / ".env.example", LAB / ".env.example"),
@@ -28,6 +27,7 @@ COPY_FILES = [
 
 SCRIPTS = [
     "generate_qmetry_excel.py",
+    "write_testcase_excel.py",
     "coverage_report_timestamp.py",
     "coverage_report_helpers.py",
     "ci_coverage.py",
@@ -62,6 +62,9 @@ SCRIPTS = [
     "test_map_requirements_to_diff.py",
     "test_ci_template_fields.py",
     "test_ci_coverage.py",
+    "prepare_testcase_writer_context.py",
+    "test_prepare_testcase_writer_context.py",
+    "test_fetch_jira_testplan_summary.py",
     "test_dev_tests_pr_column.py",
     "regen_msc204417_report.py",
     "regen_msc205625_report.py",
@@ -71,7 +74,7 @@ SCRIPTS = [
 ]
 
 PERMISSIONS = {
-    "_comment": "Merge into ~/.cursor/permissions.json. Cursor Settings → Agents → Auto-Run → Allowlist.",
+    "_comment": "Merge into ~/.cursor/permissions.json. Cursor Settings â†’ Agents â†’ Auto-Run â†’ Allowlist.",
     "mcpAllowlist": [
         "user-atlassian:getJiraIssue",
         "user-atlassian:getJiraIssueRemoteIssueLinks",
@@ -92,6 +95,7 @@ PERMISSIONS = {
         "python scripts/map_requirements_to_diff.py",
         "python scripts/build_coverage_report.py",
         "python scripts/generate_qmetry_excel.py",
+        "python scripts/write_testcase_excel.py",
         "python scripts/install_coverage_validator_permissions.py",
         "mkdir",
     ],
@@ -101,6 +105,8 @@ def remove_stale(lab: Path) -> None:
     """Remove renamed agent/skill paths and old guide deck."""
     stale_paths = [
         lab / ".cursor/skills/msc-code-coverage-validator",
+        lab / ".cursor/skills/msc-dev-code-and-qa-test-coverage-validator",
+        lab / ".cursor/skills/jira-msc-bug",
         lab / ".cursor/agents/msc-code-coverage-validator.md",
         lab / ".cursor/commands/msc-code-coverage-validator.md",
         lab / "docs/MSC-Code-Coverage-Validator-Guide.pptx",
@@ -113,6 +119,9 @@ def remove_stale(lab: Path) -> None:
 
 
 def main() -> None:
+    import sys
+
+    keep_cursor = "--publish" in sys.argv
     LAB.mkdir(parents=True, exist_ok=True)
     remove_stale(LAB)
     for src, dst in COPY_DIRS:
@@ -154,8 +163,7 @@ def main() -> None:
     write_commands(LAB)
     write_gitignore(LAB)
     write_agents_md(LAB)
-    update_lab_readme(LAB)
-    # README.md body is updated via update_lab_readme; full copy not used
+    copy_lab_readme_templates(LAB)
     docs = LAB / "docs"
     docs.mkdir(exist_ok=True)
     ppt = ROOT / "docs" / "MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx"
@@ -163,39 +171,24 @@ def main() -> None:
         ppt = ROOT / "reports" / "MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx"
     if ppt.exists():
         shutil.copy2(ppt, docs / ppt.name)
-    print(f"Synced to {LAB.resolve()}")
+    # Lab nested inside TestCursor: drop .cursor so Cursor does not double-register agents/skills.
+    if not keep_cursor and LAB.resolve().parent == ROOT.resolve():
+        lab_cursor = LAB / ".cursor"
+        if lab_cursor.exists():
+            shutil.rmtree(lab_cursor)
+        print(
+            f"Synced to {LAB.resolve()} (lab .cursor removed — use TestCursor root .cursor; "
+            "re-run with --publish before pushing lab repo)"
+        )
+    else:
+        print(f"Synced to {LAB.resolve()}")
 
 
 def write_commands(lab: Path) -> None:
+    """Agents-only â€” slash commands duplicate agent entries in Cursor UI."""
     cmds = lab / ".cursor" / "commands"
-    cmds.mkdir(parents=True, exist_ok=True)
-    (cmds / "msc-testcase-writer.md").write_text(
-        """# MSC testcase writer
-
-Generate QMetry-format test cases from Jira story `$ARGUMENTS` on wbdstreaming.atlassian.net.
-
-1. Follow skill `.cursor/skills/jira-story-testcases/SKILL.md`.
-2. Fetch Jira via Atlassian MCP (`getJiraIssue`).
-3. Show full draft for user approval before writing files.
-4. After approval: write `testcases/{KEY}-testcases.tsv` and run:
-   `python scripts/generate_qmetry_excel.py testcases/{KEY}-testcases.tsv`
-5. Output: `testcases/{KEY}-testcases.xlsx`
-""",
-        encoding="utf-8",
-    )
-    (cmds / "msc-jira-bug.md").write_text(
-        """# MSC Jira bug filer
-
-Draft and file an MSC Bug on wbdstreaming.atlassian.net from `$ARGUMENTS`.
-
-1. Follow skill `.cursor/skills/jira-msc-bug/SKILL.md` and agent `.cursor/agents/msc-jira-bug.md`.
-2. Search duplicates via JQL; fetch create metadata for MSC + Bug.
-3. Show full draft (summary, description, field plan) — **wait for explicit approval**.
-4. Create via `createJiraIssue` only after user approves.
-5. Return issue key and browse URL.
-""",
-        encoding="utf-8",
-    )
+    if cmds.exists():
+        shutil.rmtree(cmds)
 
 
 def write_agents_md(lab: Path) -> None:
@@ -203,21 +196,17 @@ def write_agents_md(lab: Path) -> None:
     agents.write_text(_AGENTS_MD, encoding="utf-8")
 
 
-def update_lab_readme(lab: Path) -> None:
-    """Refresh README and docs/README with renamed validator references."""
-    replacements = [
-        ("MSC-Code-Coverage-Validator-Guide.pptx", "MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx"),
-        ("MSC Code Coverage Validator", "MSC Dev Code and QA Test Coverage Validator"),
-        ("msc-code-coverage-validator", "msc-dev-code-and-qa-test-coverage-validator"),
+def copy_lab_readme_templates(lab: Path) -> None:
+    """Copy maintainer-authored README templates (UTF-8)."""
+    tpl = ROOT / "scripts" / "templates"
+    pairs = [
+        (tpl / "pegasus-qa-agents-lab-README.md", lab / "README.md"),
+        (tpl / "pegasus-qa-agents-lab-docs-README.md", lab / "docs" / "README.md"),
     ]
-    for rel in ("README.md", "docs/README.md"):
-        path = lab / rel
-        if not path.exists():
-            continue
-        text = path.read_text(encoding="utf-8")
-        for old, new in replacements:
-            text = text.replace(old, new)
-        path.write_text(text, encoding="utf-8")
+    for src, dst in pairs:
+        if src.exists():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
 
 
 _AGENTS_MD = """# Pegasus QA Agents Lab
@@ -227,16 +216,16 @@ Three Cursor agents for MSC QA on [wbdstreaming.atlassian.net](https://wbdstream
 | Agent | Invoke | Output |
 |-------|--------|--------|
 | **msc-testcase-writer** | `@msc-testcase-writer MSC-1234` | `testcases/{KEY}-testcases.xlsx` (QMetry FF2.0) |
-| **msc-dev-code-and-qa-test-coverage-validator** | `/msc-dev-code-and-qa-test-coverage-validator MSC-1234` | `build_coverage_report.py`; LADR dedupe + unique test-plan %; Sonar PR comment CI fallback; QA scope None when dev tests cover AC; Jira readiness ✓/✗; tooltips v22 |
+| **msc-dev-code-and-qa-test-coverage-validator** | `@msc-dev-code-and-qa-test-coverage-validator MSC-1234` | HTML report; section 3/8; LADR dedupe; QA scope None when dev-covered; tooltips v22 |
 | **msc-jira-bug** | `@msc-jira-bug` + defect description | MSC Bug in Jira (after explicit approval) |
 
-## Skills
+## Skills (workflow docs — not duplicate slash commands)
 
-| Skill | Path |
-|-------|------|
-| QMetry test cases from Jira | `.cursor/skills/jira-story-testcases/SKILL.md` |
-| Coverage vs PR + test plan | `.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/SKILL.md` |
-| MSC Bug filing | `.cursor/skills/jira-msc-bug/SKILL.md` |
+| Skill folder | Path |
+|--------------|------|
+| QMetry test cases | `.cursor/skills/jira-story-testcases/SKILL.md` |
+| Coverage validator | `.cursor/skills/coverage-validator/SKILL.md` |
+| MSC Bug filing | `.cursor/skills/bug-filing/SKILL.md` |
 
 Full teammate setup: [README.md](README.md)
 """
@@ -252,15 +241,19 @@ Place QMetry / Domino Excel files here when a Jira story **references** a test p
 
 ## Example
 
-Jira comment: *"Refer Inc as full sheet for Test plan and evidence"* → `Domino Test Plan.xlsx`, sheet **Inc as full**.
+Jira comment: *"Refer Inc as full sheet for Test plan and evidence"* â†’ `Domino Test Plan.xlsx`, sheet **Inc as full**.
 
 1. Copy the workbook to `testplans/Domino Test Plan.xlsx`
 2. Optionally set `testPlanPath` / `testPlanSheet` in `.coverage-validator.defaults.json`
-3. Re-run `/msc-dev-code-and-qa-test-coverage-validator {KEY}`
+3. Re-run `@msc-dev-code-and-qa-test-coverage-validator {KEY}`
 
 ## Jira attachment
 
 If the Excel is on the issue, set `.env` from `.env.example` so `fetch_jira_testplan.py` can download it automatically.
+
+## No test plan on Jira
+
+Coverage validator can auto-generate QMetry cases via `@msc-testcase-writer` and `write_testcase_excel.py`.
 """
 
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Generic HTML coverage report builder for msc-dev-code-and-qa-test-coverage-validator.
 
@@ -42,7 +42,7 @@ from coverage_report_helpers import (  # noqa: E402
 from coverage_report_timestamp import report_paths  # noqa: E402
 
 SKILL_TEMPLATE = (
-    ROOT / ".cursor/skills/msc-dev-code-and-qa-test-coverage-validator/report-template.html"
+    ROOT / ".cursor/skills/coverage-validator/report-template.html"
 )
 
 

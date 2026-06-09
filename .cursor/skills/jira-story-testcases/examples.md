@@ -16,7 +16,7 @@ When/Then rows: only **Step Summary** column populated (generator auto-fixes col
 ## Generate Excel
 
 ```bash
-python scripts/generate_qmetry_excel.py testcases/MSC-202222-testcases.tsv
+python scripts/write_testcase_excel.py MSC-202222
 ```
 
 Output: merged metadata cells (including Status) + Given/When/Then in column F, sheet name `QMetry Template`.
