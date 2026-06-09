@@ -33,7 +33,7 @@ from pptx.util import Inches, Pt
 ROOT = Path(__file__).resolve().parents[1]
 KEEP_PREFIX_SLIDES = 10
 DEFAULT_BASE_PPT = ROOT / "reports" / "MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx"
-DEFAULT_REPORT_HTML = ROOT / "reports" / "MSC-205625-06-02-2026-17-29-55-IST.html"
+DEFAULT_REPORT_HTML = ROOT / "reports" / "MSC-205625-06-09-2026-14-05-59-IST.html"
 
 # Brand
 CORAL = RGBColor(0xFF, 0x5E, 0x4F)
@@ -75,7 +75,7 @@ DECK_SLIDE_TIPS: dict[str, str] = {
     "Automated workflow": "End-to-end --auto --write: one MCP Jira batch + batched Python scripts.",
     "Solution architecture": "Cursor IDE, Atlassian MCP, gh/prefetch scripts, and HTML builder.",
     "HTML report — 8 sections": "Mirrors live report structure.",
-    "Report UX — info icons & tooltips": "HTML: apply_report_ui_enhancements() layout v8.",
+    "Report UX — info icons & tooltips": "HTML: apply_report_ui_enhancements() layout v22 — do not edit tooltip CSS when changing metrics.",
     "§1 Coverage summary — 8 metric cards": SECTION_HEADER_INFO.get("Coverage summary", ""),
     "§3 Test plan validation — Jira Excel + LADR alignment": SECTION_HEADER_INFO.get(
         "Attached test plan validation", ""
@@ -101,7 +101,7 @@ WORKFLOW_STEP_TIPS: dict[str, str] = {
     "Test plan": "fetch_jira_testplan.py — Excel attachment, GWT, Mascot/SIT evidence columns.",
     "GitHub": "prefetch_coverage_inputs.py — all PR URLs in one shell invocation.",
     "Map": "map_requirements_to_diff.py — R1…Rn vs diff; qaScope: none when dev-covered.",
-    "Report": "build_coverage_report.py + apply_report_ui_enhancements() tooltips v8.",
+    "Report": "build_coverage_report.py + apply_report_ui_enhancements() tooltips v22.",
 }
 
 PERSONA_TIPS: dict[str, str] = {
@@ -131,7 +131,7 @@ REPORT_MATRIX = {
     },
     "MSC-205625": {
         "type": "Bug · Ready for Release",
-        "generated": "06-02-2026 17:29 IST",
+        "generated": "06-09-2026 14:05 IST",
         "verdict": "Pass with gaps",
         "dev_code_pct": "87.5%",
         "dev_tests_pct": "83.3%",
@@ -144,30 +144,30 @@ REPORT_MATRIX = {
         "pr_note": "PR #161 pick-genie · #195 encode-monitor MERGED",
         "testplan_note": "Domino Inc as full · 5/5 GWT",
         "ladr_note": "LADR quick link only (no grooming wiki)",
-        "report_file": "MSC-205625-06-02-2026-17-29-55-IST.html",
+        "report_file": "MSC-205625-06-09-2026-14-05-59-IST.html",
         "summary_short": "PFT Clear passport incremental-as-full (SIT)",
     },
     "MSC-204417": {
         "type": "Story · Ready for Release",
-        "generated": "06-02-2026 17:26 IST",
+        "generated": "06-09-2026 14:03 IST",
         "verdict": "Pass with gaps",
         "dev_code_pct": "100.0%",
         "dev_tests_pct": "33.3%",
-        "req_mapped": "15/27 AC in test plan",
-        "testplan_ac_pct": "55.6%",
+        "req_mapped": "15/15 AC in test plan",
+        "testplan_ac_pct": "100.0%",
         "qa_remaining": "2 item(s)",
         "open_gaps": "0 High · 2 Med",
         "ci_line_pct": "NA",
         "ci_branch_pct": "NA",
         "pr_note": "No PR · develop branch (pegasus-ess)",
-        "testplan_note": "Caption Monitoring · 12/12 GWT",
+        "testplan_note": "Caption Monitoring · 12/12 GWT · LADR deduped",
         "ladr_note": "LADR Captions Delivery Visibility only",
-        "report_file": "MSC-204417-06-02-2026-17-26-52-IST.html",
+        "report_file": "MSC-204417-06-09-2026-14-03-00-IST.html",
         "summary_short": "V2 caption messaging for Monitor",
     },
     "MSC-195138": {
         "type": "Story · Done",
-        "generated": "06-02-2026 17:32 IST",
+        "generated": "06-09-2026 14:15 IST",
         "verdict": "Pass with gaps",
         "dev_code_pct": "83.3%",
         "dev_tests_pct": "0.0%",
@@ -175,12 +175,12 @@ REPORT_MATRIX = {
         "testplan_ac_pct": "66.7%",
         "qa_remaining": "3 item(s)",
         "open_gaps": "0 High · 2 Med",
-        "ci_line_pct": "77.7%",
-        "ci_branch_pct": "77.7%",
+        "ci_line_pct": "62.6%",
+        "ci_branch_pct": "62.6%",
         "pr_note": "PR #22 reps · #75 texttransform MERGED",
         "testplan_note": "FF Race Scenarios · 11/11 GWT",
         "ladr_note": "—",
-        "report_file": "MSC-195138-06-02-2026-17-32-47-IST.html",
+        "report_file": "MSC-195138-06-09-2026-14-15-46-IST.html",
         "summary_short": "FF2.0 messaging race conditions",
     },
 }
@@ -236,6 +236,43 @@ def _notes_from_report_html(html: str) -> dict[str, str]:
         else:
             out["ladr_note"] = "—"
     return out
+
+
+def _resolve_report_path(issue_key: str, report_html: Path | None = None) -> Path | None:
+    """Find newest sample report HTML for PPT tail slides (repo or parent workspace)."""
+    if report_html and Path(report_html).is_file():
+        return Path(report_html)
+    for base in (ROOT / "reports", ROOT.parent / "reports"):
+        if not base.is_dir():
+            continue
+        entry = REPORT_MATRIX.get(issue_key, {})
+        named = entry.get("report_file")
+        if named:
+            candidate = base / named
+            if candidate.is_file():
+                return candidate
+        for path in sorted(
+            base.glob(f"{issue_key}*.html"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        ):
+            if "Guide" not in path.name:
+                return path
+    return None
+
+
+def _minimal_report_data_from_matrix(issue_key: str) -> dict:
+    entry = REPORT_MATRIX.get(issue_key, REPORT_MATRIX[PRIMARY_EXAMPLE_KEY])
+    return {
+        "issue_key": issue_key,
+        "story_title": entry.get("summary_short", issue_key),
+        "verdict": entry.get("verdict", "Pass with gaps"),
+        "readiness": "—",
+        "generated": entry.get("generated", ""),
+        "readiness_items": [],
+        "sections": [],
+        "report_file": entry.get("report_file", ""),
+    }
 
 
 def refresh_report_matrix_from_html(reports_dir: Path | None = None) -> str | None:
@@ -1006,7 +1043,7 @@ class Deck:
         ht.text_frame.paragraphs[0].font.name = FONT
 
     def report_ui_slide(self):
-        """Report UX — info icons, tooltip layout v8, quick links, Linked PR columns, footer."""
+        """Report UX — info icons, tooltip layout v22, quick links, Linked PR columns, footer."""
         s = self.blank()
         s.background.fill.solid()
         s.background.fill.fore_color.rgb = WHITE
@@ -1014,7 +1051,7 @@ class Deck:
         self._slide_title(
             s,
             "Report UX — info icons & tooltips",
-            "apply_report_ui_enhancements() — layout v8 · §4 ownership v3 · before every HTML write",
+            "apply_report_ui_enhancements() — layout v22 · §4 ownership v3 · before every HTML write",
         )
         # Left: where i icons appear
         self._rect(s, Inches(0.55), Inches(1.35), Inches(6.0), Inches(0.42), NAVY, "Where the i icon appears", 12, True, WHITE, True)
@@ -1034,8 +1071,8 @@ class Deck:
             bx.text_frame.paragraphs[0].font.color.rgb = BODY
             bx.text_frame.paragraphs[0].font.name = FONT
             bx.text_frame.word_wrap = True
-        # Right: tooltip v8 + quick links
-        self._rect(s, Inches(6.85), Inches(1.35), Inches(5.9), Inches(0.42), CORAL, "Tooltip layout v8 · quick links", 12, True, WHITE, True)
+        # Right: tooltip v22 + quick links
+        self._rect(s, Inches(6.85), Inches(1.35), Inches(5.9), Inches(0.42), CORAL, "Tooltip layout v22 · quick links", 12, True, WHITE, True)
         tips = [
             "Quick links: Jira · SharePoint test plan · PR(s) · LADR wiki only",
             "Grooming / deployment / PVC go-live pages excluded from nav",
@@ -1195,7 +1232,7 @@ class Deck:
         for j, row in enumerate(
             [
                 "MSC-205625 · Passport LADR · 77.8% test plan AC · 81% readiness",
-                "MSC-204417 · Captions LADR · 55.6% test plan AC",
+                "MSC-204417 · Captions LADR · 100% test plan AC (LADR deduped)",
                 "MSC-195138 · FF Race · 66.7% test plan AC",
             ]
         ):
@@ -2296,12 +2333,17 @@ def build(
     report_html: Path | None = None,
 ) -> None:
     refresh_report_matrix_from_html()
+    refresh_report_matrix_from_html(ROOT.parent / "reports")
     _set_latest_example(PRIMARY_EXAMPLE_KEY)
-    report_path = report_html or ROOT / "reports" / REPORT_MATRIX[PRIMARY_EXAMPLE_KEY]["report_file"]
-    if not report_path.is_file():
+    report_path = _resolve_report_path(PRIMARY_EXAMPLE_KEY, report_html)
+    if report_path is None and DEFAULT_REPORT_HTML.is_file():
         report_path = DEFAULT_REPORT_HTML
-    report_data = parse_msc_report_html(report_path)
-    print(f"Report source: {report_path.name} ({report_data['issue_key']})")
+    if report_path is not None:
+        report_data = parse_msc_report_html(report_path)
+        print(f"Report source: {report_path.name} ({report_data['issue_key']})")
+    else:
+        report_data = _minimal_report_data_from_matrix(PRIMARY_EXAMPLE_KEY)
+        print(f"Report source: REPORT_MATRIX only ({report_data['issue_key']}) — no sample HTML found")
 
     base = base_ppt or DEFAULT_BASE_PPT
     out.parent.mkdir(parents=True, exist_ok=True)

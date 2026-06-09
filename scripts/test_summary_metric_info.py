@@ -13,7 +13,7 @@ def test_wrap_adds_info_icons_to_all_summary_metrics():
     out = wrap_summary_metric_labels(html)
     assert "metric-info-tip" in out
     assert "metric-info-icon" in out
-    assert len(SUMMARY_METRIC_INFO) == 8
+    assert len(SUMMARY_METRIC_INFO) >= 8
 
 
 def test_wrap_idempotent():

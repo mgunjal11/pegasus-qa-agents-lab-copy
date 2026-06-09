@@ -69,12 +69,17 @@ Optional status-code rows: **8000** (`STATUS_FAILURE`), **9000** (`STATUS_ERROR`
 
 ## Coverage metrics
 
-**Test plan acceptance criteria coverage %** scores against **Jira acceptance criteria + LADR scenarios** when LADR is present:
+**Test plan acceptance criteria coverage %** scores against **unique** Jira acceptance criteria + LADR scenarios when LADR is present:
+
+- `dedupe_ladr_requirements()` — same `L1` from multiple Confluence pages (LADR wiki + deployment doc) counts once
+- `compute_testplan_coverage()` — denominator is unique requirement ids (`R1`…`Rn` + `L1`…`Ln`), not duplicated list entries
 
 ```
 coverageDetail example:
-12 test cases · 12/12 full Given When Then · 13/14 LADR scenarios covered · 3/3 Jira acceptance criteria covered
+12 test cases · 12/12 full Given When Then · 12/12 LADR scenarios covered · 3/3 Jira acceptance criteria covered
 ```
+
+If coverage looks artificially low (e.g. **55.6%** with full LADR traceability), re-run `fetch_confluence_requirements.py` and `fetch_jira_testplan.py` so caches dedupe LADR before scoring.
 
 Use **`NA`** only when `status` is `no_testplan`. Do not report **0%** when test cases semantically cover LADR/Jira scope but lacked token overlap — re-run fetch after Confluence merge.
 

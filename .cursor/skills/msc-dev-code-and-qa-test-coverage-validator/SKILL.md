@@ -355,11 +355,13 @@ Count requirements by **QA scope** label. **QA remaining** = E2E + Manual + Regr
 Use the best available source, in order:
 
 1. Codecov / Coveralls check summary or PR comment
-2. SonarQube quality gate or coverage metric on the PR
-3. CI log artifact mentioning `coverage:` or `TOTAL` from pytest-cov/jest/nyc
-4. If unavailable: use display value **`NA`** (not `—` or “Not available”) and note **`No PR for {ISSUE-KEY}; {reason}`** (e.g. `develop branch only`) in `{{CI_LINE_NOTE}}` / `{{CI_BRANCH_NOTE}}`.
+2. SonarQube PR comment, check summary, or quality-gate JSON in CI logs (including `Code Coverage (Estimated after PR merge) - 62.6%` markdown bullets)
+3. pytest-cov `TOTAL` or `coverage.xml` from CI workflow logs or `unit-coverage-report-ci` artifact
+4. If unavailable: use display value **`NA`** (not `—` or “Not available”) and note **`No PR for {ISSUE-KEY}; {reason}`** (e.g. `develop branch only`) or **`No Codecov/Sonar/pytest coverage found on PR`** in `{{CI_LINE_NOTE}}` / `{{CI_BRANCH_NOTE}}`.
 
-**Generic builder:** `build_coverage_report.py` calls **`ci_coverage_report_fields(issue_key)`** in `coverage_report_helpers.py`, which merges `ciCoverage` from each PR in `{KEY}-prefetch.json` (Sonar/Codecov/pytest-cov) and maps to template placeholders **`{{CI_LINE_COVERAGE}}`**, **`{{CI_BRANCH_COVERAGE}}`**, **`{{CI_LINE_NOTE}}`**, **`{{CI_BRANCH_NOTE}}`**, **`{{CI_LINE_CLASS}}`**, **`{{CI_BRANCH_CLASS}}`**. Re-extracts from cached `sonarComment` / `codecovComment` / `checks` when `ciCoverage` is empty. Do not hand-set legacy keys `lineCoverage` / `branchCoverage` on the replacements dict.
+**CI NA after earlier runs showed numbers:** GitHub Actions job logs may return **HTTP 410** and coverage artifacts may be **expired** — re-prefetch cannot recover pytest/Sonar-gate log metrics. Sonar **PR comments** in prefetch cache may still supply overall estimated-after-merge % via `parse_sonar_text()` in `ci_coverage.py`.
+
+**Generic builder:** `build_coverage_report.py` calls **`ci_coverage_report_fields(issue_key)`** in `coverage_report_helpers.py`, which merges `ciCoverage` from each PR in `{KEY}-prefetch.json` (Sonar/Codecov/pytest-cov) and maps to template placeholders **`{{CI_LINE_COVERAGE}}`**, **`{{CI_BRANCH_COVERAGE}}`**, **`{{CI_LINE_NOTE}}`**, **`{{CI_BRANCH_NOTE}}`**, **`{{CI_LINE_CLASS}}`**, **`{{CI_BRANCH_CLASS}}`**. Re-extracts from cached `sonarComment` / `codecovComment` / `checks` when `ciCoverage` is empty. Do not hand-set legacy keys `lineCoverage` / `branchCoverage` on the replacements dict. **Do not change** `apply_report_ui_enhancements()` or tooltip HTML when fixing CI metric data.
 
 When both line and branch coverage exist, report both as percentages; use **line** as the primary CI metric in the summary table.
 
@@ -401,10 +403,12 @@ testplan_score(R or L) = 1.0 if ≥1 mapped test case with full Given/When/Then
                          = 0.0 if no mapped test case
                          = excluded if N/A
 
-testplan_coverage_pct = round(100 * sum(scores) / count(scored items), 1)
+testplan_coverage_pct = round(100 * covered_unique_ids / unique_requirement_ids, 1)
 ```
 
-Use **`NA`** when no attachment and no local fallback. Populate `{{TESTPLAN_COVERAGE_DETAIL}}` from cache `coverage.coverageDetail`, e.g. `12 test cases · 12/12 full Given When Then · 13/14 LADR scenarios covered · 3/3 Jira acceptance criteria covered · Jira attachment`.
+**LADR deduplication:** When multiple Confluence pages parse the same L1…Ln (e.g. LADR wiki + deployment page for MSC-204417), `dedupe_ladr_requirements()` in `confluence_requirements.py` collapses duplicate ids before `compute_testplan_coverage()`. Denominator uses **unique** Jira + LADR ids — not raw list length (avoids false 55.6% when 15 unique requirements are all covered but listed twice).
+
+Use **`NA`** when no attachment and no local fallback. Populate `{{TESTPLAN_COVERAGE_DETAIL}}` from cache `coverage.coverageDetail`, e.g. `12 test cases · 12/12 full Given When Then · 12/12 LADR scenarios covered · 3/3 Jira acceptance criteria covered · Jira attachment`.
 
 Apply `{{TESTPLAN_COVERAGE_CLASS}}` using the same tiers as dev coverage.
 

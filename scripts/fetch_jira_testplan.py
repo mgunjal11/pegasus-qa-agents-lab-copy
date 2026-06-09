@@ -36,6 +36,7 @@ from jira_env import (
 from confluence_requirements import (
     build_ladr_traceability,
     compute_testplan_coverage,
+    dedupe_ladr_requirements,
     fetch_and_cache_confluence_for_issue,
     format_testplan_coverage_detail,
     load_confluence_cache,
@@ -1107,7 +1108,7 @@ def main() -> int:
             confluence_payload = fetch_and_cache_confluence_for_issue(issue_key, jira_data, site=args.site)
         except RuntimeError:
             confluence_payload = load_confluence_cache(issue_key)
-    ladr_requirements = confluence_payload.get("ladrRequirements") or []
+    ladr_requirements = dedupe_ladr_requirements(confluence_payload.get("ladrRequirements") or [])
     requirements = merge_requirement_sets(jira_requirements, ladr_requirements)
 
     for tc in all_cases:

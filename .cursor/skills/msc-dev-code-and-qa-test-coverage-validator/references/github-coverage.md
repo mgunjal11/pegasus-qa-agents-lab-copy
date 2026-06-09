@@ -42,6 +42,13 @@ Typical patterns: `Coverage: 87.2%`, `Patch coverage: 92%`.
 
 ### 3. SonarQube
 
+Sources parsed by `scripts/ci_coverage.py` (`parse_sonar_text`, quality-gate log JSON, measures JSON):
+
+- PR comment: `95.30% Coverage (94.50% Estimated after merge)`
+- PR comment (Sonar bot markdown): `Code Coverage (Estimated after PR merge) - `62.6%``
+- Check run `output_summary` on Sonar-named checks
+- Quality-gate `new_coverage` / `new_branch_coverage` in CI build job logs
+
 If the org uses SonarQube checks, read `output_summary` from the Sonar check run. Do not guess project keys.
 
 ### 4. Workflow run logs (fallback)
@@ -58,6 +65,17 @@ gh run download {run_id} --repo {org}/{repo} -n coverage-report
 ```
 
 Then parse `coverage.xml`, `lcov.info`, or HTML summary if present.
+
+### 6. When CI shows NA but an older report had numbers
+
+| Cause | What happened |
+|-------|----------------|
+| Job logs **HTTP 410** | GitHub deleted workflow job logs; `fetch_ci_job_log` cannot recover pytest-cov or Sonar gate JSON |
+| Artifact **expired** | `unit-coverage-report-ci` zip no longer downloadable |
+| Codecov comment missing | No bot comment on the PR |
+| Sonar comment format | Older parser missed markdown bullets — fixed in `parse_sonar_text()` for estimated-after-merge lines |
+
+**Recovery:** Re-trigger CI on the PR (fresh logs + artifact), then `prefetch_coverage_inputs.py {KEY} --pr URL …` and `build_coverage_report.py {KEY}`. If only the Sonar PR comment remains in cache, report may show **estimated after merge** % (not necessarily the same as new-code quality-gate % from expired logs).
 
 ## Scoring reminder
 

@@ -23,6 +23,20 @@ def test_parse_sonar_pr_comment():
     assert fields["lineClass"] == "metric-good"
 
 
+def test_parse_sonar_pr_comment_estimated_after_pr_merge_bullet():
+    """Sonar bot markdown on pegasus-reps#22 (MSC-195138) when CI logs/artifacts expired."""
+    body = (
+        "#### Coverage and Duplications\n"
+        "- Code Coverage (Estimated after PR merge) - `62.6%`\n"
+    )
+    cov = finalize_ci_coverage(parse_sonar_text(body))
+    assert cov["linePct"] == 62.6
+    assert cov["branchPct"] == 62.6
+    fields = coverage_to_report_fields(cov)
+    assert fields["lineCoverage"] == "62.6%"
+    assert fields["branchCoverage"] == "62.6%"
+
+
 def test_parse_codecov():
     body = "Coverage: 87.2% on 120 lines\nBranch coverage: 79.1%"
     cov = parse_codecov_comment(body)

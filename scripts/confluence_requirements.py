@@ -492,17 +492,51 @@ def collect_confluence_page_links(issue_key: str, root: Path | None = None) -> l
     return links
 
 
+def dedupe_ladr_requirements(ladr_reqs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Collapse duplicate LADR rows (same id or task+status) from multiple Confluence pages."""
+    seen_ids: set[str] = set()
+    seen_task_status: set[tuple[str, str]] = set()
+    out: list[dict[str, Any]] = []
+    for req in ladr_reqs:
+        rid = str(req.get("id") or "")
+        task = str(req.get("task") or "").strip().lower()
+        status = str(req.get("status") or "").strip().lower()
+        task_status = (task, status) if task and status else None
+        if rid and rid in seen_ids:
+            continue
+        if task_status and task_status in seen_task_status:
+            continue
+        if rid:
+            seen_ids.add(rid)
+        if task_status:
+            seen_task_status.add(task_status)
+        out.append(dict(req))
+    return out
+
+
 def merge_requirement_sets(
     jira_requirements: list[dict[str, str]],
     ladr_requirements: list[dict[str, str]],
 ) -> list[dict[str, str]]:
     merged = [dict(r) for r in jira_requirements]
     seen = {r["id"] for r in merged}
-    for req in ladr_requirements:
+    for req in dedupe_ladr_requirements(ladr_requirements):
         if req["id"] not in seen:
             merged.append(dict(req))
             seen.add(req["id"])
     return merged
+
+
+def _unique_requirement_ids(ids: list[str]) -> list[str]:
+    """Preserve order; drop blanks and duplicate ids (e.g. repeated L1 from merged Confluence pages)."""
+    seen: set[str] = set()
+    unique: list[str] = []
+    for rid in ids:
+        if not rid or rid in seen:
+            continue
+        seen.add(rid)
+        unique.append(rid)
+    return unique
 
 
 def _normalize(text: str) -> str:
@@ -628,6 +662,7 @@ def build_ladr_traceability(
     ladr_requirements: list[dict[str, str]],
 ) -> list[dict[str, Any]]:
     """Map each LADR requirement (L1…Ln) to test case IDs for report traceability."""
+    ladr_requirements = dedupe_ladr_requirements(ladr_requirements)
     if not ladr_requirements:
         return []
 
@@ -679,15 +714,16 @@ def compute_testplan_coverage(
     for tc in cases:
         covered.update(getattr(tc, "mapped_requirements", []) or [])
 
-    jira_ids = [r["id"] for r in jira_reqs if r.get("id")]
-    ladr_ids = [r["id"] for r in ladr_reqs if r.get("id")]
+    jira_ids = _unique_requirement_ids([r["id"] for r in jira_reqs if r.get("id")])
+    ladr_ids = _unique_requirement_ids([r["id"] for r in dedupe_ladr_requirements(ladr_reqs) if r.get("id")])
     all_ids = jira_ids + ladr_ids
+    all_id_set = set(all_ids)
 
     jira_covered = len(covered & set(jira_ids))
     ladr_covered = len(covered & set(ladr_ids))
 
     if all_ids:
-        pct = round(100 * len(covered & set(all_ids)) / len(all_ids), 1)
+        pct = round(100 * len(covered & all_id_set) / len(all_ids), 1)
     elif jira_ids:
         pct = round(100 * jira_covered / len(jira_ids), 1)
     else:
@@ -707,7 +743,7 @@ def compute_testplan_coverage(
     return {
         "testplanCoveragePct": pct,
         "requirementCount": len(all_ids) or len(jira_ids),
-        "requirementsCovered": len(covered & set(all_ids)) if all_ids else jira_covered,
+        "requirementsCovered": len(covered & all_id_set) if all_ids else jira_covered,
         "jiraRequirementCount": len(jira_ids),
         "jiraRequirementsCovered": jira_covered,
         "ladrRequirementCount": len(ladr_ids),
@@ -795,6 +831,8 @@ def fetch_and_cache_confluence_for_issue(
 
     if not all_ladr and jira_data:
         all_ladr = infer_ladr_requirements_from_jira(jira_data)
+
+    all_ladr = dedupe_ladr_requirements(all_ladr)
 
     payload = {
         "issueKey": issue_key.upper(),

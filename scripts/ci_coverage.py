@@ -72,6 +72,15 @@ def parse_sonar_text(body: str | None) -> dict[str, Any]:
         out["branchPct"] = float(new_line.group(2))
         out["branchSource"] = "SonarQube overall line coverage"
         return out
+    # Sonar bot PR comment (MSC-195138 pegasus-reps#22): markdown bullet with backticks
+    estimated_pr_merge = re.search(
+        r"Code Coverage\s*\(Estimated after PR merge\)\s*[-–—]\s*`?(\d+\.?\d*)\s*%`?",
+        text,
+        re.I,
+    )
+    if estimated_pr_merge:
+        out["linePct"] = float(estimated_pr_merge.group(1))
+        out["lineSource"] = "SonarQube Code Coverage (estimated after PR merge)"
     line = re.search(r"(\d+\.?\d*)\s*%\s*Coverage", text, re.I)
     if line:
         out["linePct"] = float(line.group(1))

@@ -11,7 +11,7 @@ A centralized lab for **AI-driven QA agents** on the WBD Media Supply Chain (MSC
 | # | Agent | What it does | How to invoke |
 |---|--------|--------------|---------------|
 | 1 | **msc-testcase-writer** | Reads Jira user stories → QMetry FF2.0 test cases (Excel, Given/When/Then) | `@msc-testcase-writer MSC-204417` |
-| 2 | **msc-dev-code-and-qa-test-coverage-validator** | Jira AC + Confluence LADR + Excel test plan vs GitHub PR; LADR ↔ test case traceability; Evidence = Mascot or SIT Jobs IDs; HTML report | `/msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
+| 2 | **msc-dev-code-and-qa-test-coverage-validator** | Jira AC + Confluence LADR (deduped) + Excel test plan vs GitHub PR; unique-id test plan %; LADR ↔ test case traceability; CI from Codecov/Sonar/pytest or Sonar PR comment; tooltips v22 | `/msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
 | 3 | **msc-jira-bug** | Drafts MSC Bug tickets; creates only after your approval | `@msc-jira-bug` + describe the defect |
 
 **Coverage validator guide deck:** `python scripts/generate_coverage_validator_ppt.py` → `docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx`
@@ -135,16 +135,18 @@ The HTML report includes three groups:
 
 **QA & release risk**
 
-- Test plan acceptance criteria coverage %
+- Test plan acceptance criteria coverage % (unique Jira + LADR ids; duplicate L1…Ln from multiple Confluence pages deduped)
 - QA scope remaining
 - Open gaps
 
 **CI pipeline**
 
 - CI line coverage %
-- CI branch coverage %
+- CI branch coverage % (Sonar/Codecov/pytest-cov; Sonar PR comment `estimated after PR merge` when logs expired)
 
 Full workflow: [.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/SKILL.md](.cursor/skills/msc-dev-code-and-qa-test-coverage-validator/SKILL.md)
+
+**Report UI:** `apply_report_ui_enhancements()` layout **v22** — hover `i` on metric labels; tooltips are data-independent (metric fixes do not change tooltip markup).
 
 ---
 
@@ -224,7 +226,8 @@ docs/                  # Generated PPT and guides
 | Many Allow/Run prompts | Run `install_coverage_validator_permissions.py`; set Auto-Run → **Allowlist** |
 | Test plan shows **Pending** / `referenced_not_local` | Add Excel under `testplans/` or set `testPlanPath` in `.coverage-validator.defaults.json` |
 | Cannot download Jira attachment | Set `ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN` in `.env` |
-| CI coverage **NA** | Link a PR on the story, or pass `--pr URL`; ensure `gh auth status` |
+| CI coverage **NA** | Link a PR; `gh auth status` OK; re-run prefetch. If an **older report had CI %** but a new one shows NA, GitHub job logs may be **HTTP 410** and `unit-coverage-report-ci` artifacts **expired** — re-trigger CI or rely on Sonar PR comment (estimated-after-merge %) in cache |
+| Test plan % too low with full LADR trace | Re-run `fetch_confluence_requirements.py` + `fetch_jira_testplan.py` (LADR dedupe across Confluence pages) |
 | `@msc-jira-bug` works but validator does not | Add `gh`, Python, and steps 5–7 above |
 
 ---

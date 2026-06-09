@@ -42,7 +42,8 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 
 ## Report builder (required)
 
-- **CI:** `ci_coverage_report_fields()` → `{{CI_LINE_COVERAGE}}`, `{{CI_BRANCH_COVERAGE}}`, notes/classes; **NA** when no PR / branch-only
+- **CI:** `ci_coverage_report_fields()` → `{{CI_LINE_COVERAGE}}`, `{{CI_BRANCH_COVERAGE}}`, notes/classes; **NA** when no PR / branch-only; Sonar PR comment fallback when job logs 410 / artifacts expired (`ci_coverage.py`)
+- **LADR / test plan %:** `dedupe_ladr_requirements()` + unique requirement ids in `compute_testplan_coverage()` — metric data only; **do not** change tooltip HTML/CSS
 - **Linked PR(s):** `render_pr_rows_from_prefetch()` — Files, **Dev tests** (from mapping `prs[].devTests` + `diffNames`), CI status
 - **No PR:** `build_branch_compare_pr_note()` + `render_branch_compare_pr_rows()` when `branchCompare` in prefetch
 - **§3 test plan:** `build_testplan_report_fields()` — Evidence, LADR trace, gaps, split Jira/LADR metrics

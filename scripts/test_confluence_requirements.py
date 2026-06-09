@@ -15,6 +15,7 @@ from confluence_requirements import (  # noqa: E402
     collect_confluence_page_links,
     collect_ladr_page_links,
     compute_testplan_coverage,
+    dedupe_ladr_requirements,
     map_testcases_to_requirements,
     merge_requirement_sets,
     parse_ladr_ess_requirements,
@@ -75,6 +76,32 @@ def test_map_caption_monitoring_scenarios():
     trace = build_ladr_traceability(cases, ladr)
     assert trace
     assert any(r["id"] == "L1" and r["mapped"] for r in trace)
+
+
+def test_compute_testplan_coverage_dedupes_duplicate_ladr_ids():
+    """MSC-204417: same L1–L12 parsed from two Confluence pages must not halve coverage %."""
+    jira = [{"id": f"R{i}", "text": f"ac{i}"} for i in range(1, 4)]
+    ladr = [{"id": f"L{i}", "task": "orderStatus", "status": f"Status{i}"} for i in range(1, 13)]
+    ladr_dup = ladr + list(ladr)
+    assert len(dedupe_ladr_requirements(ladr_dup)) == 12
+
+    mapped = [f"R{i}" for i in range(1, 4)] + [f"L{i}" for i in range(1, 13)]
+    cases = [FakeTC("all reqs", mapped_requirements=mapped)]
+    cov = compute_testplan_coverage(
+        cases,
+        merge_requirement_sets(jira, ladr_dup),
+        jira_requirements=jira,
+        ladr_requirements=ladr_dup,
+    )
+    assert cov["ladrRequirementCount"] == 12
+    assert cov["jiraRequirementCount"] == 3
+    assert cov["requirementCount"] == 15
+    assert cov["requirementsCovered"] == 15
+    assert cov["testplanCoveragePct"] == 100.0
+    assert cov["uncoveredLadrRequirements"] == []
+
+    trace = build_ladr_traceability(cases, ladr_dup)
+    assert len(trace) == 12
 
 
 def test_collect_confluence_page_links_from_issue_caches(fixture_repo_root):
