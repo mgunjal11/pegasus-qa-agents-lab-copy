@@ -106,6 +106,9 @@ def build() -> Document:
 │       ├── jira-story-testcases/      # QMetry testcase writer
 │       └── bug-filing/                # MSC bug filing (agent: msc-jira-bug)
 ├── scripts/                           # Python pipeline (see Section 4)
+├── testcases/                         # QMetry Excel output (testcase writer / fallback)
+│   └── <KEY>-testcases.xlsx
+├── testplans/                         # Local Domino/SharePoint Excel when referenced_not_local
 ├── docs/
 │   ├── MSC-Dev-Code-and-QA-Test-Coverage-Validator-Jira-Template.docx
 │   └── MSC-Dev-Code-and-QA-Test-Coverage-Validator-Directory-Guide.docx  (this file)
@@ -118,7 +121,8 @@ def build() -> Document:
         ├── <KEY>-testplan.json
         ├── <KEY>-prefetch.json
         ├── <KEY>-mapping.json
-        ├── <KEY>-analysis.json      # Optional manual overrides
+        ├── <KEY>-analysis.json        # Optional manual overrides
+        ├── <KEY>-testcases-source.tsv # QMetry rows before write_testcase_excel.py
         └── <KEY>-testplan-files/      # Downloaded Excel attachments""",
     )
 
@@ -176,7 +180,12 @@ def build() -> Document:
             [
                 "4",
                 "fetch_jira_testplan.py",
-                "Download/parse Excel test plan → {KEY}-testplan.json",
+                "Download/parse Excel test plan → {KEY}-testplan.json (status: ok | referenced_not_local | no_testplan | parse_failed)",
+            ],
+            [
+                "4b",
+                "msc-testcase-writer (agent) + write_testcase_excel.py",
+                "When testplan status is no_testplan: draft QMetry cases → {KEY}-testcases-source.tsv + testcases/{KEY}-testcases.xlsx; re-run fetch_jira_testplan.py (see references/testplan-missing-fallback.md)",
             ],
             [
                 "5",
@@ -251,7 +260,15 @@ def build() -> Document:
             ["ppt_report_from_html.py", "Helper for PPT generation"],
             ["sync_pegasus_qa_agents_lab.py", "Publish agent + scripts to pegasus-qa-agents-lab GitHub repo"],
             ["verify_jira_credentials.py", "Test Jira .env configuration"],
-            ["upload_jira_testplan.py", "Optional: upload test plan to Jira"],
+            ["upload_jira_testplan.py", "Optional: upload generated testcases/{KEY}-testcases.xlsx to Jira"],
+            [
+                "prepare_testcase_writer_context.py",
+                "Jira + LADR context for msc-testcase-writer (mode: jira_and_ladr vs jira_only)",
+            ],
+            [
+                "write_testcase_excel.py",
+                "Cache TSV → testcases/{KEY}-testcases.xlsx (QMetry FF2.0); used by testcase writer and Step 4b fallback",
+            ],
             ["regen_msc205625_report.py, regen_msc204417_report.py", "Legacy per-ticket regen scripts (prefer build_coverage_report.py)"],
         ],
     )
@@ -280,11 +297,68 @@ def build() -> Document:
             ["references/run-options.md", "--auto, --from-cache, --fetch-only, manifest flags"],
             ["references/auto-approve-setup.md", "Cursor permissions / one-shot pipeline setup"],
             ["references/dev-qa-test-scope.md", "Dev vs QA ownership rules"],
-            ["references/jira-testplan-validation.md", "Excel test plan expectations"],
+            ["references/jira-testplan-validation.md", "Excel test plan expectations; SharePoint/Domino local setup"],
+            [
+                "references/testplan-missing-fallback.md",
+                "Step 4b: when status is no_testplan → msc-testcase-writer + write_testcase_excel.py + re-fetch; generateTestPlanIfMissing / skipTestcaseGeneration flags",
+            ],
             ["references/confluence-ladr-requirements.md", "LADR L1…Ln traceability"],
+            ["references/content-vs-tooltips.md", "Edit §3/§8 data builders only — do not change tooltip HTML/CSS unless UI change requested"],
             ["references/github-coverage.md", "PR prefetch, branch compare, gh usage"],
             ["examples.md", "Sample invocations and output paths"],
         ],
+    )
+
+    add_heading(doc, "5.1 Missing Jira test plan — testcase writer fallback (Step 4b)", 1)
+    doc.add_paragraph(
+        "When fetch_jira_testplan.py sets status to no_testplan (no Jira attachment, no comment/SharePoint "
+        "reference, no existing testcases/{KEY}-testcases.xlsx), the coverage validator agent runs Step 4b "
+        "per references/testplan-missing-fallback.md. This is agent-orchestrated — not a single Python script."
+    )
+    add_table(
+        doc,
+        ["testplan.json status", "Action"],
+        [
+            ["ok", "Continue pipeline — test cases parsed from Jira attachment, testplans/, or testcases/"],
+            [
+                "referenced_not_local",
+                "Do not invoke testcase writer — place referenced Excel under testplans/ and re-run fetch_jira_testplan.py",
+            ],
+            ["parse_failed", "Fix local file; generate only if user asks"],
+            [
+                "no_testplan",
+                "If generateTestPlanIfMissing is true (default in --auto --write): invoke /msc-testcase-writer {KEY}, "
+                "write reports/.cache/{KEY}-testcases-source.tsv, run write_testcase_excel.py, re-fetch test plan",
+            ],
+        ],
+    )
+    add_bullet(
+        doc,
+        " — set skipTestcaseGeneration: true in manifest or .coverage-validator.defaults.json",
+        "Opt out",
+    )
+    add_bullet(
+        doc,
+        " — testPlanSource: workspace_generated; §3 note states locally generated via msc-testcase-writer",
+        "After fallback",
+    )
+    add_bullet(
+        doc,
+        " — Evidence column shows No execution evidence (not Mascot/SIT job IDs)",
+        "Report honesty",
+    )
+    add_code(
+        doc,
+        """# Step 4b sequence (no_testplan + --auto --write)
+python scripts/fetch_jira_testplan.py MSC-209330 --from-jira-cache   # status: no_testplan
+# → agent: /msc-testcase-writer MSC-209330
+python scripts/prepare_testcase_writer_context.py MSC-209330 --from-jira-cache
+# → reports/.cache/MSC-209330-testcases-source.tsv (agent draft)
+python scripts/write_testcase_excel.py MSC-209330
+# → testcases/MSC-209330-testcases.xlsx
+python scripts/fetch_jira_testplan.py MSC-209330 --from-jira-cache   # status: ok, workspace_generated
+python scripts/map_requirements_to_diff.py MSC-209330
+python scripts/build_coverage_report.py MSC-209330""",
     )
 
     add_heading(doc, "6. Runtime outputs and cache files", 1)
@@ -296,7 +370,21 @@ def build() -> Document:
             ["reports/.cache/{KEY}-manifest.json", "prefetch / builder", "lastReportFile, prUrls, repo, mode, timezone"],
             ["reports/.cache/{KEY}-jira.json", "Agent MCP + scripts", "Requirements R1…Rn, attachments, PR URLs, Confluence links"],
             ["reports/.cache/{KEY}-confluence.json", "fetch_confluence_requirements.py", "LADR requirements L1…Ln"],
-            ["reports/.cache/{KEY}-testplan.json", "fetch_jira_testplan.py", "Parsed test cases, GWT, Jira/LADR mapping"],
+            [
+                "reports/.cache/{KEY}-testplan.json",
+                "fetch_jira_testplan.py",
+                "Parsed test cases, GWT, Jira/LADR mapping; status field drives Step 4b fallback",
+            ],
+            [
+                "reports/.cache/{KEY}-testcases-source.tsv",
+                "msc-testcase-writer (agent)",
+                "QMetry row draft before write_testcase_excel.py (not stored in testcases/)",
+            ],
+            [
+                "testcases/{KEY}-testcases.xlsx",
+                "write_testcase_excel.py",
+                "Local QMetry plan; fetch_jira_testplan.py source priority #4; workspace_generated in report",
+            ],
             ["reports/.cache/{KEY}-prefetch.json", "prefetch / fetch_coverage_github", "PR diffs, CI status, branchCompare files"],
             ["reports/.cache/{KEY}-mapping.json", "map_requirements_to_diff.py", "Per-R code/dev-test scores, qaScope, evidence files"],
             ["reports/.cache/{KEY}-analysis.json", "Manual (optional)", "Override narrative lists and coverage % for build_coverage_report.py --analysis"],
@@ -313,14 +401,19 @@ def build() -> Document:
         doc,
         """/msc-dev-code-and-qa-test-coverage-validator MSC-205625
 
-  MCP (parallel)     →  reports/.cache/MSC-205625-jira.json
-  fetch_confluence   →  reports/.cache/MSC-205625-confluence.json
-  fetch_jira_testplan→  reports/.cache/MSC-205625-testplan.json
-  prefetch / gh      →  reports/.cache/MSC-205625-prefetch.json
-  map_requirements   →  reports/.cache/MSC-205625-mapping.json
+  MCP (parallel)       →  reports/.cache/MSC-205625-jira.json
+  fetch_confluence     →  reports/.cache/MSC-205625-confluence.json
+  fetch_jira_testplan  →  reports/.cache/MSC-205625-testplan.json
+  [Step 4b if no_testplan]
+    msc-testcase-writer + write_testcase_excel.py
+                       →  testcases/MSC-205625-testcases.xlsx
+                       →  re-fetch testplan (status: ok, workspace_generated)
+                       (see references/testplan-missing-fallback.md)
+  prefetch / gh        →  reports/.cache/MSC-205625-prefetch.json
+  map_requirements     →  reports/.cache/MSC-205625-mapping.json
   build_coverage_report
-                     →  reports/MSC-205625-<timestamp>-IST.html
-                     →  manifest lastReportFile updated""",
+                       →  reports/MSC-205625-<timestamp>-IST.html
+                       →  manifest lastReportFile updated""",
     )
 
     add_heading(doc, "9. Published copy (pegasus-qa-agents-lab)", 1)

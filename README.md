@@ -123,7 +123,7 @@ Full workflow: [.cursor/skills/coverage-validator/SKILL.md](.cursor/skills/cover
 
 Skill: [.cursor/skills/jira-story-testcases/SKILL.md](.cursor/skills/jira-story-testcases/SKILL.md)
 
-When coverage validator finds **no Jira test plan**, it auto-invokes testcase writer (`write_testcase_excel.py`) in `--auto --write` mode.
+When coverage validator finds **no Jira test plan** (`no_testplan`), Step **4b** auto-invokes testcase writer per [`references/testplan-missing-fallback.md`](.cursor/skills/coverage-validator/references/testplan-missing-fallback.md) — `write_testcase_excel.py` → `testcases/{KEY}-testcases.xlsx`, then re-fetch test plan (`workspace_generated` in §3).
 
 ---
 
@@ -209,8 +209,9 @@ docs/                  # Generated PPT and Word guides
 ```bash
 python scripts/sync_pegasus_qa_agents_lab.py --publish
 cd pegasus-qa-agents-lab
-python scripts/generate_coverage_validator_ppt.py
 python scripts/generate_coverage_validator_directory_guide.py
+# Keep polished slides 1–10 from reports/…-Guide.pptx; refresh tail from latest HTML:
+python scripts/generate_coverage_validator_ppt.py --report-html reports/MSC-205625-<latest>.html
 git add -A && git commit -m "Sync agents, skills, docs" && git push origin main
 ```
 

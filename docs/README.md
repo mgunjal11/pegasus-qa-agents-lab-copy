@@ -5,7 +5,7 @@
 | `MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx` | `python scripts/generate_coverage_validator_ppt.py` |
 | `MSC-Dev-Code-and-QA-Test-Coverage-Validator-Directory-Guide.docx` | `python scripts/generate_coverage_validator_directory_guide.py` |
 
-**Management deck (~20 slides)** — WBD QBR brand: workflow, personas, 8-section report walkthrough, Dev/QA split, §8 recommended actions.
+**Management deck (22 slides)** — WBD QBR brand. Keep polished slides 1–10 from `reports/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx`; regenerate tail: `python scripts/generate_coverage_validator_ppt.py --report-html reports/{KEY}-<latest>.html`. Use `--full` only when intentionally rebuilding prefix from script.
 
 Also copied to `reports/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx` when generated.
 
@@ -17,4 +17,4 @@ Also copied to `reports/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx` 
 - LADR dedupe in test-plan %; Sonar PR comment CI fallback
 - Report tooltips layout **v22** — do not edit `SUMMARY_METRIC_INFO` when changing metrics (see `coverage-validator/references/content-vs-tooltips.md`)
 
-**Word directory guide** — agent/skill/script tree aligned with `.cursor/agents/` + `.cursor/skills/coverage-validator/`.
+**Word directory guide** — agent/skill/script tree aligned with `.cursor/agents/` + `.cursor/skills/coverage-validator/`. Includes **Step 4b** missing-test-plan fallback (`references/testplan-missing-fallback.md`), `write_testcase_excel.py`, `testcases/{KEY}-testcases.xlsx`, and manifest flags `generateTestPlanIfMissing` / `skipTestcaseGeneration`.

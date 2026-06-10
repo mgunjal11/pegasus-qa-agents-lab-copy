@@ -98,7 +98,8 @@ DECK_SLIDE_TIPS: dict[str, str] = {
 WORKFLOW_STEP_TIPS: dict[str, str] = {
     "Jira": "Parallel MCP: getJiraIssue + remote wiki links + attachments.",
     "Confluence": "fetch_confluence_requirements.py â€” LADR ESS when linked from Jira.",
-    "Test plan": "fetch_jira_testplan.py â€” Excel attachment, GWT, Mascot/SIT evidence columns.",
+    "Test plan": "fetch_jira_testplan.py â€” Jira Excel, testplans/, or testcases/; status no_testplan triggers Step 4b (see testplan-missing-fallback.md).",
+    "Step 4b": "msc-testcase-writer + write_testcase_excel.py â†’ testcases/{KEY}-testcases.xlsx; re-fetch; workspace_generated in Â§3.",
     "GitHub": "prefetch_coverage_inputs.py â€” all PR URLs in one shell invocation.",
     "Map": "map_requirements_to_diff.py â€” R1â€¦Rn vs diff; qaScope: none when dev-covered.",
     "Report": "build_coverage_report.py + apply_report_ui_enhancements() tooltips v22.",
@@ -182,6 +183,24 @@ REPORT_MATRIX = {
         "ladr_note": "â€”",
         "report_file": "MSC-195138-06-09-2026-14-15-46-IST.html",
         "summary_short": "FF2.0 messaging race conditions",
+    },
+    "MSC-209330": {
+        "type": "Story Â· In QA",
+        "generated": "06-10-2026 13:41 IST",
+        "verdict": "Pass with gaps",
+        "dev_code_pct": "â€”",
+        "dev_tests_pct": "â€”",
+        "req_mapped": "3/3 AC in test plan",
+        "testplan_ac_pct": "100.0%",
+        "qa_remaining": "3 item(s)",
+        "open_gaps": "0 High Â· 3 Med",
+        "ci_line_pct": "â€”",
+        "ci_branch_pct": "â€”",
+        "pr_note": "PR #99 media-rule-engine Â· #107 acquire-checkin",
+        "testplan_note": "Step 4b fallback Â· 9/9 GWT Â· workspace_generated",
+        "ladr_note": "â€”",
+        "report_file": "MSC-209330-06-10-2026-13-41-36-IST.html",
+        "summary_short": "Acquire 2 promo normalization (no Jira test plan â†’ testcase writer)",
     },
 }
 
@@ -630,7 +649,7 @@ class Deck:
             "Jira story + AC + LADR links",
             "Confluence LADR requirements (when linked)",
             "Linked PR + CI",
-            "Excel test plan (Jira attachment)",
+            "Test plan (Jira Excel, testplans/, or Step 4b generated)",
             "HTML readiness report",
         ]
         for j, lbl in enumerate(stack):
@@ -880,12 +899,13 @@ class Deck:
         steps = [
             ("1", "Jira", "Parallel MCP:\nissue + remote\nwiki links"),
             ("2", "Confluence", "LADR ESS or\npassport scenarios"),
-            ("3", "Test plan", "Excel attach,\nGWT, Evidence"),
-            ("4", "GitHub", "prefetch PR(s)\nor branch compare"),
-            ("5", "Map", "map_requirements_\nto_diff.py"),
-            ("6", "Report", "build_coverage_\nreport.py + tooltips"),
+            ("3", "Test plan", "fetch_jira_\ntestplan.py"),
+            ("4", "Step 4b", "no_testplan?\nwriter + Excel"),
+            ("5", "GitHub", "prefetch PR(s)\nor branch compare"),
+            ("6", "Map", "map_requirements_\nto_diff.py"),
+            ("7", "Report", "build_coverage_\nreport.py + tooltips"),
         ]
-        sw = Inches(1.95)
+        sw = Inches(1.62)
         for i, (num, title, sub) in enumerate(steps):
             left = Inches(0.35) + (sw + Inches(0.18)) * i
             self._rect(
@@ -925,11 +945,11 @@ class Deck:
         self._rect(s, Inches(0.55), Inches(4.25), Inches(12.2), Inches(1.15), SOFT_GOLD, radius=True)
         cb = s.shapes.add_textbox(Inches(0.75), Inches(4.4), Inches(11.8), Inches(0.9))
         cb.text_frame.text = (
-            "Cache: reports/.cache/{KEY}-jira|confluence|testplan|prefetch|mapping.json â€” reuse --from-cache. "
-            "Quick links: collect_ladr_page_links() â€” LADR/design Confluence only (no grooming/deployment remote links). "
-            "No linked PR? fetch_coverage_github.py --compare develop + branchCompare mapping. "
-            "Â§4 build_qa_ownership_fields() â€” qaScope: none skips dev-covered AC from QA TC list. "
-            "build_coverage_report.py fills CI {{CI_*}} and Dev tests columns automatically."
+            "Step 4b (testplan-missing-fallback.md): when testplan.json status is no_testplan, agent runs "
+            "/msc-testcase-writer {KEY} â†’ reports/.cache/{KEY}-testcases-source.tsv + write_testcase_excel.py "
+            "â†’ testcases/{KEY}-testcases.xlsx â†’ re-fetch (workspace_generated; Â§3 No execution evidence). "
+            "Flags: generateTestPlanIfMissing (default true), skipTestcaseGeneration. "
+            "Cache: reports/.cache/{KEY}-jira|confluence|testplan|prefetch|mapping.json â€” reuse --from-cache."
         )
         cb.text_frame.paragraphs[0].font.size = Pt(12)
         cb.text_frame.paragraphs[0].font.color.rgb = BODY
@@ -969,8 +989,8 @@ class Deck:
             self._arrow(s, cx, cy, hx, hy)
         leg = s.shapes.add_textbox(Inches(0.55), Inches(6.45), Inches(12), Inches(0.45))
         leg.text_frame.text = (
-            "Skill: .cursor/skills/coverage-validator/  Â·  "
-            "fetch_jira_testplan.py merges Confluence LADR + Excel attachment  Â·  "
+            "Skill: .cursor/skills/coverage-validator/  Â·  references/testplan-missing-fallback.md (Step 4b)  Â·  "
+            "msc-testcase-writer + write_testcase_excel.py when no Jira test plan  Â·  "
             f"Command: /msc-dev-code-and-qa-test-coverage-validator  Â·  Developed by {REPORT_DEVELOPER}"
         )
         leg.text_frame.paragraphs[0].font.size = Pt(10)
@@ -990,12 +1010,12 @@ class Deck:
         sections = [
             ("1", "Coverage summary", "8 metric cards + i tooltips"),
             ("2", "Linked PR(s)", "PR Â· Repo Â· State Â· Title Â· Files Â· Dev tests Â· CI"),
-            ("3", "Test plan", "Excel attachment Â· GWT Â· Mascot or IDs"),
-            ("4", "Dev vs QA", "Ownership split"),
+            ("3", "Test plan", "Jira Excel or generated QMetry Â· GWT Â· Evidence / No execution evidence"),
+            ("4", "Dev vs QA", "Ownership split Â· qaScope: none"),
             ("5", "Traceability", "Row-per-AC matrix"),
             ("6", "Impl. review", "Gaps Â· strengths"),
             ("7", "Assumptions", "Scope notes"),
-            ("8", "Actions", "Numbered to-dos"),
+            ("8", "Actions", "Dev & QA recommended action groups"),
         ]
         for i, (num, title, sub) in enumerate(sections):
             row, col = i // 4, i % 4
@@ -1202,8 +1222,18 @@ class Deck:
         s.background.fill.solid()
         s.background.fill.fore_color.rgb = WHITE
         self.footer(s)
-        self._slide_title(s, "Â§3 Test plan validation â€” Jira Excel + LADR alignment", "Confluence LADR requirements when linked Â· Excel attachment Â· Given/When/Then Â· Evidence")
+        self._slide_title(
+            s,
+            "Â§3 Test plan validation â€” Jira Excel + LADR alignment",
+            "Jira attachment Â· Step 4b generated QMetry Â· Confluence LADR Â· Given/When/Then Â· Evidence",
+        )
         feats = [
+            (
+                "Missing plan fallback (Step 4b)",
+                "no_testplan â†’ msc-testcase-writer (testplan-missing-fallback.md) â†’ testcases/{KEY}-testcases.xlsx "
+                "â†’ re-fetch; Â§3 honest note; Evidence: No execution evidence (workspace_generated)",
+                "MSC-209330 Â· 9 TCs Â· not on Jira",
+            ),
             ("Confluence LADR (from Jira)", "If story comments or description reference LADR or wiki URLs, agent fetches Confluence via MCP or fetch_confluence_requirements.py", "LADR requirements L1â€¦Ln Â· cache {KEY}-confluence.json"),
             ("LADR â†” test plan traceability", "Each L1â€¦Ln requirement tied to Excel test case IDs in report Â§3", "4/5 LADR mapped Â· MSC-205625"),
             ("Domino Excel test plan (Jira attachment)", "Jira attachment or local testplans/", "Domino Test Plan.xlsx Â· Inc as Fulll"),
@@ -1212,7 +1242,7 @@ class Deck:
             ("Evidence (Mascot or IDs)", "Mascot URLs when present; else Edit ID from SIT validation (PFT Clear incremental-as-full)", "Edit ID 37ea180e Â· MSC-205625"),
         ]
         for i, (title, desc, proof) in enumerate(feats):
-            top = Inches(1.25) + Inches(0.88) * i
+            top = Inches(1.15) + Inches(0.78) * i
             self._rect(s, Inches(0.55), top, Inches(0.08), Inches(0.95), CORAL)
             tt = s.shapes.add_textbox(Inches(0.75), top, Inches(5.5), Inches(0.35))
             tt.text_frame.text = title
@@ -1231,9 +1261,9 @@ class Deck:
         self._rect(s, Inches(6.8), Inches(5.85), Inches(5.95), Inches(0.4), NAVY, "Scenario examples", 10, True, WHITE)
         for j, row in enumerate(
             [
-                "MSC-205625 Â· Passport LADR Â· 77.8% test plan AC Â· 81% readiness",
+                "MSC-209330 Â· No Jira plan Â· Step 4b writer Â· 9/9 GWT Â· workspace_generated",
+                "MSC-205625 Â· Passport LADR Â· 77.8% test plan AC Â· Domino attachment",
                 "MSC-204417 Â· Captions LADR Â· 100% test plan AC (LADR deduped)",
-                "MSC-195138 Â· FF Race Â· 66.7% test plan AC",
             ]
         ):
             self._rect(s, Inches(6.8), Inches(6.28) + Inches(0.38) * j, Inches(5.95), Inches(0.35), LIGHT_GRAY if j % 2 == 0 else SOFT_BLUE, row, 9, False, BODY)
@@ -1997,11 +2027,11 @@ class Deck:
                 self._add_bullets(s, Inches(0.55), top, Inches(12.2), Inches(5.2), sec.bullets, font_pt=10)
 
     def build_report_tail_from_html(self, data: dict) -> None:
-        """Slides 11+ â€” enablement, dashboard, 8 HTML sections, proven outcomes, closing."""
-        self.setup_slide()
+        """Slides 11+ — match backup deck order: overview, §1–§8, enablement, outcomes, closing."""
         self.report_overview_slide(data)
         for sec in data["sections"]:
             self.report_section_slide(sec, issue_key=data["issue_key"])
+        self.setup_slide()
         self.case_studies_slide()
         self.closing_slide()
 
@@ -2180,7 +2210,9 @@ class Deck:
         lines = [
             "Scripts (batched â€” no manual gh per run):",
             "fetch_confluence_requirements.py  Â·  fetch_jira_testplan.py  Â·  prefetch_coverage_inputs.py",
+            "prepare_testcase_writer_context.py  Â·  write_testcase_excel.py (Step 4b / msc-testcase-writer)",
             "map_requirements_to_diff.py  Â·  build_coverage_report.py  Â·  apply_report_ui_enhancements()",
+            "Refs: coverage-validator/references/testplan-missing-fallback.md  Â·  generate_coverage_validator_directory_guide.py",
             f"sync_pegasus_qa_agents_lab.py â†’ push to github.com/mgunjal11/pegasus-qa-agents-lab",
         ]
         for j, line in enumerate(lines):
@@ -2365,11 +2397,37 @@ def build(
 
 
 if __name__ == "__main__":
+    import argparse
     import shutil
-    import sys
 
-    dest = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "docs" / "MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx"
-    build(dest)
+    parser = argparse.ArgumentParser(description="Generate MSC coverage validator management deck")
+    parser.add_argument(
+        "output",
+        nargs="?",
+        default=str(ROOT / "docs" / "MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx"),
+        help="Output .pptx path",
+    )
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Rebuild entire deck from script (ignore polished prefix slides 1–10; prefer incremental default)",
+    )
+    parser.add_argument(
+        "--report-html",
+        help="Path to MSC coverage report HTML for tail slides (default: latest PRIMARY_EXAMPLE_KEY report)",
+    )
+    parser.add_argument(
+        "--base-ppt",
+        help="Polished prefix template (default: reports/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx)",
+    )
+    args = parser.parse_args()
+    dest = Path(args.output)
+    build(
+        dest,
+        keep_prefix=0 if args.full else KEEP_PREFIX_SLIDES,
+        base_ppt=Path(args.base_ppt) if args.base_ppt else None,
+        report_html=Path(args.report_html) if args.report_html else None,
+    )
     reports_copy = ROOT / "reports" / "MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx"
     if dest.resolve() != reports_copy.resolve():
         try:
