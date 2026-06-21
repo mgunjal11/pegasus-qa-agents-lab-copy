@@ -127,9 +127,9 @@ def test_recommended_actions_dev_and_qa_sections(tmp_path: Path):
 
 
 def test_auto_gaps_list_uses_utf8_em_dash_not_mojibake():
-    from build_coverage_report import _auto_gaps
+    from coverage_report_helpers import build_implementation_gaps_list
 
-    gaps, summary, _ = _auto_gaps(
+    gaps, summary, _ = build_implementation_gaps_list(
         {"requirements": []},
         {"coverage": {"uncoveredJiraRequirements": ["R4"]}},
     )

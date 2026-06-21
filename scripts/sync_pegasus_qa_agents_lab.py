@@ -49,6 +49,7 @@ SCRIPTS = [
     "test_report_ui_enhancements.py",
     "test_quick_links.py",
     "test_qa_scope_handoff.py",
+    "test_implementation_review.py",
     "patch_trace_section_template.py",
     "test_summary_metric_info.py",
     "patch_report_footer.py",

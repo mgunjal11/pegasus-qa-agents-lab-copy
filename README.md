@@ -105,6 +105,7 @@ Place Excel under `testplans/` when Jira comments reference SharePoint — see [
 - **§3** — Honest `testPlanSummaryNote`; Evidence **No execution evidence** for locally generated QMetry plans (`workspace_generated`)
 - **§4** — **Covered by dev tests** omits **None** badge (internal `qaScope: none` unchanged); QA handoff skips dev-covered requirements and limits execute-test-plan bullets to QA-scoped TCs
 - **§5** — Jira `R*` + LADR `L*` trace rows; **Dev tests** = Covered / Partial / Missing only; **QA scope** column still shows **None** when dev-covered
+- **§6** — Auto **Correctly implemented** (Jira + LADR with PR evidence); **Gaps** (test plan, partial code/dev tests, SIT validation, CI); **§7 Assumptions** from mapping confidence
 - **§8** — Separate **Dev** and **QA** recommended action lists
 - **Tooltips v22** — hover `i` on labels unchanged; metric/card **content** edits use data builders only (see `references/content-vs-tooltips.md`)
 

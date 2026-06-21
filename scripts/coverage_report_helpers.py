@@ -575,6 +575,185 @@ def build_open_gaps_detail(
     return " · ".join(parts[:5])
 
 
+def _is_qa_sit_validation_requirement(text: str) -> bool:
+    """SIT/manual validation AC — QA-owned; not scored as missing dev tests alone."""
+    return bool(
+        re.search(
+            r"\b(validated in sit|sit validation|validate in sit|manual sit)\b",
+            text or "",
+            re.I,
+        )
+    )
+
+
+def _primary_matched_file_label(matched_files: list[str]) -> str:
+    for raw in matched_files or []:
+        if raw and not str(raw).endswith(".json") and "samples/" not in str(raw).lower():
+            name = Path(raw).name
+            if name and name != "conftest.py":
+                return name
+    for raw in matched_files or []:
+        if raw:
+            return Path(raw).name
+    return ""
+
+
+def build_correctly_implemented_list(mapping: dict[str, Any]) -> str:
+    """§6 Correctly implemented panel — Jira + LADR with implemented code in PR."""
+    items: list[str] = []
+    for req in mapping.get("requirements") or []:
+        rid = str(req.get("id") or "")
+        if not rid:
+            continue
+        code = str(req.get("codeStatus") or "").lower()
+        if code != "implemented":
+            continue
+        dev = str(req.get("devTestStatus") or "").lower()
+        snippet = esc((req.get("text") or "")[:100])
+        source = "LADR" if rid.startswith("L") or str(req.get("source") or "") == "ladr" else "Jira"
+        primary = esc(_primary_matched_file_label(list(req.get("matchedFiles") or [])))
+        file_bit = f" — <code>{primary}</code>" if primary else ""
+        if dev == "covered":
+            detail = f"dev tests covered{file_bit}"
+        elif dev == "partial":
+            detail = f"code in PR; dev tests partial{file_bit}"
+        else:
+            detail = f"code in PR; dev tests {esc(dev.title())}{file_bit}"
+        items.append(f"<li><strong>{esc(rid)}</strong> ({source}) — {snippet} — {detail}.</li>")
+
+    if not items:
+        return "<li>See requirements traceability (§5) for PR evidence.</li>"
+    return "".join(items)
+
+
+def build_implementation_gaps_list(
+    mapping: dict[str, Any],
+    tp: dict[str, Any],
+    *,
+    prefetch: dict[str, Any] | None = None,
+) -> tuple[str, str, str]:
+    """§6 Gaps panel + summary card counts (High/Med)."""
+    highs: list[str] = []
+    meds: list[str] = []
+    seen: set[str] = set()
+    cov = tp.get("coverage") or {}
+    unc_j = set(cov.get("uncoveredJiraRequirements") or [])
+    unc_l = set(cov.get("uncoveredLadrRequirements") or [])
+
+    def _add(severity: str, key: str, html: str) -> None:
+        if key in seen:
+            return
+        seen.add(key)
+        (highs if severity == "high" else meds).append(html)
+
+    for r in sorted(unc_j, key=lambda x: (len(x), x)):
+        _add(
+            "medium",
+            f"tp:{r}",
+            f'<li class="medium"><strong>{esc(r)}</strong> — no mapped test case in test plan</li>',
+        )
+    for r in sorted(unc_l, key=lambda x: (len(x), x)):
+        _add(
+            "medium",
+            f"tp-l:{r}",
+            f'<li class="medium"><strong>{esc(r)}</strong> — no mapped test case in test plan (LADR)</li>',
+        )
+
+    for req in mapping.get("requirements") or []:
+        rid = str(req.get("id") or "")
+        if not rid:
+            continue
+        text = str(req.get("text") or "")
+        code = str(req.get("codeStatus") or "").lower()
+        dev = str(req.get("devTestStatus") or "").lower()
+        owner = str(req.get("owner") or "").lower()
+
+        if code == "missing":
+            _add(
+                "high",
+                f"code:{rid}",
+                f'<li class="high"><strong>{esc(rid)}</strong> — no matching code in PR diff</li>',
+            )
+        elif code == "partial":
+            _add(
+                "medium",
+                f"code-partial:{rid}",
+                f'<li class="medium"><strong>{esc(rid)}</strong> — partial PR code match; review edge cases</li>',
+            )
+
+        if _is_qa_sit_validation_requirement(text):
+            _add(
+                "medium",
+                f"sit:{rid}",
+                f'<li class="medium"><strong>{esc(rid)}</strong> — SIT validation with provided test data '
+                f"(QA manual; not proven by PR unit/integration tests alone)</li>",
+            )
+        elif dev == "missing" and owner != "qa":
+            _add(
+                "medium",
+                f"dev:{rid}",
+                f'<li class="medium"><strong>{esc(rid)}</strong> — no dev test evidence in PR</li>',
+            )
+        elif dev == "partial" and owner in ("dev", "shared"):
+            _add(
+                "medium",
+                f"dev-partial:{rid}",
+                f'<li class="medium"><strong>{esc(rid)}</strong> — dev tests partial in PR</li>',
+            )
+
+    if prefetch:
+        for pr in prefetch.get("prs") or []:
+            checks = str(pr.get("checks") or "")
+            if checks and re.search(r"\b(?:fail(?:ed|ing|ure)?|failing)\b", checks.lower()):
+                org = pr.get("org") or ""
+                repo = pr.get("repo") or ""
+                num = pr.get("number")
+                _add(
+                    "medium",
+                    f"ci:{org}/{repo}#{num}",
+                    f'<li class="medium"><strong>CI</strong> — failing checks on '
+                    f"{esc(org)}/{esc(repo)}#{esc(str(num))}</li>",
+                )
+
+    gap_summary = f"{len(highs)} High · {len(meds)} Med" if highs or meds else "None"
+    gap_class = "metric-fail" if highs else "metric-warn" if meds else "metric-good"
+    gaps_html = "".join(highs + meds)
+    return gaps_html, gap_summary, gap_class
+
+
+def build_assumptions_list(mapping: dict[str, Any], tp: dict[str, Any] | None = None) -> str:
+    """§7 Assumptions from mapping confidence and test-plan context."""
+    items: list[str] = []
+    for req in mapping.get("requirements") or []:
+        rid = str(req.get("id") or "")
+        conf = str(req.get("confidence") or "low").lower()
+        note = str(req.get("evidenceNote") or "").strip()
+        if conf in ("low", "medium"):
+            if note:
+                items.append(
+                    f"<li><strong>{esc(rid)}</strong> — mapping confidence {esc(conf)}: {esc(note)}</li>"
+                )
+            elif conf == "low":
+                items.append(
+                    f"<li><strong>{esc(rid)}</strong> — low confidence keyword match; confirm against PR diff.</li>"
+                )
+
+    tp_status = str((tp or {}).get("status") or "")
+    if tp_status == "workspace_generated":
+        items.append(
+            "<li>Test plan was generated locally (not on Jira) — no execution evidence until QA runs scenarios.</li>"
+        )
+    elif tp_status == "referenced_not_local":
+        items.append(
+            "<li>Test plan referenced in Jira comments but Excel not found locally — coverage % may be Pending.</li>"
+        )
+
+    items.append(
+        "<li>Requirement-to-code mapping uses PR diff token overlap — review §5 evidence before release sign-off.</li>"
+    )
+    return "".join(items)
+
+
 def build_qa_ownership_fields(issue_key: str, root: Path | None = None) -> dict[str, str]:
     """
     §4 Dev vs QA lists and QA scope summary from mapping + test plan.

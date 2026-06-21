@@ -24,7 +24,10 @@ sys.path.insert(0, str(SCRIPTS))
 
 from coverage_report_helpers import (  # noqa: E402
     apply_report_ui_enhancements,
+    build_assumptions_list,
     build_branch_compare_pr_note,
+    build_correctly_implemented_list,
+    build_implementation_gaps_list,
     build_jira_readiness_block,
     build_open_gaps_detail,
     build_qa_ownership_fields,
@@ -61,30 +64,6 @@ def _metric_class(pct: Any) -> str:
     if val >= 70:
         return "metric-warn"
     return "metric-fail"
-
-
-def _auto_gaps(mapping: dict[str, Any], tp: dict[str, Any]) -> tuple[str, str, str]:
-    highs: list[str] = []
-    meds: list[str] = []
-    cov = tp.get("coverage") or {}
-    for r in cov.get("uncoveredJiraRequirements") or []:
-        meds.append(f'<li class="medium"><strong>{r}</strong> — no mapped test case in test plan</li>')
-    for r in cov.get("uncoveredLadrRequirements") or []:
-        meds.append(
-            f'<li class="medium"><strong>{r}</strong> — no mapped test case in test plan (LADR)</li>'
-        )
-    for req in mapping.get("requirements") or []:
-        if req.get("codeStatus") == "missing":
-            highs.append(
-                f'<li class="high"><strong>{req.get("id")}</strong> — no matching code in PR diff</li>'
-            )
-        elif req.get("devTestStatus") == "missing" and req.get("owner") != "qa":
-            meds.append(
-                f'<li class="medium"><strong>{req.get("id")}</strong> — no dev test evidence in PR</li>'
-            )
-    gap_summary = f"{len(highs)} High · {len(meds)} Med" if highs or meds else "None"
-    gap_class = "metric-fail" if highs else "metric-warn" if meds else "metric-good"
-    return "".join(highs + meds), gap_summary, gap_class
 
 
 def _verdict(req_pct: float | None, tp_pct: float | None, gap_summary: str) -> tuple[str, str, str]:
@@ -128,8 +107,12 @@ def build_report(
             dev_pct = analysis["devCoveragePct"]
     tp_pct = cov.get("testplanCoveragePct")
 
-    gaps_html, gap_summary, gap_class = _auto_gaps(mapping, tp)
+    gaps_html, gap_summary, gap_class = build_implementation_gaps_list(
+        mapping, tp, prefetch=prefetch
+    )
     gaps_detail = build_open_gaps_detail(mapping, tp, prefetch=prefetch)
+    implemented_html = build_correctly_implemented_list(mapping)
+    assumptions_html = build_assumptions_list(mapping, tp)
     if analysis and analysis.get("gapsList"):
         gaps_html = analysis["gapsList"]
 
@@ -224,9 +207,20 @@ def build_report(
             if analysis
             else qa_fields["qaHandoffList"]
         ),
-        "{{CORRECTLY_IMPLEMENTED_LIST}}": analysis.get("correctlyImplementedList", "<li>See PR diff and mapping cache</li>") if analysis else "<li>See PR diff and mapping cache</li>",
-        "{{GAPS_LIST}}": gaps_html or "<li>—</li>",
-        "{{ASSUMPTIONS_LIST}}": analysis.get("assumptionsList", "<li>Auto-generated report — review mapping confidence before release</li>") if analysis else "<li>Auto-generated report — review mapping confidence before release</li>",
+        "{{CORRECTLY_IMPLEMENTED_LIST}}": (
+            analysis.get("correctlyImplementedList", implemented_html)
+            if analysis
+            else implemented_html
+        ),
+        "{{GAPS_LIST}}": (
+            analysis.get("gapsList", gaps_html) if analysis and analysis.get("gapsList") else gaps_html
+        )
+        or "<li>—</li>",
+        "{{ASSUMPTIONS_LIST}}": (
+            analysis.get("assumptionsList", assumptions_html)
+            if analysis
+            else assumptions_html
+        ),
         "{{ACTIONS_LIST}}": (
             analysis.get("actionsList", qa_fields["actionsList"])
             if analysis
