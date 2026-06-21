@@ -812,37 +812,62 @@ def build_implementation_gaps_list(
     return gaps_html, gap_summary, gap_class
 
 
-def build_assumptions_list(mapping: dict[str, Any], tp: dict[str, Any] | None = None) -> str:
-    """§7 Assumptions from mapping confidence and test-plan context."""
-    items: list[str] = []
-    for req in mapping.get("requirements") or []:
-        rid = str(req.get("id") or "")
-        conf = str(req.get("confidence") or "low").lower()
-        note = str(req.get("evidenceNote") or "").strip()
-        if conf in ("low", "medium"):
-            if note:
-                items.append(
-                    f"<li><strong>{esc(rid)}</strong> — mapping confidence {esc(conf)}: {esc(note)}</li>"
-                )
-            elif conf == "low":
-                items.append(
-                    f"<li><strong>{esc(rid)}</strong> — low confidence keyword match; confirm against PR diff.</li>"
-                )
+ASSUMPTIONS_MAX_BULLETS = 3
 
-    tp_status = str((tp or {}).get("status") or "")
+
+def build_assumptions_list(mapping: dict[str, Any], tp: dict[str, Any] | None = None) -> str:
+    """§7 Assumptions — at most 3 short bullets (detail lives in §5/§6)."""
+    tp = tp or {}
+    bullets: list[str] = []
+
+    tp_status = str(tp.get("status") or "")
     if tp_status == "workspace_generated":
-        items.append(
-            "<li>Test plan was generated locally (not on Jira) — no execution evidence until QA runs scenarios.</li>"
+        bullets.append(
+            "<li>Test plan generated locally — no execution evidence until QA runs it.</li>"
         )
     elif tp_status == "referenced_not_local":
-        items.append(
-            "<li>Test plan referenced in Jira comments but Excel not found locally — coverage % may be Pending.</li>"
+        bullets.append(
+            "<li>Test plan referenced in Jira but not found locally — coverage may be Pending.</li>"
         )
 
-    items.append(
-        "<li>Requirement-to-code mapping uses PR diff token overlap — review §5 evidence before release sign-off.</li>"
+    cov = tp.get("coverage") or {}
+    unc_j = [str(r) for r in cov.get("uncoveredJiraRequirements") or []]
+    unc_l = [str(r) for r in cov.get("uncoveredLadrRequirements") or []]
+    if unc_j or unc_l:
+        parts: list[str] = []
+        if unc_j:
+            parts.append(f"Jira {', '.join(unc_j)}")
+        if unc_l:
+            parts.append(f"LADR {', '.join(unc_l)}")
+        bullets.append(
+            f"<li><strong>Open questions</strong> — no test plan case for {'; '.join(parts)} (see §6).</li>"
+        )
+
+    weak: list[str] = []
+    for req in mapping.get("requirements") or []:
+        rid = str(req.get("id") or "")
+        conf = str(req.get("confidence") or "").lower()
+        if rid and conf in ("low", "medium"):
+            weak.append(f"{rid} ({conf})")
+    if weak:
+        shown = ", ".join(weak[:3])
+        if len(weak) > 3:
+            shown += "…"
+        bullets.append(f"<li><strong>Mapping</strong> — confirm {shown} in §5.</li>")
+
+    j_n = int(mapping.get("jiraRequirementCount") or 0)
+    l_n = int(mapping.get("ladrRequirementCount") or 0)
+    if l_n and j_n:
+        scope = f"{j_n} Jira + {l_n} LADR"
+    elif j_n:
+        scope = f"{j_n} Jira"
+    else:
+        scope = "scored requirements"
+    bullets.append(
+        f"<li>Scores use PR diff token overlap ({scope}); review §5 before sign-off.</li>"
     )
-    return "".join(items)
+
+    return "".join(bullets[:ASSUMPTIONS_MAX_BULLETS])
 
 
 def build_qa_ownership_fields(issue_key: str, root: Path | None = None) -> dict[str, str]:
@@ -1126,6 +1151,21 @@ def build_req_coverage_detail(mapping: dict[str, Any]) -> str:
     return "0 scored from PR diff mapping"
 
 
+def _render_requirement_type_badge(req: dict[str, Any]) -> str:
+    """Type badge on every §5 row — FR / NFR / Process (content only; no new table column)."""
+    from map_requirements_to_diff import resolve_requirement_type
+
+    rtype, cat = resolve_requirement_type(req)
+    if rtype == "non_functional":
+        title = f"Non-functional ({cat.replace('_', ' ')})" if cat else "Non-functional"
+        return f' <span class="badge badge-nfr" title="{esc(title)}">NFR</span>'
+    if rtype == "process":
+        return (
+            ' <span class="badge badge-na" title="Process or documentation requirement">Process</span>'
+        )
+    return ' <span class="badge badge-fr" title="Functional requirement">FR</span>'
+
+
 def render_requirement_rows_from_mapping(issue_key: str, root: Path | None = None) -> str:
     mapping = load_mapping_cache(issue_key, root)
     rows = []
@@ -1140,6 +1180,7 @@ def render_requirement_rows_from_mapping(issue_key: str, root: Path | None = Non
         id_cell = esc(rid)
         if str(req.get("source") or "") == "ladr" or str(rid).startswith("L"):
             id_cell = f'{id_cell} <span class="badge badge-shared">LADR</span>'
+        id_cell += _render_requirement_type_badge(req)
         rows.append(
             f"<tr>"
             f"<td>{id_cell}</td>"
@@ -2445,6 +2486,8 @@ TRACE_SECTION_CSS = """
       color: #64748b;
       font-style: italic;
     }
+    .badge-nfr { background: #fef3c7; color: #92400e; }
+    .badge-fr { background: #ecfdf5; color: #047857; }
 """
 
 PR_TABLE_INFO_CSS = """

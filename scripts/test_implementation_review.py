@@ -104,5 +104,35 @@ def test_assumptions_list_includes_confidence_and_disclaimer():
     }
     html = build_assumptions_list(mapping, {"status": "ok"})
     assert "R2" in html
-    assert "keyword-only" in html
+    assert "low" in html
+    assert "Mapping" in html
     assert "token overlap" in html
+    assert html.count("<li>") <= 3
+
+
+def test_assumptions_list_msc205625_style():
+    mapping = {
+        "jiraRequirementCount": 4,
+        "ladrRequirementCount": 5,
+        "requirements": [
+            {
+                "id": "R4",
+                "confidence": "medium",
+            },
+        ],
+    }
+    tp = {
+        "status": "ok",
+        "coverage": {
+            "uncoveredJiraRequirements": ["R4"],
+            "uncoveredLadrRequirements": ["L5"],
+        },
+    }
+    html = build_assumptions_list(mapping, tp)
+    assert html.count("<li>") <= 3
+    assert "Open questions" in html
+    assert "R4" in html and "L5" in html
+    assert "see §6" in html
+    assert "Mapping" in html and "medium" in html
+    assert "token overlap" in html
+    assert "Domino" not in html

@@ -11,7 +11,7 @@ A centralized lab for **AI-driven QA agents** on the WBD Media Supply Chain (MSC
 | # | Agent | What it does | How to invoke |
 |---|--------|--------------|---------------|
 | 1 | **msc-testcase-writer** | Jira (+ LADR when linked) → QMetry FF2.0 Excel, Given/When/Then | `@msc-testcase-writer MSC-204417` |
-| 2 | **msc-dev-code-and-qa-test-coverage-validator** | Jira AC + LADR + test plan vs PR; §3–§8 auto content; QA/Open gaps cards; §4 dev-covered omits None badge; LADR §5 trace; §6/§7 from mapping; tooltips v22 | `@msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
+| 2 | **msc-dev-code-and-qa-test-coverage-validator** | Jira AC + LADR + test plan vs PR; §5 **FR/NFR** badges; §7 brief assumptions; QA/Open gaps cards; §4 dev-covered omits None badge; §6/§8 auto content; tooltips v22 | `@msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
 | 3 | **msc-jira-bug** | Drafts MSC Bug tickets; creates only after your approval | `@msc-jira-bug` + describe the defect |
 
 **One registration per agent** — workflow skills live under `.cursor/skills/coverage-validator/` and `bug-filing/` (not duplicate slash entries).
@@ -104,8 +104,9 @@ Place Excel under `testplans/` when Jira comments reference SharePoint — see [
 - **Summary — Open gaps** — severity count from `build_implementation_gaps_list()`; note via `build_open_gaps_detail()` — named gaps when **&lt; 5** total; theme summary + **see §6 for full list** when **≥ 5** (not tooltip copy)
 - **§3** — Honest `testPlanSummaryNote`; Evidence **No execution evidence** for locally generated QMetry plans (`workspace_generated`)
 - **§4** — **Covered by dev tests** omits **None** badge (internal `qaScope: none` unchanged); QA handoff skips dev-covered requirements and limits execute-test-plan bullets to QA-scoped TCs
-- **§5** — Jira `R*` + LADR `L*` trace rows; **Dev tests** = Covered / Partial / Missing only; **QA scope** column still shows **None** when dev-covered
-- **§6** — Auto **Correctly implemented** (Jira + LADR with PR evidence); **Gaps** (test plan, partial code/dev tests, SIT validation, CI); **§7 Assumptions** from mapping confidence
+- **§5** — Jira `R*` + LADR `L*` trace rows; **FR** / **NFR** / **Process** badge on every ID (`classify_requirement_type()` — SIT validation → NFR; product behavior → FR); LADR badge on `L*`; **Dev tests** = Covered / Partial / Missing only; **QA scope** column still shows **None** when dev-covered
+- **§6** — Auto **Correctly implemented** (Jira + LADR with PR evidence); **Gaps** (test plan, partial code/dev tests, SIT validation, CI)
+- **§7** — **Assumptions** — max 3 bullets (open questions, mapping review, scoring note)
 - **§8** — Separate **Dev** and **QA** recommended action lists
 - **Tooltips v22** — hover `i` on labels unchanged; metric/card **content** edits use data builders only (see `references/content-vs-tooltips.md`)
 
@@ -183,7 +184,7 @@ docs/                  # Optional notes (primary deliverables are HTML + xlsx)
 | `fetch_jira_testplan.py` | Download/parse test plan; honest summary note |
 | `prefetch_coverage_inputs.py` | Batch `gh` PR view/diff/checks → cache (`--mode from-cache` to reuse) |
 | `build_coverage_report.py` | HTML report; calls §6/§7 builders in `coverage_report_helpers.py` |
-| `map_requirements_to_diff.py` | Requirement → PR diff mapping cache |
+| `map_requirements_to_diff.py` | Requirement → PR diff mapping; `classify_requirement_type()` → FR/NFR on §5 rows |
 | `install_coverage_validator_permissions.py` | Merge allowlist into `~/.cursor/permissions.json` |
 
 ---
@@ -197,6 +198,7 @@ docs/                  # Optional notes (primary deliverables are HTML + xlsx)
 | `â€"` garbled text in §6 Gaps | Regenerate report — `build_implementation_gaps_list()` uses UTF-8 em dash |
 | Test plan **Pending** / `referenced_not_local` | Add Excel under `testplans/` |
 | Open gaps note lists partial gap themes only | When **≥ 5** gaps, card note is condensed — open **§6 Implementation review** for the full gap list |
+| §5 shows FR on SIT validation AC | Regenerate report — SIT/staging validation AC should show **NFR** (validation); remap with latest `map_requirements_to_diff.py` |
 | CI coverage **NA** | Link PR; re-run prefetch; Sonar PR comment fallback when logs expired |
 
 ---

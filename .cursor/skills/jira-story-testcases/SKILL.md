@@ -94,6 +94,8 @@ Details: [references/ladr-confluence-requirements.md](references/ladr-confluence
 
 List **assumptions** and **open questions** separately when AC or LADR is incomplete.
 
+**FR vs NFR (for coverage validator §5):** Behavior AC (passport retained, must deliver, …) is functional. SIT/staging validation-only AC may set `"section": "non-functional"` on that item in `{KEY}-jira.json` — report shows **NFR (validation)**.
+
 ### Step 4: Identify scenarios
 
 **Jira only:** for each acceptance criterion, derive at minimum:

@@ -112,6 +112,231 @@ def _test_status(score: float, has_test_file: bool) -> str:
     return "missing"
 
 
+NFR_HEADING_RE = re.compile(
+    r"^#{1,4}\s*(non[-\s]?functional(?:\s+requirements?)?|\bnfr\b|quality\s+attributes?)\s*$",
+    re.I,
+)
+FUNCTIONAL_HEADING_RE = re.compile(
+    r"^#{1,4}\s*(functional(?:\s+requirements?)?|acceptance\s+criteria|user\s+story)\s*$",
+    re.I,
+)
+PROCESS_HEADING_RE = re.compile(
+    r"^#{1,4}\s*(process|documentation|out\s+of\s+scope)\s*$",
+    re.I,
+)
+VALIDATION_NFR_RE = re.compile(
+    r"\b("
+    r"(?:fix |change )?must be validated|"
+    r"validated in sit|validate in sit|sit validation|verified in sit|"
+    r"validation in sit|confirm(?:ed)? in sit|test(?:ed)? in sit|"
+    r"validated in staging|verified in (?:uat|staging|production)|"
+    r"using provided test data|"
+    r"manual (?:sit )?(?:validation|verification|testing)|"
+    r"qa sign[- ]off|exploratory testing"
+    r")\b",
+    re.I,
+)
+FUNCTIONAL_BEHAVIOR_RE = re.compile(
+    r"\b("
+    r"must (?:not )?(?:drop|retain|deliver|attach|include|exclude|return|emit|send|fetch|re-fetch|merge|update|support)|"
+    r"shall (?:not )?\w+|"
+    r"when .{0,80} must |"
+    r"expected behavior|actual behavior|"
+    r"content passport|passport (?:must|shall|is)|pick-genie"
+    r")\b",
+    re.I,
+)
+NFR_TEXT_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\b(performance|latency|throughput|response time|scalability|load test|stress test|benchmark)\b", re.I), "performance"),
+    (re.compile(r"\b(security|encrypt(?:ion)?|authentication|authorization|oauth|pci|gdpr|hipaa|vulnerability|penetration test)\b", re.I), "security"),
+    (re.compile(r"\b(logging|log level|metrics|observability|telemetry|tracing|monitoring|alerting|dashboard|datadog|splunk)\b", re.I), "observability"),
+    (re.compile(r"\b(availability|uptime|sla|reliability|failover|disaster recovery|resilience|durability)\b", re.I), "reliability"),
+    (re.compile(r"\b(accessibility|a11y|wcag)\b", re.I), "accessibility"),
+    (re.compile(r"\b(compliance|audit trail|retention policy|data retention)\b", re.I), "compliance"),
+)
+PROCESS_TEXT_RE = re.compile(
+    r"\b(runbook|documentation only|update wiki|confluence doc|process change|no code change)\b",
+    re.I,
+)
+
+
+def _normalize_hint_key(text: str) -> str:
+    return re.sub(r"\s+", " ", text.strip().lower())[:160]
+
+
+def section_hints_from_text(text: str) -> dict[str, str]:
+    """Map requirement ids or normalized line text to functional / non_functional / process."""
+    hints: dict[str, str] = {}
+    if not text:
+        return hints
+    current = "functional"
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if re.match(r"^#{1,4}\s", line):
+            if NFR_HEADING_RE.match(line):
+                current = "non_functional"
+            elif FUNCTIONAL_HEADING_RE.match(line):
+                current = "functional"
+            elif PROCESS_HEADING_RE.match(line):
+                current = "process"
+            continue
+        rid_match = re.match(r"^(?:[-*]\s*)?(R\d+|L\d+)\s*[:\-–]\s*(.+)$", line, re.I)
+        if rid_match:
+            hints[rid_match.group(1).upper()] = current
+            hints[_normalize_hint_key(rid_match.group(2))] = current
+            continue
+        if line.startswith(("-", "*", "•")) or re.match(r"^\d+[.)]\s", line):
+            bullet = re.sub(r"^[-*•]\s*", "", line)
+            bullet = re.sub(r"^\d+[.)]\s*", "", bullet)
+            if bullet:
+                hints[_normalize_hint_key(bullet)] = current
+    return hints
+
+
+def build_section_hints(jira: dict[str, Any], confluence: dict[str, Any] | None = None) -> dict[str, str]:
+    """Merge Jira description/AC and Confluence body section hints for requirement typing."""
+    hints: dict[str, str] = {}
+    blobs: list[str] = []
+    desc = str(jira.get("description") or "")
+    if not desc:
+        desc = str((jira.get("fields") or {}).get("description") or "")
+    if desc:
+        blobs.append(desc)
+    for field_val in (jira.get("fields") or {}).values():
+        if isinstance(field_val, str) and len(field_val) > 40:
+            if re.search(r"\b(acceptance|requirement|criteria)\b", field_val, re.I):
+                blobs.append(field_val)
+    for req in jira.get("requirements") or []:
+        if isinstance(req, dict) and req.get("section"):
+            rid = str(req.get("id") or "").upper()
+            sec = str(req.get("section")).lower().replace("-", "_")
+            if rid and sec in ("non_functional", "nfr", "nonfunctional"):
+                hints[rid] = "non_functional"
+            elif rid and sec in ("functional", "fr"):
+                hints[rid] = "functional"
+            elif rid and sec == "process":
+                hints[rid] = "process"
+    for blob in blobs:
+        hints.update(section_hints_from_text(blob))
+    conf = confluence or {}
+    for page in conf.get("pages") or []:
+        body = str(page.get("bodyText") or "")
+        if body:
+            hints.update(section_hints_from_text(body))
+    return hints
+
+
+def _is_validation_focused_nfr(text: str) -> bool:
+    """SIT/staging validation AC with no primary system-behavior statement → NFR."""
+    if not VALIDATION_NFR_RE.search(text or ""):
+        return False
+    if FUNCTIONAL_BEHAVIOR_RE.search(text or ""):
+        if re.search(r"\b(fix )?must be validated\b", text or "", re.I):
+            return True
+        return False
+    return True
+
+
+def _infer_nfr_category(text: str) -> str | None:
+    if _is_validation_focused_nfr(text):
+        return "validation"
+    for pattern, category in NFR_TEXT_RULES:
+        if pattern.search(text or ""):
+            return category
+    return None
+
+
+def _normalize_requirement_type(value: str | None) -> str | None:
+    if not value:
+        return None
+    norm = str(value).lower().replace("-", "_").replace(" ", "_")
+    if norm in ("nfr", "non_functional", "nonfunctional"):
+        return "non_functional"
+    if norm in ("fr", "functional"):
+        return "functional"
+    if norm in ("process", "docs", "documentation"):
+        return "process"
+    return None
+
+
+def classify_requirement_type(
+    text: str,
+    *,
+    source: str = "jira",
+    kind: str | None = None,
+    section_hint: str | None = None,
+    explicit: str | None = None,
+) -> tuple[str, str | None]:
+    """
+    Classify a requirement as functional, non_functional, or process.
+
+    FR = product/system behavior (retain passport, deliver on pick, …).
+    NFR = quality attributes (perf, security, logging) or environment validation
+    (SIT/staging sign-off, provided test data, manual QA verification).
+    """
+    explicit_type = _normalize_requirement_type(explicit)
+    if explicit_type:
+        cat = _infer_nfr_category(text) if explicit_type == "non_functional" else None
+        return explicit_type, cat
+
+    if section_hint in ("non_functional", "functional", "process"):
+        if section_hint == "non_functional":
+            return "non_functional", _infer_nfr_category(text)
+        return section_hint, None
+
+    if PROCESS_TEXT_RE.search(text or ""):
+        return "process", None
+
+    if _is_validation_focused_nfr(text):
+        return "non_functional", "validation"
+
+    if kind in ("passport_scenario", "status_code"):
+        return "functional", None
+
+    if source == "ladr" and not _infer_nfr_category(text):
+        return "functional", None
+
+    cat = _infer_nfr_category(text)
+    if cat:
+        return "non_functional", cat
+
+    return "functional", None
+
+
+def section_hint_for_requirement(req: dict[str, Any], hints: dict[str, str]) -> str | None:
+    rid = str(req.get("id") or "").upper()
+    if rid and rid in hints:
+        return hints[rid]
+    text = str(req.get("text") or "")
+    key = _normalize_hint_key(text)
+    if key in hints:
+        return hints[key]
+    for hint_text, kind in hints.items():
+        if hint_text.startswith(("R", "L")) and len(hint_text) <= 4:
+            continue
+        if len(hint_text) > 24 and (hint_text in key or key in hint_text):
+            return kind
+    return None
+
+
+def resolve_requirement_type(req: dict[str, Any]) -> tuple[str, str | None]:
+    """Return (requirementType, nfrCategory) using current rules on requirement text."""
+    explicit = None
+    if str(req.get("requirementTypeSource") or "") == "jira":
+        explicit = str(req.get("requirementType") or "")
+    elif req.get("type"):
+        explicit = str(req.get("type"))
+    return classify_requirement_type(
+        str(req.get("text") or ""),
+        source=str(req.get("source") or "jira"),
+        kind=str(req.get("kind") or "") or None,
+        section_hint=str(req.get("sectionHint") or "") or None,
+        explicit=explicit or None,
+    )
+
+
 def derive_owner_and_qa_scope(
     text: str,
     dev_status: str,
@@ -181,6 +406,7 @@ def _map_one_requirement(
     test_files: list[str],
     prefetch: dict[str, Any],
     source: str,
+    section_hints: dict[str, str] | None = None,
 ) -> tuple[dict[str, Any], float, float | None]:
     """Map a single requirement; returns (mapped dict, code score weight, dev score weight or None)."""
     rid = req.get("id") or ""
@@ -236,6 +462,21 @@ def _map_one_requirement(
         mapped["status"] = req.get("status")
     if req.get("kind"):
         mapped["kind"] = req.get("kind")
+
+    section_hint = section_hint_for_requirement(req, section_hints or {})
+    req_type, nfr_cat = classify_requirement_type(
+        text,
+        source=source,
+        kind=str(req.get("kind") or "") or None,
+        section_hint=section_hint,
+        explicit=str(req.get("requirementType") or req.get("type") or "") or None,
+    )
+    mapped["requirementType"] = req_type
+    if nfr_cat:
+        mapped["nfrCategory"] = nfr_cat
+    if section_hint:
+        mapped["sectionHint"] = section_hint
+
     return mapped, code_weight, dev_weight
 
 
@@ -252,6 +493,9 @@ def map_requirements(
 
     jira_requirements, ladr_requirements = _collect_requirements(jira, tp)
     requirements = jira_requirements + ladr_requirements
+
+    confluence = _load_json(base / "reports" / ".cache" / f"{key}-confluence.json")
+    section_hints = build_section_hints(jira, confluence)
 
     diff_blob = ""
     prod_files: list[str] = []
@@ -355,6 +599,7 @@ def map_requirements(
             test_files=test_files,
             prefetch=prefetch,
             source=source,
+            section_hints=section_hints,
         )
         mapped_reqs.append(mapped)
         if source == "jira":

@@ -57,7 +57,7 @@ When `/msc-dev-code-and-qa-test-coverage-validator` calls you because Jira has *
 
 When drafting cases (standalone or fallback), reference **R*** and **L*** ids in Summary or Step Summary so the coverage validator can map test plan rows to §5 traceability, §6 review, and QA scope cards.
 
-**Do not** change coverage-validator tooltip HTML/CSS when producing testcase output.
+**FR vs NFR (coverage report §5):** When extracting Jira AC into `requirements` in `{KEY}-jira.json`, keep behavior AC (passport retained, must deliver, …) as functional. Tag SIT/staging validation AC (e.g. “validated in SIT using provided test data”) with `"section": "non-functional"` when possible — the validator classifies these as **NFR (validation)**. Do not change coverage-validator tooltip HTML/CSS when producing testcase output.
 
 ## After approval (interactive mode)
 

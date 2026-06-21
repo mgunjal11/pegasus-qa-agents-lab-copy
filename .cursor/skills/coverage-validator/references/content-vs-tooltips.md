@@ -11,10 +11,10 @@ When enhancing the coverage validator or testcase writer, **change report data a
 | §4 Dev vs QA handoff | `build_qa_ownership_fields()` |
 | §6 Implementation review | `build_correctly_implemented_list()`, `build_implementation_gaps_list()` |
 | §6 Open gaps summary card | `build_implementation_gaps_list()` (count) + `build_open_gaps_detail(gap_summary=…)` — condensed note with **see §6 for full list** when ≥5 gaps |
-| §7 Assumptions | `build_assumptions_list()` |
+| §7 Assumptions | `build_assumptions_list()` — **max 3 bullets** (open questions, mapping review, scoring) |
 | §8 Recommended actions | `build_recommended_actions_list()` — **Dev** and **QA** sub-lists |
 | Summary QA scope cards | `_format_qa_scope_summary()`, `_format_qa_scope_detail()` |
-| §5 trace rows | `render_requirement_rows_from_mapping()` |
+| §5 trace rows | `render_requirement_rows_from_mapping()` + `classify_requirement_type()` — **FR** / **NFR** / **Process** badges on ID cell (content only; no new column) |
 | Verdict, coverage % | `build_coverage_report.py`, mapping cache |
 | Testcase writer output | `write_testcase_excel.py`, cache TSV only |
 
@@ -30,6 +30,7 @@ When enhancing the coverage validator or testcase writer, **change report data a
 
 - `inject_recommended_actions_styles()` — §8 Dev/QA group headings
 - `inject_recommended_actions_markup()` — unwrap legacy `<ol>` around action groups
+- `.badge-fr` / `.badge-nfr` in trace section CSS — §5 requirement type badges (not tooltip strings)
 - Metric card / readiness **icon** colors (not tooltip strings)
 
 ## Test plan honesty rules (content)

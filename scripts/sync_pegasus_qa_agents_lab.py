@@ -50,6 +50,7 @@ SCRIPTS = [
     "test_quick_links.py",
     "test_qa_scope_handoff.py",
     "test_implementation_review.py",
+    "test_requirement_type.py",
     "patch_trace_section_template.py",
     "test_summary_metric_info.py",
     "patch_report_footer.py",
@@ -210,7 +211,7 @@ Three Cursor agents for MSC QA on [wbdstreaming.atlassian.net](https://wbdstream
 | Agent | Invoke | Output |
 |-------|--------|--------|
 | **msc-testcase-writer** | `@msc-testcase-writer MSC-1234` | `testcases/{KEY}-testcases.xlsx` (QMetry FF2.0) |
-| **msc-dev-code-and-qa-test-coverage-validator** | `@msc-dev-code-and-qa-test-coverage-validator MSC-1234` | HTML report; §3–§8 auto content; LADR trace; QA/Open gaps cards; §6/§7 from mapping; §4 dev-covered omits None badge; tooltips v22 |
+| **msc-dev-code-and-qa-test-coverage-validator** | `@msc-dev-code-and-qa-test-coverage-validator MSC-1234` | HTML report; §5 FR/NFR badges; §7 brief; QA/Open gaps cards; §6/§8 auto content; §4 dev-covered omits None badge; tooltips v22 |
 | **msc-jira-bug** | `@msc-jira-bug` + defect description | MSC Bug in Jira (after explicit approval) |
 
 ## Skills (workflow docs — not duplicate slash commands)
