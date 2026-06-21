@@ -480,6 +480,101 @@ def _qa_scope_needs_qa_execution(scope: str) -> bool:
     return (scope or "").lower() not in ("none", "n/a", "na", "")
 
 
+def _format_qa_scope_summary(reqs: list[dict[str, Any]], reqs_needing_qa: set[str]) -> str:
+    """Metric value: count with optional E2E / Manual / … breakdown."""
+    n_qa = len(reqs_needing_qa)
+    if not n_qa:
+        return "0 items"
+    scope_counts: dict[str, int] = {}
+    for req in reqs:
+        rid = str(req.get("id") or "")
+        if rid not in reqs_needing_qa:
+            continue
+        scope = str(req.get("qaScope") or "e2e").lower()
+        if scope in ("none", "n/a", "na", ""):
+            continue
+        label = {
+            "e2e": "E2E",
+            "manual": "Manual",
+            "regression": "Regression",
+            "spot-check": "Spot-check",
+        }.get(scope, scope.replace("-", " ").title())
+        scope_counts[label] = scope_counts.get(label, 0) + 1
+    if scope_counts:
+        breakdown = " · ".join(f"{v} {k}" for k, v in sorted(scope_counts.items()))
+        return f"{n_qa} item(s) ({breakdown})"
+    return f"{n_qa} item(s)"
+
+
+def _format_qa_scope_detail(
+    reqs: list[dict[str, Any]],
+    reqs_needing_qa: set[str],
+    tc_ids: list[str],
+) -> str:
+    """One-line note under QA scope remaining card (not the hover tooltip)."""
+    if not reqs_needing_qa:
+        n_none = sum(
+            1
+            for r in reqs
+            if not _qa_scope_needs_qa_execution(str(r.get("qaScope") or ""))
+            and str(r.get("devTestStatus")) == "covered"
+        )
+        if n_none:
+            return f"All scored requirements dev-covered ({n_none} with QA scope None)"
+        return "No separate QA execution required"
+
+    jira_ids = sorted((r for r in reqs_needing_qa if str(r).startswith("R")), key=lambda x: (len(x), x))
+    ladr_ids = sorted((r for r in reqs_needing_qa if str(r).startswith("L")), key=lambda x: (len(x), x))
+    parts: list[str] = []
+    if jira_ids:
+        parts.append(f"Jira: {', '.join(jira_ids)}")
+    if ladr_ids:
+        parts.append(f"LADR: {', '.join(ladr_ids)}")
+    if tc_ids:
+        tc_sorted = ", ".join(sorted(set(tc_ids), key=lambda x: (len(x), x)))
+        parts.append(f"Test plan cases: {tc_sorted}")
+    return " · ".join(parts)
+
+
+def build_open_gaps_detail(
+    mapping: dict[str, Any],
+    tp: dict[str, Any],
+    *,
+    prefetch: dict[str, Any] | None = None,
+) -> str:
+    """One-line note under Open gaps card — names IDs/themes, not tooltip text."""
+    cov = tp.get("coverage") or {}
+    parts: list[str] = []
+
+    unc_j = cov.get("uncoveredJiraRequirements") or []
+    unc_l = cov.get("uncoveredLadrRequirements") or []
+    if unc_j:
+        parts.append(f"Test plan gap — Jira {', '.join(unc_j)}")
+    if unc_l:
+        parts.append(f"Test plan gap — LADR {', '.join(unc_l)}")
+
+    for req in mapping.get("requirements") or []:
+        rid = str(req.get("id") or "")
+        if req.get("codeStatus") == "missing":
+            parts.append(f"No PR code — {rid}")
+        elif req.get("devTestStatus") == "missing" and str(req.get("owner") or "").lower() != "qa":
+            parts.append(f"No dev tests — {rid}")
+
+    if prefetch:
+        for pr in prefetch.get("prs") or []:
+            checks = str(pr.get("checks") or "")
+            if checks and re.search(r"\b(?:fail(?:ed|ing|ure)?|failing)\b", checks.lower()):
+                org = pr.get("org") or ""
+                repo = pr.get("repo") or ""
+                num = pr.get("number")
+                parts.append(f"CI failing — {org}/{repo}#{num}")
+                break
+
+    if not parts:
+        return "No open gaps detected"
+    return " · ".join(parts[:5])
+
+
 def build_qa_ownership_fields(issue_key: str, root: Path | None = None) -> dict[str, str]:
     """
     §4 Dev vs QA lists and QA scope summary from mapping + test plan.
@@ -504,9 +599,10 @@ def build_qa_ownership_fields(issue_key: str, root: Path | None = None) -> dict[
         snippet = (req.get("text") or "")[:90]
         if not _qa_scope_needs_qa_execution(scope):
             if dev == "covered":
+                # §4 dev-covered list only: omit QA scope badge (incl. None); §5 traceability still shows scope.
                 dev_items.append(
                     f"<li><strong>{esc(rid)}</strong> — {esc(snippet)}"
-                    f" — {_badge_for_qa_scope(scope)}; proven by PR unit/integration tests.</li>"
+                    f" — proven by PR unit/integration tests.</li>"
                 )
             continue
 
@@ -517,10 +613,14 @@ def build_qa_ownership_fields(issue_key: str, root: Path | None = None) -> dict[
 
     tc_ids: list[str] = []
     for tc in tp.get("testCases") or []:
-        mapped_r = [str(m) for m in (tc.get("mapped_requirements") or []) if str(m).startswith("R")]
-        if not mapped_r:
+        mapped_req_ids = [
+            str(m)
+            for m in (tc.get("mapped_requirements") or [])
+            if str(m).startswith("R") or str(m).startswith("L")
+        ]
+        if not mapped_req_ids:
             continue
-        if any(m in reqs_needing_qa for m in mapped_r):
+        if any(m in reqs_needing_qa for m in mapped_req_ids):
             tid = str(tc.get("id") or "")
             if tid:
                 tc_ids.append(tid)
@@ -539,20 +639,8 @@ def build_qa_ownership_fields(issue_key: str, root: Path | None = None) -> dict[
         )
 
     n_qa = len(reqs_needing_qa)
-    n_none = sum(
-        1
-        for r in reqs
-        if not _qa_scope_needs_qa_execution(str(r.get("qaScope") or ""))
-        and str(r.get("devTestStatus")) == "covered"
-    )
-    summary = f"{n_qa} item(s)" if n_qa else "0 items"
-    detail = (
-        f"{n_none} dev-covered with QA scope None"
-        if n_none
-        else "No dev-covered requirements scored"
-    )
-    if n_qa and tc_ids:
-        detail += f" · {len(set(tc_ids))} test plan case(s) for QA"
+    summary = _format_qa_scope_summary(reqs, reqs_needing_qa)
+    detail = _format_qa_scope_detail(reqs, reqs_needing_qa, tc_ids)
 
     if not dev_items:
         dev_items.append(
@@ -610,8 +698,12 @@ def build_recommended_actions_list(
     if qa_tc_ids is None:
         qa_tc_ids = []
         for tc in tp.get("testCases") or []:
-            mapped_r = [str(m) for m in (tc.get("mapped_requirements") or []) if str(m).startswith("R")]
-            if any(m in reqs_needing_qa for m in mapped_r):
+            mapped_req_ids = [
+                str(m)
+                for m in (tc.get("mapped_requirements") or [])
+                if str(m).startswith("R") or str(m).startswith("L")
+            ]
+            if any(m in reqs_needing_qa for m in mapped_req_ids):
                 tid = str(tc.get("id") or "")
                 if tid:
                     qa_tc_ids.append(tid)
@@ -752,6 +844,18 @@ def _render_trace_evidence_cell(
     )
 
 
+def build_req_coverage_detail(mapping: dict[str, Any]) -> str:
+    """Human-readable scored-requirement count for Dev code coverage detail line."""
+    j_n = int(mapping.get("jiraRequirementCount") or 0)
+    l_n = int(mapping.get("ladrRequirementCount") or 0)
+    total = int(mapping.get("requirementCount") or 0)
+    if l_n and j_n:
+        return f"{j_n} Jira + {l_n} LADR scored from PR diff mapping"
+    if total:
+        return f"{total} scored from PR diff mapping"
+    return "0 scored from PR diff mapping"
+
+
 def render_requirement_rows_from_mapping(issue_key: str, root: Path | None = None) -> str:
     mapping = load_mapping_cache(issue_key, root)
     rows = []
@@ -763,9 +867,12 @@ def render_requirement_rows_from_mapping(issue_key: str, root: Path | None = Non
             conf,
             str(req.get("evidenceNote") or ""),
         )
+        id_cell = esc(rid)
+        if str(req.get("source") or "") == "ladr" or str(rid).startswith("L"):
+            id_cell = f'{id_cell} <span class="badge badge-shared">LADR</span>'
         rows.append(
             f"<tr>"
-            f"<td>{esc(rid)}</td>"
+            f"<td>{id_cell}</td>"
             f"<td>{esc(req.get('text', ''))}</td>"
             f"<td>{_badge_for_status(req.get('codeStatus', 'missing'))}</td>"
             f"<td>{_badge_for_status(req.get('devTestStatus', 'missing'), 'dev')}</td>"
@@ -2680,7 +2787,8 @@ def inject_trace_section_markup(html: str) -> str:
             r'(<section class="report-section section-trace">.*?<div class="section-body">)\s*'
             r'(<div class="table-wrap">)',
             r'\1\n        <p class="trace-section-lead">Per-requirement mapping from Jira acceptance criteria '
-            r"to branch/PR code, dev tests, ownership, and file-level evidence.</p>\n        \2",
+            r"and linked Confluence LADR (when present) to branch/PR code, dev tests, ownership, "
+            r"and file-level evidence.</p>\n        \2",
             html,
             count=1,
             flags=re.DOTALL,

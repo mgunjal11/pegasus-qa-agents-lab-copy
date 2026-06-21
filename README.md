@@ -11,7 +11,7 @@ A centralized lab for **AI-driven QA agents** on the WBD Media Supply Chain (MSC
 | # | Agent | What it does | How to invoke |
 |---|--------|--------------|---------------|
 | 1 | **msc-testcase-writer** | Jira (+ LADR when linked) → QMetry FF2.0 Excel, Given/When/Then | `@msc-testcase-writer MSC-204417` |
-| 2 | **msc-dev-code-and-qa-test-coverage-validator** | Jira AC + LADR + test plan vs PR; §8 Dev/QA actions; honest §3 note; generated-plan evidence rules; tooltips v22 | `@msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
+| 2 | **msc-dev-code-and-qa-test-coverage-validator** | Jira AC + LADR + test plan vs PR; §4 dev-covered omits None badge; QA/Open gaps card detail; §8 Dev/QA actions; honest §3 note; LADR §5 trace; tooltips v22 | `@msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
 | 3 | **msc-jira-bug** | Drafts MSC Bug tickets; creates only after your approval | `@msc-jira-bug` + describe the defect |
 
 **One registration per agent** — workflow skills live under `.cursor/skills/coverage-validator/` and `bug-filing/` (not duplicate slash entries).
@@ -100,10 +100,13 @@ Place Excel under `testplans/` when Jira comments reference SharePoint — see [
 
 ### Report highlights (HTML)
 
+- **Summary — QA scope remaining** — count with scope breakdown (e.g. `4 E2E · 1 Manual`); note lists Jira/LADR ids and linked test plan case ids (`{{QA_SCOPE_DETAIL}}`)
+- **Summary — Open gaps** — severity count unchanged; note names gaps (test plan, missing code/dev tests, CI failing) via `build_open_gaps_detail()` — not tooltip copy
 - **§3** — Honest `testPlanSummaryNote`; Evidence **No execution evidence** for locally generated QMetry plans (`workspace_generated`)
-- **§4** — QA handoff skips dev-covered R* (`qaScope: none`)
+- **§4** — **Covered by dev tests** omits **None** badge (internal `qaScope: none` unchanged); QA handoff skips dev-covered requirements and limits execute-test-plan bullets to QA-scoped TCs
+- **§5** — Jira `R*` + LADR `L*` trace rows; **Dev tests** = Covered / Partial / Missing only; **QA scope** column still shows **None** when dev-covered
 - **§8** — Separate **Dev** and **QA** recommended action lists
-- **Tooltips v22** — hover `i` on labels; metric/content changes do **not** require tooltip edits (see `references/content-vs-tooltips.md`)
+- **Tooltips v22** — hover `i` on labels unchanged; metric/card **content** edits use data builders only (see `references/content-vs-tooltips.md`)
 
 Full workflow: [.cursor/skills/coverage-validator/SKILL.md](.cursor/skills/coverage-validator/SKILL.md)
 

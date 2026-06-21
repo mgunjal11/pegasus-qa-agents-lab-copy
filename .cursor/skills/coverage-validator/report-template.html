@@ -442,12 +442,12 @@
               <div class="metric-card metric-neutral">
                 <div class="label">QA scope remaining</div>
                 <div class="metric-value">{{QA_SCOPE_SUMMARY}}</div>
-                <div class="note">E2E, manual, or regression still required</div>
+                <div class="note">{{QA_SCOPE_DETAIL}}</div>
               </div>
               <div class="metric-card {{OPEN_GAPS_CLASS}}">
                 <div class="label">Open gaps</div>
                 <div class="metric-value">{{OPEN_GAPS_SUMMARY}}</div>
-                <div class="note">{{OPEN_GAPS_DETAIL}} — from implementation review</div>
+                <div class="note">{{OPEN_GAPS_DETAIL}}</div>
               </div>
             </div>
           </div>
@@ -531,7 +531,7 @@
     <section class="report-section section-trace">
       <div class="section-head"><span class="section-num">5</span><h2>Requirements traceability</h2></div>
       <div class="section-body">
-        <p class="trace-section-lead">Per-requirement mapping from Jira acceptance criteria to branch/PR code, dev tests, ownership, and file-level evidence.</p>
+        <p class="trace-section-lead">Per-requirement mapping from Jira acceptance criteria and linked Confluence LADR (when present) to branch/PR code, dev tests, ownership, and file-level evidence.</p>
         <div class="table-wrap">
           <table class="trace-table">
             <thead>

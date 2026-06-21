@@ -12,7 +12,10 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from map_requirements_to_diff import derive_owner_and_qa_scope  # noqa: E402
 from coverage_report_helpers import (  # noqa: E402
+    _format_qa_scope_detail,
+    _format_qa_scope_summary,
     _qa_scope_needs_qa_execution,
+    build_open_gaps_detail,
     build_qa_ownership_fields,
     build_recommended_actions_list,
 )
@@ -72,6 +75,9 @@ def test_build_qa_handoff_excludes_dev_covered_from_execute_bullet(tmp_path: Pat
 
     fields = build_qa_ownership_fields("MSC-TEST", root=tmp_path)
     assert "R1" in fields["devCoveredList"]
+    # §4 only: dev-covered bullets omit QA scope None; §5 traceability still uses the badge.
+    assert "None" not in fields["devCoveredList"]
+    assert "proven by PR unit/integration tests" in fields["devCoveredList"]
     assert "R2" in fields["qaHandoffList"]
     assert "TC2" in fields["qaHandoffList"]
     assert "TC1" not in fields["qaHandoffList"]
@@ -130,3 +136,93 @@ def test_auto_gaps_list_uses_utf8_em_dash_not_mojibake():
     assert "— no mapped test case in test plan" in gaps
     assert "â€" not in gaps
     assert "·" in summary or summary == "None"
+
+
+def test_qa_scope_summary_breakdown():
+    reqs = [
+        {"id": "R1", "qaScope": "e2e"},
+        {"id": "R2", "qaScope": "manual"},
+        {"id": "R3", "qaScope": "e2e"},
+    ]
+    needing = {"R1", "R2", "R3"}
+    summary = _format_qa_scope_summary(reqs, needing)
+    assert "3 item(s)" in summary
+    assert "2 E2E" in summary
+    assert "1 Manual" in summary
+
+
+def test_qa_scope_detail_lists_ids_and_test_cases():
+    reqs = [
+        {"id": "R2", "qaScope": "e2e", "devTestStatus": "missing"},
+        {"id": "L1", "qaScope": "regression", "devTestStatus": "partial"},
+    ]
+    detail = _format_qa_scope_detail(reqs, {"R2", "L1"}, ["TC2", "TC5"])
+    assert "Jira: R2" in detail
+    assert "LADR: L1" in detail
+    assert "TC2" in detail and "TC5" in detail
+
+
+def test_qa_scope_detail_all_dev_covered():
+    reqs = [
+        {"id": "R1", "qaScope": "none", "devTestStatus": "covered"},
+        {"id": "R2", "qaScope": "none", "devTestStatus": "covered"},
+    ]
+    detail = _format_qa_scope_detail(reqs, set(), [])
+    assert "All scored requirements dev-covered" in detail
+
+
+def test_open_gaps_detail_names_requirements_and_ci():
+    mapping = {
+        "requirements": [
+            {"id": "R3", "codeStatus": "missing", "devTestStatus": "missing", "owner": "dev"},
+            {"id": "R4", "codeStatus": "implemented", "devTestStatus": "missing", "owner": "dev"},
+        ]
+    }
+    tp = {
+        "coverage": {
+            "uncoveredJiraRequirements": ["R4"],
+            "uncoveredLadrRequirements": ["L5"],
+        }
+    }
+    prefetch = {
+        "prs": [
+            {
+                "org": "wbd-msc",
+                "repo": "demo",
+                "number": 99,
+                "checks": "unit tests failing",
+            }
+        ]
+    }
+    detail = build_open_gaps_detail(mapping, tp, prefetch=prefetch)
+    assert "Test plan gap — Jira R4" in detail
+    assert "Test plan gap — LADR L5" in detail
+    assert "No PR code — R3" in detail
+    assert "No dev tests — R4" in detail
+    assert "CI failing" in detail
+
+
+def test_build_qa_ownership_fields_includes_scope_detail(tmp_path: Path):
+    cache = tmp_path / "reports" / ".cache"
+    cache.mkdir(parents=True)
+    mapping = {
+        "requirements": [
+            {
+                "id": "R2",
+                "text": "Monitor UI visibility",
+                "devTestStatus": "missing",
+                "qaScope": "e2e",
+                "owner": "shared",
+            },
+        ]
+    }
+    testplan = {
+        "testCases": [{"id": "TC2", "mapped_requirements": ["R2"]}],
+    }
+    (cache / "MSC-DET-mapping.json").write_text(json.dumps(mapping), encoding="utf-8")
+    (cache / "MSC-DET-testplan.json").write_text(json.dumps(testplan), encoding="utf-8")
+
+    fields = build_qa_ownership_fields("MSC-DET", root=tmp_path)
+    assert "1 item(s)" in fields["qaScopeSummary"]
+    assert "Jira: R2" in fields["qaScopeDetail"]
+    assert "TC2" in fields["qaScopeDetail"]

@@ -73,6 +73,7 @@ dev_test_coverage_pct = round(100 * sum(dev_score) / count(dev-scored items), 1)
 - Count requirements by QA scope: None, Spot-check, E2E, Manual, Regression
 - **QA remaining** = items where QA scope is E2E, Manual, or Regression, **plus** Shared/Dev items where Dev test status is Partial or Missing
 - **QA scope None** = Dev test status **Covered** — `build_qa_ownership_fields()` omits these from §4 QA handoff and limits “execute test plan” bullets to TCs mapped only to requirements that still need QA
+- **§4 display:** **Covered by dev tests** list omits the **None** badge (shows `proven by PR unit/integration tests` only). **§5 traceability** QA scope column still shows **None** when dev-covered.
 
 Report both the dev coverage % and a plain-language QA handoff list. `map_requirements_to_diff.py` sets `qaScope: none` when `devTestStatus` is **covered** (see `derive_owner_and_qa_scope()`).
 

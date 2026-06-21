@@ -353,7 +353,7 @@ Count of Jira acceptance criteria extracted and scored: `{{REQ_MAPPED_SUMMARY}}`
 
 **Open gaps**
 
-From Implementation review gap list: `{{OPEN_GAPS_SUMMARY}}` e.g. `2 High · 2 Med`. `{{OPEN_GAPS_DETAIL}}` one-line context. Class `{{OPEN_GAPS_CLASS}}`: `metric-fail` if any High/Critical, `metric-warn` if Medium only, `metric-good` if none.
+From Implementation review gap list: `{{OPEN_GAPS_SUMMARY}}` e.g. `2 High · 2 Med`. `{{OPEN_GAPS_DETAIL}}` one-line card note from `build_open_gaps_detail()` — names uncovered Jira/LADR test-plan ids, missing PR code/dev tests, and CI failures when present (not tooltip copy). Class `{{OPEN_GAPS_CLASS}}`: `metric-fail` if any High/Critical, `metric-warn` if Medium only, `metric-good` if none.
 
 **Test requirement coverage %** *(internal only — not shown in summary)*
 
@@ -367,7 +367,7 @@ Optionally report sub-counts in `{{DEV_COVERAGE_DETAIL}}`: e.g. `4/5 dev-owned �
 
 **QA scope summary** (informational counts, not a percentage gate)
 
-Count requirements by **QA scope** label. **QA remaining** = E2E + Manual + Regression items, plus Dev/Shared items where Dev test status is Partial or Missing. Populate `{{QA_SCOPE_SUMMARY}}` and `{{QA_HANDOFF_LIST}}`.
+Count requirements by **QA scope** label. **QA remaining** = E2E + Manual + Regression items, plus Dev/Shared items where Dev test status is Partial or Missing. Populate `{{QA_SCOPE_SUMMARY}}` (e.g. `5 item(s) (4 E2E · 1 Manual)` via `_format_qa_scope_summary()`), `{{QA_SCOPE_DETAIL}}` (named Jira/LADR ids + test plan case ids via `_format_qa_scope_detail()`), and `{{QA_HANDOFF_LIST}}`.
 
 **CI line coverage %**
 
@@ -451,7 +451,7 @@ Optional narrative overrides: `python scripts/build_coverage_report.py {ISSUE-KE
 
 Analysis JSON keys (optional): `verdict`, `verdictClass`, `verdictRationale`, `reqCoveragePct`, `reqCoverageDetail`, `devCoveragePct`, `devCoverageDetail`, `qaScopeSummary`, `openGapsSummary`, `openGapsClass`, `openGapsDetail`, `gapsList`, `devCoveredList`, `qaHandoffList`, `correctlyImplementedList`, `assumptionsList`, `actionsList`, `requirementRows`, `prNote`, `storyTitle`.
 
-The builder fills: **Jira readiness block** (`build_jira_readiness_block()` — ✓ green / ✗ red per checklist row), **quick links** (`build_quick_links()` — Jira, SharePoint test plan, PR(s), **LADR Confluence** via `collect_ladr_page_links()` only when a LADR or design-requirements page exists), release score, split test plan metrics, **§4 Dev vs QA ownership** via `build_qa_ownership_fields()` — requirements with **QA scope None** (dev unit/integration **Covered**) are **not** listed for QA test-plan execution; only TCs mapped to QA-scoped `R*` appear in handoff, **§8 Recommended actions** via `build_recommended_actions_list()` inside `build_qa_ownership_fields()` — separate **Dev** and **QA** `<ul>` groups (layout CSS via `inject_recommended_actions_styles()` / `inject_recommended_actions_markup()` only), **Linked PR rows** (file counts + **auto Dev tests** from prefetch/mapping), **branch-compare rows** when no PRs, **CI pipeline cards** via `ci_coverage_report_fields()` (re-extracts Sonar/Codecov/pytest-cov; `finalize_ci_coverage()` for branch display), auto traceability rows from mapping cache (unless `requirementRows` in analysis), unmapped TCs, suggested mappings. **`{{PR_NOTE}}`** from analysis or `build_branch_compare_pr_note()`. Always runs `apply_report_ui_enhancements()` before write (idempotent if called twice; do not edit tooltip bodies in the same change).
+The builder fills: **Jira readiness block** (`build_jira_readiness_block()` — ✓ green / ✗ red per checklist row), **quick links** (`build_quick_links()` — Jira, SharePoint test plan, PR(s), **LADR Confluence** via `collect_ladr_page_links()` only when a LADR or design-requirements page exists), release score, split test plan metrics, **§4 Dev vs QA ownership** via `build_qa_ownership_fields()` — requirements with **QA scope None** (dev unit/integration **Covered**) are **not** listed for QA test-plan execution; **Covered by dev tests** bullets omit the **None** badge (§4 display only — §5 traceability QA scope column still shows **None**); only TCs mapped to QA-scoped `R*`/`L*` appear in handoff, **§8 Recommended actions** via `build_recommended_actions_list()` inside `build_qa_ownership_fields()` — separate **Dev** and **QA** `<ul>` groups (layout CSS via `inject_recommended_actions_styles()` / `inject_recommended_actions_markup()` only), **Linked PR rows** (file counts + **Dev tests** pytest modules from prefetch/mapping — not tier badges), **branch-compare rows** when no PRs, **§5 traceability** Jira + LADR rows via `render_requirement_rows_from_mapping()` — **Dev tests** = Covered/Partial/Missing only, **CI pipeline cards** via `ci_coverage_report_fields()` (re-extracts Sonar/Codecov/pytest-cov; `finalize_ci_coverage()` for branch display), auto traceability rows from mapping cache (unless `requirementRows` in analysis), unmapped TCs, suggested mappings. **`{{PR_NOTE}}`** from analysis or `build_branch_compare_pr_note()`. **`{{OPEN_GAPS_DETAIL}}`** from `build_open_gaps_detail()`. Always runs `apply_report_ui_enhancements()` before write (idempotent if called twice; do not edit tooltip bodies in the same change).
 
 **Manual / agent-refined:** Read [report-template.html](report-template.html) and replace all `{{PLACEHOLDER}}` tokens. New placeholders: `{{CACHE_META}}`, `{{QUICK_LINKS}}`, `{{JIRA_READINESS_BLOCK}}`, `{{RELEASE_SCORE_BLOCK}}`, `{{TESTPLAN_SPLIT_METRICS}}`, `{{UNMAPPED_TC_BLOCK}}`, `{{SUGGESTED_MAPPING_BLOCK}}`.
 
@@ -473,10 +473,11 @@ Read [report-template.html](report-template.html) and produce a **complete, self
 | `{{REQ_COVERAGE_CLASS}}`, `{{DEV_COVERAGE_CLASS}}` | `metric-good` (≥85%), `metric-warn` (70–84.9%), `metric-fail` (<70%), `metric-na` |
 | `{{REQ_COVERAGE_DETAIL}}`, `{{DEV_COVERAGE_DETAIL}}` | e.g. `3.5/5 scored`, `4/5 dev-owned — 2 unit, 2 integration` |
 | `{{REQ_MAPPED_SUMMARY}}`, `{{REQ_MAPPED_DETAIL}}`, `{{REQ_MAPPED_CLASS}}` | e.g. `3/3 acceptance criteria`, `R1–R3`, `metric-good` |
-| `{{OPEN_GAPS_SUMMARY}}`, `{{OPEN_GAPS_DETAIL}}`, `{{OPEN_GAPS_CLASS}}` | e.g. `2 High · 2 Med`, brief note, `metric-warn` |
-| `{{QA_SCOPE_SUMMARY}}` | e.g. `2 items` — use `metric-neutral` card (no purple) |
+| `{{OPEN_GAPS_SUMMARY}}`, `{{OPEN_GAPS_DETAIL}}`, `{{OPEN_GAPS_CLASS}}` | e.g. `2 High · 2 Med`, named gap themes (test plan / code / CI), `metric-warn` |
+| `{{QA_SCOPE_SUMMARY}}` | e.g. `5 item(s) (4 E2E · 1 Manual)` — use `metric-neutral` card (no purple) |
+| `{{QA_SCOPE_DETAIL}}` | Card note under QA scope remaining — Jira/LADR ids + test plan case ids |
 | `{{QA_HANDOFF_LIST}}` | `<li>` items — QA scenarios not covered by dev tests |
-| `{{DEV_COVERED_LIST}}` | `<li>` items — what dev unit/integration tests already prove |
+| `{{DEV_COVERED_LIST}}` | `<li>` items — dev-covered requirements; **no None badge** (proven by PR unit/integration tests) |
 | `{{CI_LINE_COVERAGE}}`, `{{CI_BRANCH_COVERAGE}}` | Percent or **`NA`** when no PR/CI |
 | `{{CI_LINE_NOTE}}`, `{{CI_BRANCH_NOTE}}` | e.g. `Source: codecov` or `No PR for MSC-204417; develop branch only` |
 | `{{CI_LINE_CLASS}}`, `{{CI_BRANCH_CLASS}}` | `metric-na` when unavailable; else tier class if numeric |
@@ -492,7 +493,7 @@ Read [report-template.html](report-template.html) and produce a **complete, self
 | State | open / MERGED / CLOSED from `gh pr view` |
 | Title | PR title from `gh pr view --json title` |
 | Files | `{n} files ({m} test)` from `diffNames` in prefetch |
-| Dev tests | Pytest modules from PR diff — **auto** via `format_dev_tests_summary()` / `{KEY}-mapping.json` `prs[].devTests`; shows `—` when no `test_*.py` / `*_test.py` in diff |
+| Dev tests | Pytest modules from PR diff — **auto** via `format_dev_tests_summary()` / `{KEY}-mapping.json` `prs[].devTests`; shows `—` when no `test_*.py` / `*_test.py` in diff (module names only — not Unit/Integration tier badges) |
 | CI status | `gh pr checks` — **N/A** when empty or prefetch failed |
 
 ```python
@@ -537,7 +538,7 @@ html = filled_template  # all {{PLACEHOLDER}} tokens replaced
 html = apply_report_ui_enhancements(html)
 ```
 
-| `{{REQUIREMENT_ROWS}}` | HTML `<tr>` rows — Code, Dev tests, Owner, QA scope, Evidence (see below) |
+| `{{REQUIREMENT_ROWS}}` | HTML `<tr>` rows — Code, Dev tests (Covered/Partial/Missing), Owner, QA scope (incl. **None** in §5), Evidence; LADR rows tagged with LADR badge |
 | `{{CORRECTLY_IMPLEMENTED_LIST}}` | `<li>` items |
 | `{{GAPS_LIST}}` | `<li class="critical|high|medium">` items |
 | `{{ASSUMPTIONS_LIST}}` | `<li>` items |

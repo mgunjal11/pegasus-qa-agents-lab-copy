@@ -26,14 +26,17 @@ from coverage_report_helpers import (  # noqa: E402
     apply_report_ui_enhancements,
     build_branch_compare_pr_note,
     build_jira_readiness_block,
+    build_open_gaps_detail,
     build_qa_ownership_fields,
     build_quick_links,
     build_release_score_block,
+    build_req_coverage_detail,
     build_testplan_report_fields,
     build_cache_meta_line,
     ci_coverage_report_fields,
     load_jira_cache,
     load_mapping_cache,
+    load_prefetch_cache,
     load_testplan_cache,
     render_pr_rows_from_prefetch,
     render_requirement_rows_from_mapping,
@@ -66,6 +69,10 @@ def _auto_gaps(mapping: dict[str, Any], tp: dict[str, Any]) -> tuple[str, str, s
     cov = tp.get("coverage") or {}
     for r in cov.get("uncoveredJiraRequirements") or []:
         meds.append(f'<li class="medium"><strong>{r}</strong> — no mapped test case in test plan</li>')
+    for r in cov.get("uncoveredLadrRequirements") or []:
+        meds.append(
+            f'<li class="medium"><strong>{r}</strong> — no mapped test case in test plan (LADR)</li>'
+        )
     for req in mapping.get("requirements") or []:
         if req.get("codeStatus") == "missing":
             highs.append(
@@ -100,6 +107,7 @@ def build_report(
     key = issue_key.upper()
     jira = load_jira_cache(key, base)
     tp = load_testplan_cache(key, base)
+    prefetch = load_prefetch_cache(key, base)
     mapping = load_mapping_cache(key, base)
 
     if not mapping:
@@ -121,6 +129,7 @@ def build_report(
     tp_pct = cov.get("testplanCoveragePct")
 
     gaps_html, gap_summary, gap_class = _auto_gaps(mapping, tp)
+    gaps_detail = build_open_gaps_detail(mapping, tp, prefetch=prefetch)
     if analysis and analysis.get("gapsList"):
         gaps_html = analysis["gapsList"]
 
@@ -133,13 +142,20 @@ def build_report(
     tc_n = cov.get("testCaseCount", 0)
     gwt_n = cov.get("completeGwtCount", 0)
     qa_fields = build_qa_ownership_fields(key, base)
+    jira_n = mapping.get("jiraRequirementCount") or len(mapping.get("requirements") or [])
+    ladr_n = mapping.get("ladrRequirementCount") or 0
+    if ladr_n:
+        ac_label = f"{jira_n} Jira + {ladr_n} LADR requirements"
+    else:
+        ac_label = f"{len(mapping.get('requirements') or [])} acceptance criteria"
     if not analysis or not analysis.get("verdictRationale"):
         rationale = (
-            f"{verdict} — {len(mapping.get('requirements') or [])} acceptance criteria; "
+            f"{verdict} — {ac_label}; "
             f"test plan {tp_pct}% ({tc_n} scenarios, {gwt_n}/{tc_n} full Given When Then); "
             f"dev code {req_pct}%; dev tests {dev_pct}%."
         )
 
+    req_detail_default = build_req_coverage_detail(mapping)
     replacements: dict[str, str] = {
         "{{ISSUE_KEY}}": key,
         "{{STORY_TITLE}}": (analysis or {}).get("storyTitle") or jira.get("summary") or key,
@@ -152,9 +168,9 @@ def build_report(
         "{{REQ_COVERAGE_PCT}}": f"{req_pct}%" if req_pct is not None else "NA",
         "{{REQ_COVERAGE_CLASS}}": _metric_class(req_pct),
         "{{REQ_COVERAGE_DETAIL}}": (
-            analysis.get("reqCoverageDetail", f"{mapping.get('requirementCount', 0)} scored from PR diff mapping")
+            analysis.get("reqCoverageDetail", req_detail_default)
             if analysis
-            else f"{mapping.get('requirementCount', 0)} scored from PR diff mapping"
+            else req_detail_default
         ),
         "{{DEV_COVERAGE_PCT}}": f"{dev_pct}%" if dev_pct is not None else "NA",
         "{{DEV_COVERAGE_CLASS}}": _metric_class(dev_pct),
@@ -171,6 +187,11 @@ def build_report(
             if analysis
             else qa_fields["qaScopeSummary"]
         ),
+        "{{QA_SCOPE_DETAIL}}": (
+            analysis.get("qaScopeDetail", qa_fields["qaScopeDetail"])
+            if analysis
+            else qa_fields["qaScopeDetail"]
+        ),
         "{{OPEN_GAPS_SUMMARY}}": (
             analysis.get("openGapsSummary", gap_summary) if analysis else gap_summary
         ),
@@ -178,9 +199,9 @@ def build_report(
             analysis.get("openGapsClass", gap_class) if analysis else gap_class
         ),
         "{{OPEN_GAPS_DETAIL}}": (
-            analysis.get("openGapsDetail", "auto-detected from mapping and test plan")
+            analysis.get("openGapsDetail", gaps_detail)
             if analysis
-            else "auto-detected from mapping and test plan"
+            else gaps_detail
         ),
         "{{PR_NOTE}}": (
             analysis.get("prNote", "")

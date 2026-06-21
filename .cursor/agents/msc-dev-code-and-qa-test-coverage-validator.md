@@ -49,7 +49,9 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 - **Linked PR(s):** `render_pr_rows_from_prefetch()` — Files, **Dev tests** (from mapping `prs[].devTests`), CI status
 - **No PR:** `build_branch_compare_pr_note()` + `render_branch_compare_pr_rows()` when `branchCompare` in prefetch
 - **§3 test plan:** `build_testplan_report_fields()` — `testPlanSummaryNote` via `build_testplan_summary_note()` (honest source; no Domino boilerplate on `workspace_generated` plans); Evidence via `render_testplan_evidence()` — **`testPlanSource: workspace_generated`** → **No execution evidence**; LADR trace, gaps, split metrics
-- **§4 Dev vs QA:** `build_qa_ownership_fields()` — if dev test status is **Covered**, `qaScope` is **None**; do **not** ask QA to execute test plan cases mapped only to those `R*` (`derive_owner_and_qa_scope()` in mapping)
+- **§4 Dev vs QA:** `build_qa_ownership_fields()` — if dev test status is **Covered**, `qaScope` is **none** internally; **Covered by dev tests** bullets omit the **None** badge (show `proven by PR unit/integration tests` only); **QA handoff** still shows E2E/Manual badges; do **not** ask QA to execute test plan cases mapped only to dev-covered `R*`/`L*`
+- **Summary QA cards:** `{{QA_SCOPE_SUMMARY}}` scope breakdown (e.g. `5 item(s) (4 E2E · 1 Manual)`); `{{QA_SCOPE_DETAIL}}` names Jira/LADR ids + test plan case ids; `{{OPEN_GAPS_DETAIL}}` names test-plan gaps, missing code/dev tests, CI failures — **card notes only** (not tooltip copy)
+- **§5 traceability:** Jira `R*` + LADR `L*` rows (LADR badge); **Dev tests** column = Covered / Partial / Missing only (no Unit/Integration tier badges); **QA scope** column still shows **None** when dev-covered
 - **§8 Recommended actions:** `build_recommended_actions_list()` — separate **Dev** and **QA** lists; layout via `inject_recommended_actions_styles()` / `inject_recommended_actions_markup()` only
 - **Quick links:** `collect_ladr_page_links()` — LADR/design Confluence only in header
 - **Mapping:** `confidence` high only with `matchedFiles`; `evidenceNote` when keyword-only

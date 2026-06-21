@@ -158,6 +158,87 @@ def _is_test_path(path: str) -> bool:
     return is_test_diff_path(path)
 
 
+def _collect_requirements(
+    jira: dict[str, Any],
+    tp: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Jira R* items first, then deduped Confluence LADR L* when present in test plan cache."""
+    from confluence_requirements import dedupe_ladr_requirements
+
+    raw = jira.get("requirements") or tp.get("jiraRequirements") or tp.get("requirements") or []
+    jira_reqs = [r for r in raw if str(r.get("id") or "").startswith("R")]
+    if not jira_reqs and raw:
+        jira_reqs = [r for r in raw if not str(r.get("id") or "").startswith("L")]
+    ladr_reqs = dedupe_ladr_requirements(tp.get("ladrRequirements") or [])
+    return jira_reqs, ladr_reqs
+
+
+def _map_one_requirement(
+    req: dict[str, Any],
+    *,
+    diff_blob: str,
+    prod_files: list[str],
+    test_files: list[str],
+    prefetch: dict[str, Any],
+    source: str,
+) -> tuple[dict[str, Any], float, float | None]:
+    """Map a single requirement; returns (mapped dict, code score weight, dev score weight or None)."""
+    rid = req.get("id") or ""
+    text = req.get("text") or ""
+    req_tokens = _tokens(text)
+    code_score = _overlap_score(req_tokens, diff_blob)
+    test_score = _overlap_score(req_tokens, "\n".join(test_files))
+    combined = min(1.0, code_score * 0.75 + test_score * 0.35)
+    has_test = test_score > 0.1 and bool(test_files)
+
+    code_status = _status_from_score(code_score)
+    dev_status = _test_status(test_score, has_test)
+    code_weight = 1.0 if code_status == "implemented" else 0.5 if code_status == "partial" else 0.0
+
+    owner, qa_scope = derive_owner_and_qa_scope(text, dev_status, code_status)
+    dev_weight: float | None = None
+    if owner != "qa":
+        dev_weight = 1.0 if dev_status == "covered" else 0.5 if dev_status == "partial" else 0.0
+
+    path_tokens = _path_tokens(text)
+    matched_files = [
+        f for f in prod_files + test_files if any(t in f.lower() for t in path_tokens)
+    ][:5]
+
+    evidence_note = ""
+    if not matched_files and code_score >= 0.2:
+        bc_commits = (prefetch.get("branchCompare") or {}).get("commits") or []
+        evidence_note = _commit_evidence_note(req_tokens, bc_commits)
+        if not evidence_note:
+            evidence_note = (
+                "Keyword overlap in branch diff/commits only — "
+                "no changed file path matched requirement terms"
+            )
+
+    mapped = {
+        "id": rid,
+        "text": text,
+        "source": source,
+        "codeStatus": code_status,
+        "codeScore": round(code_score, 3),
+        "devTestStatus": dev_status,
+        "devTestScore": round(test_score, 3),
+        "owner": owner,
+        "qaScope": qa_scope,
+        "confidence": _evidence_confidence(combined, code_score, matched_files),
+        "matchedFiles": matched_files,
+        "evidenceNote": evidence_note,
+        "suggestedTestCases": [],
+    }
+    if req.get("task"):
+        mapped["task"] = req.get("task")
+    if req.get("status"):
+        mapped["status"] = req.get("status")
+    if req.get("kind"):
+        mapped["kind"] = req.get("kind")
+    return mapped, code_weight, dev_weight
+
+
 def map_requirements(
     issue_key: str,
     *,
@@ -169,12 +250,8 @@ def map_requirements(
     tp = _load_json(base / "reports" / ".cache" / f"{key}-testplan.json")
     prefetch = _load_json(base / "reports" / ".cache" / f"{key}-prefetch.json")
 
-    requirements = (
-        jira.get("requirements")
-        or tp.get("jiraRequirements")
-        or tp.get("requirements")
-        or []
-    )
+    jira_requirements, ladr_requirements = _collect_requirements(jira, tp)
+    requirements = jira_requirements + ladr_requirements
 
     diff_blob = ""
     prod_files: list[str] = []
@@ -263,65 +340,36 @@ def map_requirements(
             )
 
     mapped_reqs: list[dict[str, Any]] = []
-    scores: list[float] = []
+    jira_scores: list[float] = []
     dev_scores: list[float] = []
 
     for req in requirements:
         rid = req.get("id") or ""
-        text = req.get("text") or ""
         if not rid:
             continue
-        req_tokens = _tokens(text)
-        code_score = _overlap_score(req_tokens, diff_blob)
-        test_score = _overlap_score(req_tokens, "\n".join(test_files))
-        combined = min(1.0, code_score * 0.75 + test_score * 0.35)
-        has_test = test_score > 0.1 and bool(test_files)
-
-        code_status = _status_from_score(code_score)
-        dev_status = _test_status(test_score, has_test)
-        scores.append(1.0 if code_status == "implemented" else 0.5 if code_status == "partial" else 0.0)
-
-        owner, qa_scope = derive_owner_and_qa_scope(text, dev_status, code_status)
-        if owner != "qa":
-            dev_scores.append(
-                1.0 if dev_status == "covered" else 0.5 if dev_status == "partial" else 0.0
-            )
-
-        path_tokens = _path_tokens(text)
-        matched_files = [
-            f for f in prod_files + test_files if any(t in f.lower() for t in path_tokens)
-        ][:5]
-
-        evidence_note = ""
-        if not matched_files and code_score >= 0.2:
-            bc_commits = (prefetch.get("branchCompare") or {}).get("commits") or []
-            evidence_note = _commit_evidence_note(req_tokens, bc_commits)
-            if not evidence_note:
-                evidence_note = (
-                    "Keyword overlap in branch diff/commits only — "
-                    "no changed file path matched requirement terms"
-                )
-
-        mapped_reqs.append(
-            {
-                "id": rid,
-                "text": text,
-                "codeStatus": code_status,
-                "codeScore": round(code_score, 3),
-                "devTestStatus": dev_status,
-                "devTestScore": round(test_score, 3),
-                "owner": owner,
-                "qaScope": qa_scope,
-                "confidence": _evidence_confidence(combined, code_score, matched_files),
-                "matchedFiles": matched_files,
-                "evidenceNote": evidence_note,
-                "suggestedTestCases": [],
-            }
+        source = "ladr" if str(rid).startswith("L") else "jira"
+        mapped, code_weight, dev_weight = _map_one_requirement(
+            req,
+            diff_blob=diff_blob,
+            prod_files=prod_files,
+            test_files=test_files,
+            prefetch=prefetch,
+            source=source,
         )
+        mapped_reqs.append(mapped)
+        if source == "jira":
+            jira_scores.append(code_weight)
+        if dev_weight is not None:
+            dev_scores.append(dev_weight)
 
     # Link test plan TCs with partial keyword overlap (suggestions)
     cov = tp.get("coverage") or {}
-    uncovered = set(cov.get("uncoveredJiraRequirements") or cov.get("uncoveredRequirements") or [])
+    uncovered_jira = set(cov.get("uncoveredJiraRequirements") or cov.get("uncoveredRequirements") or [])
+    uncovered_ladr = set(cov.get("uncoveredLadrRequirements") or [])
+
+    def _is_uncovered(rid: str) -> bool:
+        return rid in uncovered_ladr if rid.startswith("L") else rid in uncovered_jira
+
     for tc in tp.get("testCases") or []:
         hay = " ".join(
             [
@@ -332,7 +380,7 @@ def map_requirements(
         tc_mapped = set(tc.get("mapped_requirements") or [])
         for req in mapped_reqs:
             rid = req["id"]
-            if rid in tc_mapped or rid not in uncovered:
+            if rid in tc_mapped or not _is_uncovered(rid):
                 continue
             overlap = _overlap_score(_tokens(req["text"]), hay)
             if 0.12 <= overlap < 0.35:
@@ -340,13 +388,15 @@ def map_requirements(
                     {"id": tc.get("id"), "summary": tc.get("summary"), "overlap": round(overlap, 2)}
                 )
 
-    req_pct = round(100 * sum(scores) / len(scores), 1) if scores else None
+    req_pct = round(100 * sum(jira_scores) / len(jira_scores), 1) if jira_scores else None
     dev_pct = round(100 * sum(dev_scores) / len(dev_scores), 1) if dev_scores else None
 
     return {
         "issueKey": key,
         "fetchedAt": datetime.now(timezone.utc).isoformat(),
         "requirementCount": len(mapped_reqs),
+        "jiraRequirementCount": len(jira_requirements),
+        "ladrRequirementCount": len(ladr_requirements),
         "reqCoveragePct": req_pct,
         "devTestCoveragePct": dev_pct,
         "requirements": mapped_reqs,
