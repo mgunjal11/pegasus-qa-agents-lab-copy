@@ -121,7 +121,7 @@ Follow [testcase-template.md](testcase-template.md) exactly (11 columns).
 - **3 rows per case**: row 1 = metadata + `Given:` in Step Summary; rows 2â€“3 = `When:` / `Then:` in Step Summary only.
 - **Story**: issue key on row 1.
 - **Status**: leave blank for new test cases (merged across 3 rows in Excel).
-- Include **R*** / **L*** reference in Summary or Step Summary where helpful.
+- Include **R*** / **L*** reference in Summary or Step Summary where helpful (required for coverage-validator §5 trace, §6 review, and QA scope mapping).
 - **LADR Then steps:** include milestone **task** and **status** (e.g. `orderStatus Completed`) so `map_testcases_to_requirements()` can score L-items after import.
 
 ### Step 6: Review gate (required)

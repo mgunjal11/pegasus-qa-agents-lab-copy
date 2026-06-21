@@ -40,7 +40,7 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 | GitHub | **One shell:** prefetch with all `--pr` URLs, or read fresh cache — **never** N separate `gh` calls |
 | Mapping | **One shell:** `map_requirements_to_diff.py {KEY}` |
 | Report | **One shell:** `build_coverage_report.py {KEY}` — builder calls `apply_report_ui_enhancements()` |
-| Never | Hand-set `lineCoverage` instead of `{{CI_LINE_COVERAGE}}`; edit `SUMMARY_METRIC_INFO` or tooltip CSS when changing §3/§8 **content** |
+| Never | Hand-set `lineCoverage` instead of `{{CI_LINE_COVERAGE}}`; edit `SUMMARY_METRIC_INFO` or tooltip CSS when changing §3–§8 **content** |
 
 ## Report builder (required)
 
@@ -52,13 +52,14 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 - **§4 Dev vs QA:** `build_qa_ownership_fields()` — if dev test status is **Covered**, `qaScope` is **none** internally; **Covered by dev tests** bullets omit the **None** badge (show `proven by PR unit/integration tests` only); **QA handoff** still shows E2E/Manual badges; do **not** ask QA to execute test plan cases mapped only to dev-covered `R*`/`L*`
 - **Summary QA cards:** `{{QA_SCOPE_SUMMARY}}` scope breakdown (e.g. `5 item(s) (4 E2E · 1 Manual)`); `{{QA_SCOPE_DETAIL}}` names Jira/LADR ids + test plan case ids; `{{OPEN_GAPS_DETAIL}}` names test-plan gaps, missing code/dev tests, CI failures — **card notes only** (not tooltip copy)
 - **§5 traceability:** Jira `R*` + LADR `L*` rows (LADR badge); **Dev tests** column = Covered / Partial / Missing only (no Unit/Integration tier badges); **QA scope** column still shows **None** when dev-covered
-- **§6 Implementation review:** `build_correctly_implemented_list()`, `build_implementation_gaps_list()`, `build_assumptions_list()` — auto Jira/LADR implemented items, named gaps (test plan, partial code/dev tests, SIT, CI), mapping assumptions (not tooltip copy)
+- **§6 Implementation review:** `build_correctly_implemented_list()` — Jira + LADR with PR file evidence; `build_implementation_gaps_list()` — feeds `{{GAPS_LIST}}` and **Open gaps** summary count; partial code/dev tests, SIT validation, CI failures
+- **§7 Assumptions:** `build_assumptions_list()` — mapping confidence, test-plan source notes, token-overlap disclaimer
 - **§8 Recommended actions:** `build_recommended_actions_list()` — separate **Dev** and **QA** lists; layout via `inject_recommended_actions_styles()` / `inject_recommended_actions_markup()` only
 - **Quick links:** `collect_ladr_page_links()` — LADR/design Confluence only in header
 - **Mapping:** `confidence` high only with `matchedFiles`; `evidenceNote` when keyword-only
 - **UI:** `apply_report_ui_enhancements()` — tooltips layout **v22** (do not edit tooltip copy when changing metrics)
 - **Verdict:** Fail only when `gap_summary` has **≥1 High** (`[1-9]+ High`), not when text is `0 High · N Med`
-- **Gaps list UTF-8:** `build_coverage_report.py` `_auto_gaps()` uses proper em dash (`—`) in §7 HTML
+- **Gaps list UTF-8:** `build_implementation_gaps_list()` uses proper em dash (`—`) in §6 HTML; drives `{{OPEN_GAPS_SUMMARY}}` card count
 
 ## Hard rules
 
@@ -68,7 +69,7 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 4. Prefer `build_coverage_report.py` over per-ticket `regen_*.py` scripts.
 5. Do not fabricate evidence or coverage %.
 6. HTML → `reports/<KEY>-<MM-DD-YYYY-HH-MM-SS>-<TZ>.html`; save `lastReportFile` in manifest.
-7. `apply_report_ui_enhancements(html)` before write. **Do not** edit `SUMMARY_METRIC_INFO` when changing §3/§8 — see [content-vs-tooltips.md](.cursor/skills/coverage-validator/references/content-vs-tooltips.md).
+7. `apply_report_ui_enhancements(html)` before write. **Do not** edit `SUMMARY_METRIC_INFO` when changing §3–§8 **content** — see [content-vs-tooltips.md](.cursor/skills/coverage-validator/references/content-vs-tooltips.md).
 8. No Jira/GitHub comments unless `--post-jira`.
 
 ## Key scripts
@@ -79,4 +80,7 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 | `write_testcase_excel.py` | Cache TSV → `testcases/{KEY}-testcases.xlsx` |
 | `prepare_testcase_writer_context.py` | `jira_and_ladr` vs `jira_only` for testcase writer |
 | `build_coverage_report.py` | HTML report + `apply_report_ui_enhancements()` |
+| `build_correctly_implemented_list()` | §6 Correctly implemented (in `coverage_report_helpers.py`) |
+| `build_implementation_gaps_list()` | §6 Gaps + Open gaps summary count |
+| `build_assumptions_list()` | §7 Assumptions |
 | `build_recommended_actions_list()` | §8 Dev/QA actions (in `coverage_report_helpers.py`) |

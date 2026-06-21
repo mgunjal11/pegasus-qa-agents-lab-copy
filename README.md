@@ -11,7 +11,7 @@ A centralized lab for **AI-driven QA agents** on the WBD Media Supply Chain (MSC
 | # | Agent | What it does | How to invoke |
 |---|--------|--------------|---------------|
 | 1 | **msc-testcase-writer** | Jira (+ LADR when linked) → QMetry FF2.0 Excel, Given/When/Then | `@msc-testcase-writer MSC-204417` |
-| 2 | **msc-dev-code-and-qa-test-coverage-validator** | Jira AC + LADR + test plan vs PR; §4 dev-covered omits None badge; QA/Open gaps card detail; §8 Dev/QA actions; honest §3 note; LADR §5 trace; tooltips v22 | `@msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
+| 2 | **msc-dev-code-and-qa-test-coverage-validator** | Jira AC + LADR + test plan vs PR; §3–§8 auto content; QA/Open gaps cards; §4 dev-covered omits None badge; LADR §5 trace; §6/§7 from mapping; tooltips v22 | `@msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
 | 3 | **msc-jira-bug** | Drafts MSC Bug tickets; creates only after your approval | `@msc-jira-bug` + describe the defect |
 
 **One registration per agent** — workflow skills live under `.cursor/skills/coverage-validator/` and `bug-filing/` (not duplicate slash entries).
@@ -182,7 +182,8 @@ docs/                  # Optional notes (primary deliverables are HTML + xlsx)
 | `prepare_testcase_writer_context.py` | `jira_and_ladr` vs `jira_only` mode |
 | `fetch_jira_testplan.py` | Download/parse test plan; honest summary note |
 | `prefetch_coverage_inputs.py` | Batch `gh` PR view/diff/checks → cache (`--mode from-cache` to reuse) |
-| `build_coverage_report.py` | HTML report + §8 Dev/QA actions |
+| `build_coverage_report.py` | HTML report; calls §6/§7 builders in `coverage_report_helpers.py` |
+| `map_requirements_to_diff.py` | Requirement → PR diff mapping cache |
 | `install_coverage_validator_permissions.py` | Merge allowlist into `~/.cursor/permissions.json` |
 
 ---
@@ -193,7 +194,7 @@ docs/                  # Optional notes (primary deliverables are HTML + xlsx)
 |---------|-----|
 | Duplicate `/msc-*` suggestions | Use agents only; skills are `coverage-validator` / `bug-filing` folders |
 | Test plan 0% but xlsx existed | Re-run `write_testcase_excel.py {KEY}` then `fetch_jira_testplan.py` |
-| `â€"` garbled text in §7 Gaps | Regenerate report after `build_coverage_report.py` UTF-8 fix |
+| `â€"` garbled text in §6 Gaps | Regenerate report — `build_implementation_gaps_list()` uses UTF-8 em dash |
 | Test plan **Pending** / `referenced_not_local` | Add Excel under `testplans/` |
 | CI coverage **NA** | Link PR; re-run prefetch; Sonar PR comment fallback when logs expired |
 

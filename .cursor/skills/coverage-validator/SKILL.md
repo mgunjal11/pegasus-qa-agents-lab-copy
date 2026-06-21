@@ -539,9 +539,9 @@ html = apply_report_ui_enhancements(html)
 ```
 
 | `{{REQUIREMENT_ROWS}}` | HTML `<tr>` rows — Code, Dev tests (Covered/Partial/Missing), Owner, QA scope (incl. **None** in §5), Evidence; LADR rows tagged with LADR badge |
-| `{{CORRECTLY_IMPLEMENTED_LIST}}` | `<li>` items |
-| `{{GAPS_LIST}}` | `<li class="critical|high|medium">` items |
-| `{{ASSUMPTIONS_LIST}}` | `<li>` items |
+| `{{CORRECTLY_IMPLEMENTED_LIST}}` | §6 — `build_correctly_implemented_list()`: Jira/LADR rows with `codeStatus: implemented`, dev test status, primary `<code>` file |
+| `{{GAPS_LIST}}` | §6 — `build_implementation_gaps_list()`: `<li class="high|medium">` test-plan gaps, missing/partial code & dev tests, SIT validation, CI failures; drives `{{OPEN_GAPS_SUMMARY}}` |
+| `{{ASSUMPTIONS_LIST}}` | §7 — `build_assumptions_list()`: low/medium mapping confidence, test-plan source notes, token-overlap disclaimer |
 | `{{ACTIONS_LIST}}` | §8 — `build_recommended_actions_list()` → Dev + QA action groups |
 
 **Status badges** (requirement table):

@@ -9,9 +9,13 @@ When enhancing the coverage validator or testcase writer, **change report data a
 | §3 test plan rows, note, gaps | `fetch_jira_testplan.py`, `build_testplan_report_fields()`, `build_testplan_summary_note()` |
 | §3 Evidence column | `render_testplan_evidence()`, `testplan_evidence.py` (`testPlanSource: workspace_generated`) |
 | §4 Dev vs QA handoff | `build_qa_ownership_fields()` |
+| §6 Implementation review | `build_correctly_implemented_list()`, `build_implementation_gaps_list()` |
+| §6 Open gaps summary card | `build_implementation_gaps_list()` (count) + `build_open_gaps_detail()` (one-line note) |
+| §7 Assumptions | `build_assumptions_list()` |
 | §8 Recommended actions | `build_recommended_actions_list()` — **Dev** and **QA** sub-lists |
+| Summary QA scope cards | `_format_qa_scope_summary()`, `_format_qa_scope_detail()` |
 | §5 trace rows | `render_requirement_rows_from_mapping()` |
-| Verdict, coverage %, gap lists | `build_coverage_report.py`, mapping cache |
+| Verdict, coverage % | `build_coverage_report.py`, mapping cache |
 | Testcase writer output | `write_testcase_excel.py`, cache TSV only |
 
 ## Do not change without explicit UI request

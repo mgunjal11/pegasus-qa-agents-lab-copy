@@ -55,6 +55,8 @@ When `/msc-dev-code-and-qa-test-coverage-validator` calls you because Jira has *
 3. Write `reports/.cache/{KEY}-testcases-source.tsv` + `python scripts/write_testcase_excel.py {KEY}` without waiting for approval.
 4. Validator re-fetches test plan; §3 note states **locally generated** plan; Evidence shows **No execution evidence** (not step UUIDs).
 
+When drafting cases (standalone or fallback), reference **R*** and **L*** ids in Summary or Step Summary so the coverage validator can map test plan rows to §5 traceability, §6 review, and QA scope cards.
+
 **Do not** change coverage-validator tooltip HTML/CSS when producing testcase output.
 
 ## After approval (interactive mode)
