@@ -104,7 +104,7 @@ Place Excel under `testplans/` when Jira comments reference SharePoint — see [
 - **Summary — Open gaps** — severity count from `build_implementation_gaps_list()`; note via `build_open_gaps_detail()` — named gaps when **&lt; 5** total; theme summary + **see §6 for full list** when **≥ 5** (not tooltip copy)
 - **§3** — Honest `testPlanSummaryNote`; Evidence **No execution evidence** for locally generated QMetry plans (`workspace_generated`)
 - **§4** — **Covered by dev tests** omits **None** badge (internal `qaScope: none` unchanged); QA handoff skips dev-covered requirements and limits execute-test-plan bullets to QA-scoped TCs
-- **§5** — Jira `R*` + LADR `L*` trace rows; **FR** / **NFR** / **Process** badge on every ID (`classify_requirement_type()` — SIT validation → NFR; product behavior → FR); LADR badge on `L*`; **Dev tests** = Covered / Partial / Missing only; **QA scope** column still shows **None** when dev-covered
+- **§5** — Jira `R*` + LADR `L*` trace rows; **FR** / **NFR** / **Process** badges; **pytest names** in Evidence when diff adds `test_*`; symbol-aware mapping (`mapping_evidence.py`); LADR badge on `L*`
 - **§6** — Auto **Correctly implemented** (Jira + LADR with PR evidence); **Gaps** (test plan, partial code/dev tests, SIT validation, CI)
 - **§7** — **Assumptions** — max 3 bullets (open questions, mapping review, scoring note)
 - **§8** — Separate **Dev** and **QA** recommended action lists
@@ -185,6 +185,8 @@ docs/                  # Optional notes (primary deliverables are HTML + xlsx)
 | `prefetch_coverage_inputs.py` | Batch `gh` PR view/diff/checks → cache (`--mode from-cache` to reuse) |
 | `build_coverage_report.py` | HTML report; calls §6/§7 builders in `coverage_report_helpers.py` |
 | `map_requirements_to_diff.py` | Requirement → PR diff mapping; `classify_requirement_type()` → FR/NFR on §5 rows |
+| `mapping_evidence.py` | Symbol + pytest-name scoring for §5 Evidence |
+| `cache_freshness.py` | Stale mapping detection (`--rerun` / auto-remap on build) |
 | `install_coverage_validator_permissions.py` | Merge allowlist into `~/.cursor/permissions.json` |
 
 ---

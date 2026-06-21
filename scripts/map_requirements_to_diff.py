@@ -402,6 +402,7 @@ def _map_one_requirement(
     req: dict[str, Any],
     *,
     diff_blob: str,
+    diff_context: Any,
     prod_files: list[str],
     test_files: list[str],
     prefetch: dict[str, Any],
@@ -409,13 +410,22 @@ def _map_one_requirement(
     section_hints: dict[str, str] | None = None,
 ) -> tuple[dict[str, Any], float, float | None]:
     """Map a single requirement; returns (mapped dict, code score weight, dev score weight or None)."""
+    from mapping_evidence import score_requirement_evidence
+
     rid = req.get("id") or ""
     text = req.get("text") or ""
     req_tokens = _tokens(text)
-    code_score = _overlap_score(req_tokens, diff_blob)
-    test_score = _overlap_score(req_tokens, "\n".join(test_files))
+    path_tokens = _path_tokens(text)
+    evidence = score_requirement_evidence(
+        text, req_tokens, diff_context, prod_files, test_files, path_tokens
+    )
+    code_score = float(evidence["codeScore"])
+    test_score = float(evidence["testScore"])
+    matched_files = list(evidence["matchedFiles"])
+    matched_tests = list(evidence["matchedTests"])
+    matched_symbols = list(evidence["matchedSymbols"])
     combined = min(1.0, code_score * 0.75 + test_score * 0.35)
-    has_test = test_score > 0.1 and bool(test_files)
+    has_test = (test_score > 0.1 and bool(test_files)) or bool(matched_tests)
 
     code_status = _status_from_score(code_score)
     dev_status = _test_status(test_score, has_test)
@@ -426,21 +436,21 @@ def _map_one_requirement(
     if owner != "qa":
         dev_weight = 1.0 if dev_status == "covered" else 0.5 if dev_status == "partial" else 0.0
 
-    path_tokens = _path_tokens(text)
-    matched_files = [
-        f for f in prod_files + test_files if any(t in f.lower() for t in path_tokens)
-    ][:5]
-
     evidence_note = ""
-    if not matched_files and code_score >= 0.2:
+    if matched_tests:
+        evidence_note = "Matched tests: " + ", ".join(matched_tests)
+    elif matched_symbols and not matched_files:
+        evidence_note = "Matched symbols: " + ", ".join(matched_symbols)
+    if not matched_files and code_score >= 0.2 and not evidence_note:
         bc_commits = (prefetch.get("branchCompare") or {}).get("commits") or []
         evidence_note = _commit_evidence_note(req_tokens, bc_commits)
         if not evidence_note:
             evidence_note = (
-                "Keyword overlap in branch diff/commits only — "
+                "Keyword/symbol overlap in branch diff/commits only — "
                 "no changed file path matched requirement terms"
             )
 
+    conf_files = matched_files or ([f"symbol:{s}" for s in matched_symbols[:2]] if matched_symbols else [])
     mapped = {
         "id": rid,
         "text": text,
@@ -451,8 +461,9 @@ def _map_one_requirement(
         "devTestScore": round(test_score, 3),
         "owner": owner,
         "qaScope": qa_scope,
-        "confidence": _evidence_confidence(combined, code_score, matched_files),
+        "confidence": _evidence_confidence(combined, code_score, conf_files),
         "matchedFiles": matched_files,
+        "matchedTests": matched_tests,
         "evidenceNote": evidence_note,
         "suggestedTestCases": [],
     }
@@ -503,6 +514,7 @@ def map_requirements(
     pr_summaries: list[dict[str, Any]] = []
 
     from coverage_report_helpers import format_dev_tests_summary, is_dev_test_module_path
+    from mapping_evidence import extract_diff_context
 
     for pr in prefetch.get("prs") or []:
         diff_blob += "\n" + str(pr.get("diff") or "")
@@ -583,6 +595,7 @@ def map_requirements(
                 }
             )
 
+    diff_context = extract_diff_context(diff_blob, prod_files, test_files)
     mapped_reqs: list[dict[str, Any]] = []
     jira_scores: list[float] = []
     dev_scores: list[float] = []
@@ -595,6 +608,7 @@ def map_requirements(
         mapped, code_weight, dev_weight = _map_one_requirement(
             req,
             diff_blob=diff_blob,
+            diff_context=diff_context,
             prod_files=prod_files,
             test_files=test_files,
             prefetch=prefetch,
@@ -657,9 +671,35 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Map Jira requirements to PR diff evidence")
     parser.add_argument("issue_key")
     parser.add_argument("--write", action="store_true", default=True)
+    parser.add_argument(
+        "--rerun",
+        action="store_true",
+        help="Always remap (default). Alias for explicit full remap.",
+    )
+    parser.add_argument(
+        "--skip-if-fresh",
+        action="store_true",
+        help="Skip when mapping cache is newer than prefetch/jira/testplan/confluence",
+    )
+    parser.add_argument(
+        "--cache-max-age",
+        type=int,
+        default=None,
+        help="Max mapping age in hours (default: manifest cacheMaxAgeHours or 24)",
+    )
     args = parser.parse_args()
-    payload = map_requirements(args.issue_key.upper())
-    out = mapping_cache_path(args.issue_key)
+    key = args.issue_key.upper()
+    if args.skip_if_fresh and not args.rerun:
+        from cache_freshness import is_mapping_stale, load_manifest_max_age
+
+        max_age = args.cache_max_age if args.cache_max_age is not None else load_manifest_max_age(key)
+        stale, reason = is_mapping_stale(key, max_age_hours=max_age)
+        if not stale:
+            out = mapping_cache_path(key)
+            print(json.dumps({"output": str(out.resolve()), "skipped": True, "reason": reason}))
+            return 0
+    payload = map_requirements(key)
+    out = mapping_cache_path(key)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"output": str(out.resolve()), "reqCoveragePct": payload.get("reqCoveragePct")}))

@@ -14,7 +14,7 @@ When enhancing the coverage validator or testcase writer, **change report data a
 | §7 Assumptions | `build_assumptions_list()` — **max 3 bullets** (open questions, mapping review, scoring) |
 | §8 Recommended actions | `build_recommended_actions_list()` — **Dev** and **QA** sub-lists |
 | Summary QA scope cards | `_format_qa_scope_summary()`, `_format_qa_scope_detail()` |
-| §5 trace rows | `render_requirement_rows_from_mapping()` + `classify_requirement_type()` — **FR** / **NFR** / **Process** badges on ID cell (content only; no new column) |
+| §5 trace rows | `render_requirement_rows_from_mapping()` + `mapping_evidence.py` + `classify_requirement_type()` |
 | Verdict, coverage % | `build_coverage_report.py`, mapping cache |
 | Testcase writer output | `write_testcase_excel.py`, cache TSV only |
 

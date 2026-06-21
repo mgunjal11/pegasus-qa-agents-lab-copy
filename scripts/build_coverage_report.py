@@ -81,9 +81,20 @@ def build_report(
     root: Path | None = None,
     analysis: dict[str, Any] | None = None,
     dev_tests_by_number: dict[int | str, str] | None = None,
+    rerun_mapping: bool = False,
 ) -> tuple[str, Path, str, str]:
     base = root or ROOT
     key = issue_key.upper()
+    from cache_freshness import ensure_fresh_mapping, is_mapping_stale, load_manifest_max_age
+
+    max_age = load_manifest_max_age(key, base)
+    if rerun_mapping:
+        ensure_fresh_mapping(key, base, force=True, max_age_hours=max_age)
+    else:
+        stale, _ = is_mapping_stale(key, base, max_age_hours=max_age)
+        if stale:
+            ensure_fresh_mapping(key, base, force=False, max_age_hours=max_age)
+
     jira = load_jira_cache(key, base)
     tp = load_testplan_cache(key, base)
     prefetch = load_prefetch_cache(key, base)
@@ -252,13 +263,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Build coverage validation HTML report")
     parser.add_argument("issue_key")
     parser.add_argument("--analysis", help="Optional JSON overrides for narrative sections")
+    parser.add_argument(
+        "--rerun",
+        action="store_true",
+        help="Force remap requirements before building (also remaps when upstream caches are newer)",
+    )
     args = parser.parse_args()
 
     analysis = None
     if args.analysis:
         analysis = json.loads(Path(args.analysis).read_text(encoding="utf-8"))
 
-    html, out_path, generated, tz = build_report(args.issue_key.upper(), analysis=analysis)
+    html, out_path, generated, tz = build_report(
+        args.issue_key.upper(),
+        analysis=analysis,
+        rerun_mapping=args.rerun,
+    )
     out_path.write_text(html, encoding="utf-8")
 
     manifest_path = ROOT / "reports" / ".cache" / f"{args.issue_key.upper()}-manifest.json"

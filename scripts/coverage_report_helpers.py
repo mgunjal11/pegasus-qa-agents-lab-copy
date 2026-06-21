@@ -1110,11 +1110,13 @@ def _render_trace_evidence_cell(
     matched_files: list[str],
     confidence: str,
     evidence_note: str = "",
+    matched_tests: list[str] | None = None,
 ) -> str:
-    """Evidence column: file list (not truncated) + mapping confidence."""
+    """Evidence column: file list + optional matched test names + mapping confidence."""
     conf = confidence or "low"
-    files = [f for f in (matched_files or []) if f]
-    if not files:
+    files = [f for f in (matched_files or []) if f and not str(f).startswith("symbol:")]
+    tests = [t for t in (matched_tests or []) if t]
+    if not files and not tests:
         note = (evidence_note or "").strip()
         body = (
             f'<p class="evidence-note">{esc(note)}</p>'
@@ -1127,13 +1129,19 @@ def _render_trace_evidence_cell(
             f'<span class="conf-badge" title="Mapping confidence for cited evidence">'
             f"{esc(conf)}</span></td>"
         )
-    shown = files[:6]
-    items = "".join(f"<li><code>{esc(f)}</code></li>" for f in shown)
+    items = "".join(f"<li><code>{esc(f)}</code></li>" for f in files[:6])
+    if tests:
+        items += "".join(
+            f'<li><code>{esc(t)}()</code> <span class="evidence-tag">test</span></li>' for t in tests[:4]
+        )
     extra = ""
     if len(files) > 6:
         extra = f'<li class="evidence-more">+{len(files) - 6} more file(s)</li>'
+    note = (evidence_note or "").strip()
+    note_html = f'<p class="evidence-note">{esc(note)}</p>' if note and not tests else ""
     return (
         f'<td class="evidence-cell">'
+        f"{note_html}"
         f'<ul class="evidence-list">{items}{extra}</ul>'
         f'<span class="conf-badge">{esc(conf)}</span></td>'
     )
@@ -1176,6 +1184,7 @@ def render_requirement_rows_from_mapping(issue_key: str, root: Path | None = Non
             req.get("matchedFiles") or [],
             conf,
             str(req.get("evidenceNote") or ""),
+            list(req.get("matchedTests") or []),
         )
         id_cell = esc(rid)
         if str(req.get("source") or "") == "ladr" or str(rid).startswith("L"):
@@ -2488,6 +2497,12 @@ TRACE_SECTION_CSS = """
     }
     .badge-nfr { background: #fef3c7; color: #92400e; }
     .badge-fr { background: #ecfdf5; color: #047857; }
+    .section-trace .evidence-tag {
+      font-size: 0.68rem;
+      color: #6366f1;
+      font-weight: 600;
+      margin-left: 0.15rem;
+    }
 """
 
 PR_TABLE_INFO_CSS = """

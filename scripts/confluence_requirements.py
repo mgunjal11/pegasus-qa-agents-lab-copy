@@ -339,6 +339,52 @@ def parse_ladr_ess_requirements(body_text: str, source: str = "ladr") -> list[di
     return reqs
 
 
+GENERIC_SECTION_HEADING_RE = re.compile(
+    r"^#{1,4}\s*(?:\d+\.?\s*)?"
+    r"(requirements|acceptance criteria|scenarios|design scenarios|use cases|"
+    r"ladr|ess|test scenarios|verification scenarios)\b",
+    re.I,
+)
+
+
+def parse_generic_confluence_requirements(
+    body_text: str, source: str = "ladr"
+) -> list[dict[str, str]]:
+    """
+    Parse bullet/numbered items under requirement-like Confluence headings.
+    Fallback when ESS/passport parsers find nothing.
+    """
+    if not body_text or len(body_text.strip()) < 40:
+        return []
+
+    reqs: list[dict[str, str]] = []
+    in_section = False
+    for raw in body_text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if re.match(r"^#{1,4}\s", line):
+            in_section = bool(GENERIC_SECTION_HEADING_RE.match(line))
+            continue
+        if not in_section:
+            continue
+        bullet = re.sub(r"^[-*•]\s*", "", line)
+        bullet = re.sub(r"^\d+[.)]\s*", "", bullet)
+        if len(bullet) < 18:
+            continue
+        if bullet.lower().startswith(("see ", "refer ", "note:", "todo:")):
+            continue
+        reqs.append(
+            {
+                "id": f"L{len(reqs) + 1}",
+                "text": bullet.strip(),
+                "source": source,
+                "kind": "confluence_bullet",
+            }
+        )
+    return reqs
+
+
 def load_confluence_cache(issue_key: str) -> dict[str, Any]:
     path = confluence_cache_path(issue_key)
     if not path.exists():
@@ -816,6 +862,8 @@ def fetch_and_cache_confluence_for_issue(
             ladr_reqs = parse_ladr_ess_requirements(body, source="ladr")
             if not ladr_reqs:
                 ladr_reqs = parse_passport_confluence_requirements(body, source="ladr")
+            if not ladr_reqs:
+                ladr_reqs = parse_generic_confluence_requirements(body, source="ladr")
             page["ladrRequirements"] = ladr_reqs
             pages.append(page)
             all_ladr.extend(ladr_reqs)

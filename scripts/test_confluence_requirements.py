@@ -18,6 +18,7 @@ from confluence_requirements import (  # noqa: E402
     dedupe_ladr_requirements,
     map_testcases_to_requirements,
     merge_requirement_sets,
+    parse_generic_confluence_requirements,
     parse_ladr_ess_requirements,
 )
 
@@ -35,6 +36,17 @@ def test_parse_ladr_ess_requirements():
     reqs = parse_ladr_ess_requirements(body)
     assert len(reqs) >= 12
     assert any(r["task"] == "orderStatus" and r["status"] == "Failure" for r in reqs)
+
+
+def test_parse_generic_confluence_requirements():
+    body = """## Design scenarios
+- Passport must attach when pick evaluates full fulfillment
+- MDU workflow must not attach passport in pick phase
+"""
+    reqs = parse_generic_confluence_requirements(body)
+    assert len(reqs) == 2
+    assert reqs[0]["id"] == "L1"
+    assert "Passport must attach" in reqs[0]["text"]
 
 
 def test_map_caption_monitoring_scenarios():
