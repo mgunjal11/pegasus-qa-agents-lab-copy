@@ -190,17 +190,19 @@ When Jira **references** SharePoint/Domino Excel but does not attach the file, c
 | Caches | `reports/.cache/{ISSUE-KEY}-*.json` |
 | Optional pytest cache | `reports/.cache/{ISSUE-KEY}-test-execution.json` |
 
-**Report highlights (content only — tooltips v22 unchanged):**
+### Coverage report sections
 
-- **Summary** — QA scope remaining, Open gaps (condensed when ≥5 gaps)
-- **§3** — Honest `testPlanSummaryNote`; **No execution evidence** for `workspace_generated` plans
-- **§4** — Dev vs QA handoff; dev-covered list omits misleading **None** badge
-- **§5** — FR / NFR / Process badges; **compact Evidence** (2 paths + 1 test + `+N more`; full path on hover); NFR SIT capped at medium
-- **§6** — Correctly implemented + Gaps (SIT, CI, test plan)
-- **§7** — Assumptions (max 3 bullets)
-- **§8** — Dev and QA recommended actions
+Each HTML report has eight numbered sections. **Section content** comes from data builders (`coverage_report_helpers.py`, `map_requirements_to_diff.py`, etc.). **Info-icon tooltips** (layout v22) are injected by `apply_report_ui_enhancements()` — change content via builders only; do not edit tooltip strings when updating report text. See [content-vs-tooltips.md](.cursor/skills/coverage-validator/references/content-vs-tooltips.md).
 
-Content vs tooltips: [.cursor/skills/coverage-validator/references/content-vs-tooltips.md](.cursor/skills/coverage-validator/references/content-vs-tooltips.md)
+| Section | Highlights |
+|---------|------------|
+| **Summary** | QA scope remaining; Open gaps card (condensed when ≥5 gaps) |
+| **§3 Test plan** | Honest `testPlanSummaryNote`; **No execution evidence** for `workspace_generated` plans |
+| **§4 Dev vs QA** | Handoff list; dev-covered rows omit misleading **None** badge in bullets |
+| **§5 Traceability** | FR / NFR / Process badges; Evidence shows 2 paths + 1 test; **click +N more** to expand all files/tests; NFR SIT capped at **medium** |
+| **§6 Implementation review** | Correctly implemented list + Gaps (SIT, CI, test plan) |
+| **§7 Assumptions** | Max 3 short bullets |
+| **§8 Recommended actions** | Separate Dev and QA action lists |
 
 Full workflow: [.cursor/skills/coverage-validator/SKILL.md](.cursor/skills/coverage-validator/SKILL.md)
 
@@ -300,7 +302,8 @@ docs/
 | CI coverage **NA** | Link PR; re-run prefetch |
 | `--execute-tests` skipped | Set `testRepoRoot` or `COVERAGE_TEST_REPO_ROOT` to local clone |
 | §6 Correctly implemented tooltip hidden under banner | Regenerate report — review-panel h3 tooltips open below icon (`TOOLTIP_LAYOUT_FIX_CSS`) |
-| §5 Evidence lists too many files | Regenerate report — `_summarize_trace_evidence()` shows 2 paths + 1 test + `+N more` |
+| §5 Evidence shows only "+N more" with no expand | Regenerate report — click **+N more** expands via `<details>`; `_summarize_trace_evidence()` in `coverage_report_helpers.py` |
+| §5 Evidence lists too many files by default | Expected — default view is 2 paths + 1 test; expand **+N more** for full list; full path on hover |
 | Garbled em dash in §6 | Regenerate report (UTF-8 HTML) |
 
 ---

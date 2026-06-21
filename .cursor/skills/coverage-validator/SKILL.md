@@ -526,14 +526,14 @@ The helper adds (idempotent — safe on template or post-builder HTML):
 - **Coverage** — meta, cache, quick links, Jira readiness **checklist rows only** (not the h3 heading), verdict, §1–§8 h2, summary groups, all §1 metrics (incl. release score), test plan note/split metrics, §3 LADR lead, §4 ownership, §5 trace lead, review h3 panels, all table headers. **No** report h1 title tooltip.
 - **Layout v22** — metric-card tooltips: row-anchored, flip **up**, **left: 0** (fixes first grid column clip); summary **group titles** open **below**, **right-aligned** to `i`; section **h2** flip up, row-anchored; release readiness flip up, wider box; table **first column** left-aligned; table **last two columns** open left; header cache/quick links row-anchored.
 - **Jira input readiness** — green ✓ / red ✗ (`normalize_jira_readiness_icons()`).
-- **§5 trace** — `trace-section-lead`, `trace-table` (`inject_trace_section_styles` v2).
+- **§5 trace** — `trace-section-lead`, `trace-table`, expandable Evidence (`TRACE_SECTION_CSS` v4 — `<details>` +N more).
 - **Footer** — agent + developer attribution.
 
 **Quick links:** `collect_ladr_page_links()` — LADR/design Confluence only.
 
 Always call the helper once before write. Do not hand-roll tooltip HTML in reports.
 
-**Regression tests:** `python -m pytest scripts/test_report_ui_enhancements.py scripts/test_summary_metric_info.py scripts/test_quick_links.py scripts/test_qa_scope_handoff.py scripts/test_implementation_review.py scripts/test_requirement_type.py scripts/test_confluence_requirements.py scripts/test_fetch_jira_testplan_summary.py scripts/test_testplan_evidence.py -q`
+**Regression tests:** `python -m pytest scripts/test_report_ui_enhancements.py scripts/test_summary_metric_info.py scripts/test_trace_evidence.py scripts/test_quick_links.py scripts/test_qa_scope_handoff.py scripts/test_implementation_review.py scripts/test_requirement_type.py scripts/test_confluence_requirements.py scripts/test_fetch_jira_testplan_summary.py scripts/test_testplan_evidence.py -q`
 
 **Content vs tooltips:** When updating §3–§8 or testcase-writer integration, edit data builders only — see [references/content-vs-tooltips.md](references/content-vs-tooltips.md). Do not change `SUMMARY_METRIC_INFO` tooltip **strings** unless the user requests copy changes; positioning/stacking CSS in `TOOLTIP_LAYOUT_FIX_CSS` is allowed for clip bugs (e.g. §6 Correctly implemented).
 
@@ -544,7 +544,7 @@ html = filled_template  # all {{PLACEHOLDER}} tokens replaced
 html = apply_report_ui_enhancements(html)
 ```
 
-| `{{REQUIREMENT_ROWS}}` | HTML `<tr>` rows — **FR** / **NFR** / **Process** badge on ID (+ LADR badge on `L*`); Code, Dev tests (Covered/Partial/Missing), Owner, QA scope (incl. **None** in §5), Evidence (compact via `_summarize_trace_evidence()`: 2 paths + 1 test + `+N more`) |
+| `{{REQUIREMENT_ROWS}}` | HTML `<tr>` rows — **FR** / **NFR** / **Process** badge on ID (+ LADR badge on `L*`); Code, Dev tests (Covered/Partial/Missing), Owner, QA scope (incl. **None** in §5), Evidence (compact: 2 paths + 1 test; click **+N more** to expand all paths/tests) |
 | `{{CORRECTLY_IMPLEMENTED_LIST}}` | §6 — `build_correctly_implemented_list()`: Jira/LADR rows with `codeStatus: implemented`, dev test status, primary `<code>` file |
 | `{{GAPS_LIST}}` | §6 — `build_implementation_gaps_list()`: `<li class="high|medium">` test-plan gaps, missing/partial code & dev tests, SIT validation, CI failures; drives `{{OPEN_GAPS_SUMMARY}}` |
 | `{{ASSUMPTIONS_LIST}}` | §7 — `build_assumptions_list()`: **max 3 bullets** — open questions (see §6), low/medium mapping ids (see §5), scoring disclaimer |

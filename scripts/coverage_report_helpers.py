@@ -1134,10 +1134,10 @@ def _summarize_trace_evidence(
     *,
     max_files: int = 2,
     max_tests: int = 1,
-) -> tuple[list[tuple[str, str, str]], int]:
+) -> tuple[list[tuple[str, str, str]], list[tuple[str, str, str]]]:
     """
-    Compact Evidence list for §5 — prefer src + one test module; drop fixtures/samples/json.
-    Returns ([(display_label, kind, full_value), ...], hidden_count).
+    Compact Evidence for §5 — visible rows plus extra rows for expand (+N more).
+    Returns (visible_items, extra_items) as (display_label, kind, full_value).
     """
     from mapping_evidence import _is_weak_evidence_path, rank_matched_files
 
@@ -1145,6 +1145,7 @@ def _summarize_trace_evidence(
     tests = [t for t in (matched_tests or []) if t]
     ranked = rank_matched_files(files, limit=24)
     strong = [f for f in ranked if not _is_weak_evidence_path(f)]
+    weak = [f for f in ranked if _is_weak_evidence_path(f)]
 
     display_files: list[str] = []
     seen_src = False
@@ -1172,16 +1173,27 @@ def _summarize_trace_evidence(
             continue
         display_tests.append(name)
 
-    hidden = max(0, len(strong) - len(display_files)) + max(0, len(tests) - len(display_tests))
-    hidden += sum(1 for f in ranked if _is_weak_evidence_path(f))
+    def _as_items(paths: list[str], test_names: list[str]) -> list[tuple[str, str, str]]:
+        out: list[tuple[str, str, str]] = []
+        for path in paths:
+            out.append((_compact_evidence_path(path), "file", path))
+        for name in test_names:
+            label = name if len(name) <= 44 else f"{name[:41]}…"
+            out.append((label, "test", name))
+        return out
 
-    items: list[tuple[str, str, str]] = []
-    for path in display_files:
-        items.append((_compact_evidence_path(path), "file", path))
-    for name in display_tests:
-        label = name if len(name) <= 44 else f"{name[:41]}…"
-        items.append((label, "test", name))
-    return items, hidden
+    visible = _as_items(display_files, display_tests)
+    extra_files = [p for p in strong if p not in display_files]
+    extra_tests = [n for n in tests if n not in display_tests]
+    extra = _as_items(extra_files + weak, extra_tests)
+    return visible, extra
+
+
+def _evidence_list_item(label: str, kind: str, full: str) -> str:
+    title = f' title="{esc(full)}"' if full != label else ""
+    if kind == "test":
+        return f'<li><code{title}>{esc(label)}</code> <span class="evidence-tag">test</span></li>'
+    return f"<li><code{title}>{esc(label)}</code></li>"
 
 
 def _render_trace_evidence_cell(
@@ -1190,11 +1202,11 @@ def _render_trace_evidence_cell(
     evidence_note: str = "",
     matched_tests: list[str] | None = None,
 ) -> str:
-    """Evidence column: compact file/test list + mapping confidence (display-only summary)."""
+    """Evidence column: compact list + expandable +N more (details/summary) + confidence."""
     conf = confidence or "low"
     note = (evidence_note or "").strip()
-    items, hidden = _summarize_trace_evidence(matched_files, matched_tests)
-    if not items:
+    items, extra = _summarize_trace_evidence(matched_files, matched_tests)
+    if not items and not extra:
         body = (
             f'<p class="evidence-note">{esc(note)}</p>'
             if note
@@ -1206,21 +1218,21 @@ def _render_trace_evidence_cell(
             f'<span class="conf-badge" title="Mapping confidence for cited evidence">'
             f"{esc(conf)}</span></td>"
         )
-    rows: list[str] = []
-    for label, kind, full in items:
-        title = f' title="{esc(full)}"' if full != label else ""
-        if kind == "test":
-            rows.append(
-                f'<li><code{title}>{esc(label)}</code> <span class="evidence-tag">test</span></li>'
-            )
-        else:
-            rows.append(f"<li><code{title}>{esc(label)}</code></li>")
-    extra = f'<li class="evidence-more">+{hidden} more</li>' if hidden > 0 else ""
+    rows = "".join(_evidence_list_item(label, kind, full) for label, kind, full in items)
+    expand_html = ""
+    if extra:
+        extra_rows = "".join(_evidence_list_item(label, kind, full) for label, kind, full in extra)
+        expand_html = (
+            f'<details class="evidence-expand">'
+            f'<summary class="evidence-more">+{len(extra)} more</summary>'
+            f'<ul class="evidence-list evidence-list-extra">{extra_rows}</ul>'
+            f"</details>"
+        )
     note_html = f'<p class="evidence-note">{esc(note)}</p>' if note and not any(i[1] == "test" for i in items) else ""
     return (
         f'<td class="evidence-cell">'
         f"{note_html}"
-        f'<ul class="evidence-list">{"".join(rows)}{extra}</ul>'
+        f'<ul class="evidence-list">{rows}</ul>{expand_html}'
         f'<span class="conf-badge">{esc(conf)}</span></td>'
     )
 
@@ -2505,7 +2517,7 @@ TOOLTIP_LAYOUT_FIX_BLOCK_RE = re.compile(
     re.MULTILINE,
 )
 
-TRACE_SECTION_CSS_MARKER = "/* trace section visibility v3 — compact evidence */"
+TRACE_SECTION_CSS_MARKER = "/* trace section visibility v4 — expandable evidence */"
 
 TRACE_SECTION_CSS = """
     """ + TRACE_SECTION_CSS_MARKER + """
@@ -2596,12 +2608,35 @@ TRACE_SECTION_CSS = """
       font-weight: 600;
       margin-left: 0.15rem;
     }
-    .section-trace .evidence-more {
+    .section-trace .evidence-expand {
+      margin: 0.2rem 0 0.35rem;
+    }
+    .section-trace .evidence-expand > summary.evidence-more {
       font-size: 0.75rem;
-      color: #64748b;
+      color: #6366f1;
+      cursor: pointer;
       list-style: none;
-      margin-left: -1rem;
-      padding-top: 0.15rem;
+      font-weight: 600;
+      padding: 0.15rem 0;
+      user-select: none;
+    }
+    .section-trace .evidence-expand > summary.evidence-more::-webkit-details-marker {
+      display: none;
+    }
+    .section-trace .evidence-expand > summary.evidence-more::before {
+      content: "▸ ";
+      display: inline-block;
+      transition: transform 0.15s ease;
+    }
+    .section-trace .evidence-expand[open] > summary.evidence-more::before {
+      transform: rotate(90deg);
+    }
+    .section-trace .evidence-list-extra {
+      margin-top: 0.25rem;
+      padding-left: 1.15rem;
+    }
+    .section-trace .evidence-list-extra code {
+      opacity: 0.92;
     }
 """
 
