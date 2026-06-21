@@ -11,5 +11,6 @@
   "validateTestPlan": true,
   "testPlanPath": "testplans/Domino Test Plan.xlsx",
   "testPlanSheet": "Inc as full",
-  "testPlanFilename": "Domino Test Plan.xlsx"
+  "testPlanFilename": "Domino Test Plan.xlsx",
+  "testRepoRoot": "C:/path/to/your-service-clone"
 }

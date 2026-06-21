@@ -412,6 +412,19 @@ def build_cache_meta_line(issue_key: str, root: Path | None = None) -> str:
                 parts.append(f"{label} cache {ts} UTC" if ts else label)
             except (json.JSONDecodeError, OSError):
                 parts.append(label)
+    exec_path = base / "reports" / ".cache" / f"{issue_key.upper()}-test-execution.json"
+    if exec_path.exists():
+        try:
+            ex = json.loads(exec_path.read_text(encoding="utf-8"))
+            st = ex.get("status")
+            if st == "ok":
+                parts.append(f"Pytest {int(ex.get('passed') or 0)} passed")
+            elif st == "fail":
+                parts.append(f"Pytest {int(ex.get('failed') or 0)} failed")
+            elif st == "skipped":
+                parts.append("Pytest skipped (no local repo)")
+        except (json.JSONDecodeError, OSError):
+            pass
     if not parts:
         return ""
     return " · ".join(parts)

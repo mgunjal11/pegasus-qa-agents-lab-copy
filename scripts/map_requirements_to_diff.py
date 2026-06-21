@@ -491,6 +491,100 @@ def _map_one_requirement(
     return mapped, code_weight, dev_weight
 
 
+SIT_PROOF_RE = re.compile(
+    r"\b(sit|staging|mascot|foundry\.wbdapps|test data|edit id|media request)\b",
+    re.I,
+)
+
+
+def adjust_nfr_validation_evidence(mapped: dict[str, Any], text: str) -> dict[str, Any]:
+    """
+    NFR validation AC (e.g. SIT sign-off) — PR unit tests are not proof.
+    Cap confidence at medium; never high without local pytest execution evidence.
+    """
+    if mapped.get("requirementType") != "non_functional":
+        return mapped
+    if mapped.get("nfrCategory") != "validation":
+        return mapped
+
+    mapped["matchedTests"] = []
+    mapped["matchedFiles"] = [
+        f
+        for f in mapped.get("matchedFiles") or []
+        if "/src/" in f.replace("\\", "/").lower()
+    ][:3]
+
+    mapped["devTestStatus"] = "missing"
+    mapped["devTestScore"] = 0.0
+    if str(mapped.get("codeStatus") or "") == "implemented":
+        mapped["codeStatus"] = "partial"
+
+    exec_proof = bool(mapped.get("pytestPassed"))
+    if exec_proof:
+        mapped["confidence"] = "medium"
+        mapped["evidenceNote"] = (
+            "Local pytest passed for linked PR tests — still requires QA SIT validation "
+            "with provided test data."
+        )
+    elif SIT_PROOF_RE.search(text or ""):
+        mapped["confidence"] = "medium"
+        mapped["evidenceNote"] = (
+            "SIT validation AC — PR diff overlap only; execute in staging with provided "
+            "test data (QA manual). PR unit tests are not proof."
+        )
+    else:
+        mapped["confidence"] = "low"
+        mapped["evidenceNote"] = "NFR validation — no SIT execution evidence in PR or local pytest."
+
+    return mapped
+
+
+def apply_pytest_execution_to_mapping(
+    mapping: dict[str, Any],
+    execution: dict[str, Any],
+) -> dict[str, Any]:
+    """When --execute-tests passed, annotate requirements whose matched tests ran green."""
+    if execution.get("status") != "ok" or not int(execution.get("passed") or 0):
+        return mapping
+    ran_files = {p.replace("\\", "/").lower() for p in execution.get("testFiles") or []}
+    ran_stems = {Path(p).stem.lower() for p in execution.get("testFiles") or []}
+    reqs = []
+    for req in mapping.get("requirements") or []:
+        r = dict(req)
+        names = [str(t).lower() for t in r.get("matchedTests") or []]
+        files = [str(f).replace("\\", "/").lower() for f in r.get("matchedFiles") or []]
+        file_hit = any(rf in f or f.endswith(rf) for f in files for rf in ran_files)
+        name_hit = bool(names) and any(
+            stem in n or n in stem for n in names for stem in ran_stems
+        )
+        if file_hit or name_hit:
+            r["pytestPassed"] = True
+        reqs.append(r)
+    out = dict(mapping)
+    out["requirements"] = reqs
+    out["pytestExecution"] = {
+        "passed": execution.get("passed"),
+        "failed": execution.get("failed"),
+        "status": execution.get("status"),
+    }
+    return out
+
+
+def finalize_mapping_evidence(
+    mapping: dict[str, Any],
+    execution: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Apply optional pytest proof, then NFR validation evidence caps on all requirements."""
+    out = dict(mapping)
+    if execution:
+        out = apply_pytest_execution_to_mapping(out, execution)
+    reqs = []
+    for req in out.get("requirements") or []:
+        reqs.append(adjust_nfr_validation_evidence(dict(req), str(req.get("text") or "")))
+    out["requirements"] = reqs
+    return out
+
+
 def map_requirements(
     issue_key: str,
     *,
@@ -650,7 +744,7 @@ def map_requirements(
     req_pct = round(100 * sum(jira_scores) / len(jira_scores), 1) if jira_scores else None
     dev_pct = round(100 * sum(dev_scores) / len(dev_scores), 1) if dev_scores else None
 
-    return {
+    payload = {
         "issueKey": key,
         "fetchedAt": datetime.now(timezone.utc).isoformat(),
         "requirementCount": len(mapped_reqs),
@@ -665,6 +759,9 @@ def map_requirements(
             "testFiles": len(test_files),
         },
     }
+    exec_path = base / "reports" / ".cache" / f"{key}-test-execution.json"
+    execution = _load_json(exec_path) if exec_path.exists() else None
+    return finalize_mapping_evidence(payload, execution)
 
 
 def main() -> int:

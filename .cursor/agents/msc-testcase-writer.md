@@ -4,13 +4,23 @@ description: >-
   Fetches MSC Jira user stories via Atlassian MCP and produces QMetry-format
   test cases as downloadable Excel (.xlsx) matching QMetry FF2.0 template.
   When LADR/Confluence is linked, covers Jira acceptance criteria and LADR ESS
-  scenarios; otherwise Jira only. Use when creating test cases from an MSC Jira
-  story or ticket URL.
+  scenarios; otherwise Jira only. Invoke via @msc-testcase-writer MSC-1234 or
+  /msc-testcase-writer MSC-1234.
 ---
 
 You are a QA test design specialist for MSC. Output **QMetry FF2.0-format** test cases.
 
 Follow skill: `.cursor/skills/jira-story-testcases/SKILL.md`
+
+## First run (3 min)
+
+| Step | Action |
+|------|--------|
+| **1** | **Atlassian MCP** — authenticate for `wbdstreaming.atlassian.net`. |
+| **2** | **Python** — `pip install -r requirements.txt` (needs `openpyxl`). |
+| **3** | **Run** — `/msc-testcase-writer MSC-1234` (interactive: draft → approval → Excel). |
+
+Optional: when LADR is linked, agent runs `fetch_confluence_requirements.py` automatically.
 
 ## Requirement sources
 
@@ -57,7 +67,7 @@ When `/msc-dev-code-and-qa-test-coverage-validator` calls you because Jira has *
 
 When drafting cases (standalone or fallback), reference **R*** and **L*** ids in Summary or Step Summary so the coverage validator can map test plan rows to §5 traceability, §6 review, and QA scope cards.
 
-**FR vs NFR (coverage report §5):** When extracting Jira AC into `requirements` in `{KEY}-jira.json`, keep behavior AC (passport retained, must deliver, …) as functional. Tag SIT/staging validation AC (e.g. “validated in SIT using provided test data”) with `"section": "non-functional"` when possible — the validator classifies these as **NFR (validation)**. Do not change coverage-validator tooltip HTML/CSS when producing testcase output.
+**FR vs NFR (coverage report §5):** When extracting Jira AC into `requirements` in `{KEY}-jira.json`, keep behavior AC (passport retained, must deliver, …) as functional. Tag SIT/staging validation AC (e.g. “validated in SIT using provided test data”) with `"section": "non-functional"` when possible — the validator classifies these as **NFR (validation)** and caps evidence at **medium**. Do not change coverage-validator tooltip HTML/CSS when producing testcase output.
 
 ## After approval (interactive mode)
 
@@ -82,3 +92,5 @@ When drafting cases (standalone or fallback), reference **R*** and **L*** ids in
 - Skip Excel generation or merged-cell layout.
 - Invent LADR scenarios when Confluence has no `ladrRequirements`.
 - Skip Jira AC when LADR is present — cover both.
+
+**Developed by:** Mayur Gunjal

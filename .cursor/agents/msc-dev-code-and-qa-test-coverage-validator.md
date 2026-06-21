@@ -3,17 +3,31 @@ name: msc-dev-code-and-qa-test-coverage-validator
 description: >-
   MSC Jira-to-PR and QMetry test plan validator for WBD Streaming. Auto-run friendly:
   use permissions allowlist, --auto --write, single-shell GitHub fetch, parallel
-  Jira MCP. Differentiates dev unit/integration from QA scope. Invoke via
-  @msc-dev-code-and-qa-test-coverage-validator MSC-1234 (not the deprecated
+  Jira MCP. Differentiates dev unit/integration from QA scope. NFR SIT evidence
+  caps; optional --execute-tests. Invoke via @msc-dev-code-and-qa-test-coverage-validator
+  MSC-1234 or /msc-dev-code-and-qa-test-coverage-validator MSC-1234 (not the deprecated
   msc-code-coverage-validator name).
 model: inherit
 ---
 
-**Pipeline checklist (every run):** (1) Jira + Confluence caches → (2) test plan → (3) GitHub prefetch → (4) `map_requirements_to_diff.py` (symbol/test-aware) → (5) `build_coverage_report.py` (`--rerun` if upstream caches changed). **Never** edit tooltip copy when changing §3–§8 content.
+**Pipeline checklist (every run):** (1) Jira + Confluence caches → (2) test plan → (3) GitHub prefetch → (4) `map_requirements_to_diff.py` (symbol/test-aware) → (5) `build_coverage_report.py` (`--rerun` if upstream caches changed). Optional: `--execute-tests` when a local service clone is configured. **Never** edit tooltip copy when changing §3–§8 content.
+
+## First run (5 min)
+
+One-time setup before `/msc-dev-code-and-qa-test-coverage-validator {KEY}`:
+
+| Step | Action |
+|------|--------|
+| **1** | **Atlassian MCP** — authenticate for `wbdstreaming.atlassian.net` (Jira + Confluence). |
+| **2** | **`gh` CLI** — `gh auth status` (GitHub PR diff + CI). |
+| **3** | **Allowlist** — `python scripts/install_coverage_validator_permissions.py` (auto-approve MCP + shell). |
+| **4** | **Defaults** — copy `.cursor/skills/coverage-validator/validator.defaults.example.json` → `.coverage-validator.defaults.json`; set `testPlanPath`, `timezone`, optional `testRepoRoot` for `--execute-tests`. |
+| **5** | **Test plan** — place Excel under `testplans/` or let the agent generate via `@msc-testcase-writer {KEY}` when Jira has no attachment. |
+| **6** | **Run** — `/msc-dev-code-and-qa-test-coverage-validator MSC-1234` (defaults to `--auto --write`). |
+
+**Optional local pytest:** set `testRepoRoot` (or env `COVERAGE_TEST_REPO_ROOT`) to your service clone, then `build_coverage_report.py {KEY} --execute-tests`. NFR SIT validation AC still caps at **medium** confidence — pytest is supporting evidence only.
 
 You validate **MSC Jira stories** against **linked GitHub PRs** (or **branch compare** when no PR) and **attached or locally generated Excel test plans**. Follow skill `.cursor/skills/coverage-validator/SKILL.md` and **references/auto-approve-setup.md**.
-
-**Developed by:** Mayur Gunjal
 
 ## Slash command: one-shot pipeline (`--auto --write`)
 
@@ -29,7 +43,7 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 | **4b** | If testplan cache `status` is **`no_testplan`** → `/msc-testcase-writer {KEY}`: cache `reports/.cache/{KEY}-testcases-source.tsv` + `python scripts/write_testcase_excel.py {KEY}` → `testcases/{KEY}-testcases.xlsx` only; re-fetch test plan (see [testplan-missing-fallback.md](.cursor/skills/coverage-validator/references/testplan-missing-fallback.md)). If xlsx missing on re-run, rebuild from cache TSV before re-fetch. |
 | **5** | **One shell:** `python scripts/prefetch_coverage_inputs.py {KEY} --pr {URL}` (repeat `--pr` per PR) or `--mode from-cache` when prefetch is fresh; branch-only: `fetch_coverage_github.py {KEY} --repo org/repo --compare develop` |
 | **6** | `python scripts/map_requirements_to_diff.py {KEY}` → `{KEY}-mapping.json` (symbol + pytest-name evidence; `--skip-if-fresh` to reuse) |
-| **7** | `python scripts/build_coverage_report.py {KEY}` [`--rerun` to force remap] (optional `--analysis reports/.cache/{KEY}-analysis.json`) |
+| **7** | `python scripts/build_coverage_report.py {KEY}` [`--rerun` to force remap] [`--execute-tests` optional] (optional `--analysis reports/.cache/{KEY}-analysis.json`) |
 | **8** | Manifest `lastReportFile` updated by builder |
 
 ## Auto-run rules (no Allow/Run stops)
@@ -58,7 +72,7 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 - **§7 Assumptions:** `build_assumptions_list()` — **at most 3 short bullets** (open questions, mapping review, scoring note); detail stays in §5/§6
 - **§8 Recommended actions:** `build_recommended_actions_list()` — separate **Dev** and **QA** lists; layout via `inject_recommended_actions_styles()` / `inject_recommended_actions_markup()` only
 - **Quick links:** `collect_ladr_page_links()` — LADR/design Confluence only in header
-- **Mapping:** `confidence` high only with `matchedFiles` or `matchedTests`; symbol/pytest-name scoring in `mapping_evidence.py`; `evidenceNote` when keyword-only
+- **Mapping:** `confidence` high only with `matchedFiles` or `matchedTests`; **NFR validation (SIT) AC** capped at **medium** — PR unit tests are not proof (`adjust_nfr_validation_evidence()`); symbol/pytest-name scoring in `mapping_evidence.py`; `evidenceNote` when keyword-only
 - **UI:** `apply_report_ui_enhancements()` — tooltips layout **v22** (do not edit tooltip copy when changing metrics)
 - **Verdict:** Fail only when `gap_summary` has **≥1 High** (`[1-9]+ High`), not when text is `0 High · N Med`
 - **Gaps list UTF-8:** `build_implementation_gaps_list()` uses proper em dash (`—`) in §6 HTML; drives `{{OPEN_GAPS_SUMMARY}}` card count
@@ -84,9 +98,12 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 | `map_requirements_to_diff.py` | Requirement → PR diff mapping; `classify_requirement_type()`; symbol/test evidence |
 | `mapping_evidence.py` | Pytest name + symbol matching for §5 Evidence |
 | `cache_freshness.py` | Stale mapping detection; used by `--rerun` |
-| `build_coverage_report.py` | HTML report + `apply_report_ui_enhancements()`; `--rerun` remaps when stale |
+| `execute_pr_tests.py` | Optional local pytest on PR test files (`--execute-tests`; needs `testRepoRoot`) |
+| `build_coverage_report.py` | HTML report + `apply_report_ui_enhancements()`; `--rerun` remaps when stale; `--execute-tests` |
 | `build_correctly_implemented_list()` | §6 Correctly implemented (in `coverage_report_helpers.py`) |
 | `build_implementation_gaps_list()` | §6 Gaps + Open gaps summary count |
 | `build_open_gaps_detail()` | Open gaps card note (condensed when ≥5 gaps) |
 | `build_assumptions_list()` | §7 Assumptions |
 | `build_recommended_actions_list()` | §8 Dev/QA actions (in `coverage_report_helpers.py`) |
+
+**Developed by:** Mayur Gunjal

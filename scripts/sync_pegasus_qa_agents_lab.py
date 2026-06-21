@@ -51,6 +51,7 @@ SCRIPTS = [
     "test_qa_scope_handoff.py",
     "test_implementation_review.py",
     "test_requirement_type.py",
+    "test_nfr_validation_evidence.py",
     "mapping_evidence.py",
     "cache_freshness.py",
     "test_mapping_evidence.py",
@@ -61,6 +62,7 @@ SCRIPTS = [
     "patch_report_template.py",
     "map_requirements_to_diff.py",
     "build_coverage_report.py",
+    "execute_pr_tests.py",
     "test_confluence_remote_links.py",
     "test_map_requirements_to_diff.py",
     "test_ci_template_fields.py",
@@ -96,6 +98,7 @@ PERMISSIONS = {
         "python scripts/fetch_confluence_requirements.py",
         "python scripts/map_requirements_to_diff.py",
         "python scripts/build_coverage_report.py",
+        "python scripts/execute_pr_tests.py",
         "python scripts/generate_qmetry_excel.py",
         "python scripts/write_testcase_excel.py",
         "python scripts/install_coverage_validator_permissions.py",
@@ -215,7 +218,7 @@ Three Cursor agents for MSC QA on [wbdstreaming.atlassian.net](https://wbdstream
 | Agent | Invoke | Output |
 |-------|--------|--------|
 | **msc-testcase-writer** | `@msc-testcase-writer MSC-1234` | `testcases/{KEY}-testcases.xlsx` (QMetry FF2.0) |
-| **msc-dev-code-and-qa-test-coverage-validator** | `@msc-dev-code-and-qa-test-coverage-validator MSC-1234` | HTML report; §5 FR/NFR badges; §7 brief; QA/Open gaps cards; §6/§8 auto content; §4 dev-covered omits None badge; tooltips v22 |
+| **msc-dev-code-and-qa-test-coverage-validator** | `@msc-dev-code-and-qa-test-coverage-validator MSC-1234` | HTML report; §5 FR/NFR; NFR SIT capped at medium; optional `--execute-tests`; §7 brief; QA/Open gaps cards; tooltips v22 |
 | **msc-jira-bug** | `@msc-jira-bug` + defect description | MSC Bug in Jira (after explicit approval) |
 
 ## Skills (workflow docs — not duplicate slash commands)

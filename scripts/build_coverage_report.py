@@ -82,12 +82,20 @@ def build_report(
     analysis: dict[str, Any] | None = None,
     dev_tests_by_number: dict[int | str, str] | None = None,
     rerun_mapping: bool = False,
+    execute_tests: bool = False,
 ) -> tuple[str, Path, str, str]:
     base = root or ROOT
     key = issue_key.upper()
     from cache_freshness import ensure_fresh_mapping, is_mapping_stale, load_manifest_max_age
 
     max_age = load_manifest_max_age(key, base)
+    if execute_tests:
+        subprocess.run(
+            [sys.executable, str(SCRIPTS / "execute_pr_tests.py"), key],
+            cwd=base,
+            check=False,
+        )
+        rerun_mapping = True
     if rerun_mapping:
         ensure_fresh_mapping(key, base, force=True, max_age_hours=max_age)
     else:
@@ -268,6 +276,11 @@ def main() -> int:
         action="store_true",
         help="Force remap requirements before building (also remaps when upstream caches are newer)",
     )
+    parser.add_argument(
+        "--execute-tests",
+        action="store_true",
+        help="Run local pytest on PR test files (requires testRepoRoot), then remap and build",
+    )
     args = parser.parse_args()
 
     analysis = None
@@ -278,6 +291,7 @@ def main() -> int:
         args.issue_key.upper(),
         analysis=analysis,
         rerun_mapping=args.rerun,
+        execute_tests=args.execute_tests,
     )
     out_path.write_text(html, encoding="utf-8")
 

@@ -36,6 +36,8 @@ Pattern references: `plan-aware-review`, `pr-review`, and `plan-feature` from [m
 
 ## Preconditions
 
+See agent **First run (5 min)** for one-page setup (MCP, `gh`, allowlist, defaults, `testplans/`).
+
 - **Atlassian MCP** authenticated for `wbdstreaming.atlassian.net`.
 - **`gh` CLI** installed and authenticated (`gh auth status`).
 - Read MCP tool schemas before calling `getJiraIssue`, `getJiraIssueRemoteIssueLinks`, `getConfluencePage`, or `searchJiraIssuesUsingJql`.
@@ -92,8 +94,8 @@ When invoked via slash command with issue key in `$ARGUMENTS`, run **end-to-end*
 | 4 | `fetch_jira_testplan.py {KEY} --from-jira-cache` |
 | 4b | If `status` is **`no_testplan`** → `/msc-testcase-writer {KEY}` (see [testplan-missing-fallback.md](references/testplan-missing-fallback.md)); re-run `fetch_jira_testplan.py` |
 | 5 | **One shell:** `prefetch_coverage_inputs.py {KEY} --pr URL …` (multiple `--pr`) or `--from-cache`; branch-only: `fetch_coverage_github.py {KEY} --repo org/repo --compare develop` |
-| 6 | `map_requirements_to_diff.py {KEY}` (`--skip-if-fresh`; symbol/test evidence via `mapping_evidence.py`) |
-| 7 | `build_coverage_report.py {KEY}` [`--rerun` force/stale remap] [`--analysis` optional] |
+| 6 | `map_requirements_to_diff.py {KEY}` (`--skip-if-fresh`; symbol/test evidence via `mapping_evidence.py`; NFR SIT validation capped in `finalize_mapping_evidence()`) |
+| 7 | `build_coverage_report.py {KEY}` [`--rerun` force/stale remap] [`--execute-tests` optional local pytest] [`--analysis` optional] |
 | 8 | Manifest `lastReportFile` (builder writes timestamped HTML) |
 
 Never issue multiple separate `gh` invocations; use prefetch cache or one prefetch script call.
@@ -271,7 +273,9 @@ After prefetch and test plan caches exist:
 python scripts/map_requirements_to_diff.py {ISSUE-KEY}
 ```
 
-Writes `reports/.cache/{ISSUE-KEY}-mapping.json` with per-requirement `codeStatus`, `devTestStatus`, `matchedFiles`, **`matchedTests`** (pytest names from diff), `confidence` (**high** only when `matchedFiles` or `matchedTests` non-empty; else medium/low with **`evidenceNote`**), **`requirementType`** / **`nfrCategory`** from `classify_requirement_type()` (FR = product behavior; NFR = perf/security/logging or SIT validation AC), **suggestedTestCases** for partial keyword overlap, and per-PR **`devTests`** (comma-separated pytest module names from `diffNames`, e.g. `test_passport_manager.py`).
+Writes `reports/.cache/{ISSUE-KEY}-mapping.json` with per-requirement `codeStatus`, `devTestStatus`, `matchedFiles`, **`matchedTests`** (pytest names from diff), `confidence` (**high** only when `matchedFiles` or `matchedTests` non-empty for **functional** requirements; **NFR validation / SIT AC** capped at **medium** even with PR tests — see `adjust_nfr_validation_evidence()`), **`requirementType`** / **`nfrCategory`** from `classify_requirement_type()` (FR = product behavior; NFR = perf/security/logging or SIT validation AC), **suggestedTestCases** for partial keyword overlap, and per-PR **`devTests`** (comma-separated pytest module names from `diffNames`, e.g. `test_passport_manager.py`).
+
+**Optional local pytest:** `python scripts/execute_pr_tests.py {ISSUE-KEY}` or `build_coverage_report.py {ISSUE-KEY} --execute-tests` — requires `testRepoRoot` in `.coverage-validator.defaults.json` or `COVERAGE_TEST_REPO_ROOT`. Writes `{KEY}-test-execution.json`; mapping picks up `pytestPassed` on matching requirements (NFR SIT still medium max).
 
 **Cache freshness:** `cache_freshness.is_mapping_stale()` compares mapping `fetchedAt` to prefetch/jira/testplan/confluence. `build_coverage_report.py --rerun` forces remap; default build remaps when upstream caches are newer. `map_requirements_to_diff.py --skip-if-fresh` skips when mapping is current.
 

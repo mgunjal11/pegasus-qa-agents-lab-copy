@@ -5,17 +5,18 @@ description: >-
   cases (11 QMetry columns, Given/When/Then, downloadable Excel with merged
   cells). When LADR/Confluence is linked, drafts cover Jira acceptance criteria
   and LADR ESS scenarios together; otherwise Jira only. Shows a full draft for
-  review before writing files. Use when the user asks to create test cases from a
-  Jira story, user story, ticket, or acceptance criteria on wbdstreaming.atlassian.net.
+  review before writing files. Invoke via @msc-testcase-writer KEY or
+  /msc-testcase-writer KEY on wbdstreaming.atlassian.net.
 ---
 
-# Jira story â†’ QMetry test cases
+# Jira story → QMetry test cases
 
 ## Preconditions
 
 - Atlassian MCP is enabled and authenticated (`wbdstreaming.atlassian.net`).
 - Prefer MCP over guessing: resolve **cloudId** and fetch the full issue before writing test cases.
 - Read tool schemas in the MCP folder before calling `getJiraIssue`, `searchJiraIssuesUsingJql`, or `getAccessibleAtlassianResources`.
+- Python: `pip install -r requirements.txt` (needs `openpyxl` for Excel output).
 
 ## Defaults (confirm or override with the user)
 
@@ -24,7 +25,7 @@ description: >-
 | Site | `wbdstreaming.atlassian.net` |
 | Output format | QMetry Excel (.xlsx) only in `testcases/` (matches FF2.0 template) |
 | Summary format | `{ISSUE-KEY}_{descriptive scenario and verification}` |
-| Step format | `Given:` / `When:` / `Then:` in **Step Summary** â€” 3 rows per test case |
+| Step format | `Given:` / `When:` / `Then:` in **Step Summary** — 3 rows per test case |
 | Automatable | Yes |
 | Automation Status | Not Started |
 | Priority | P0 (happy path), P1 (negative/edge) |
@@ -34,7 +35,7 @@ description: >-
 
 **Do not assume** without asking: QMetry **Folders** path or priority overrides.
 
-Reference template: `QMetry FF2.0.xlsx` â€” sheet **QMetry Template**, 11 columns, merged metadata cells per 3-row block (including **Status**; only Step Summary unmerged).
+Reference template: `QMetry FF2.0.xlsx` — sheet **QMetry Template**, 11 columns, merged metadata cells per 3-row block (including **Status**; only Step Summary unmerged).
 
 ## Workflow
 
@@ -42,8 +43,8 @@ Reference template: `QMetry FF2.0.xlsx` â€” sheet **QMetry Template**, 11 c
 Task Progress:
 - [ ] Step 1: Resolve Jira issue key or URL
 - [ ] Step 2: Fetch story via Atlassian MCP (+ remote wiki links)
-- [ ] Step 2b: Fetch Confluence / LADR when linked (else skip â€” Jira only)
-- [ ] Step 3: Extract requirements (Jira R1â€¦Rn; + L1â€¦Ln when LADR present)
+- [ ] Step 2b: Fetch Confluence / LADR when linked (else skip — Jira only)
+- [ ] Step 3: Extract requirements (Jira R1…Rn; + L1…Ln when LADR present)
 - [ ] Step 4: Identify test scenarios (Jira AC + LADR milestones when applicable)
 - [ ] Step 5: Draft test cases in QMetry format
 - [ ] Step 6: Show draft to user and wait for approval
@@ -59,12 +60,12 @@ Accept: issue key (`MSC-1234`), browse URL, or ARI from search. If ambiguous, as
 1. Resolve `cloudId`: pass `wbdstreaming.atlassian.net` first; if that fails, call `getAccessibleAtlassianResources`.
 2. **Parallel MCP:** `getJiraIssue` (`responseContentFormat: "markdown"`) + `getJiraIssueRemoteIssueLinks`.
 3. Request fields: `summary`, `description`, `issuetype`, `status`, `priority`, `components`, `labels`, `parent`, `subtasks`, `issuelinks`, `comment`, `attachment`.
-4. Persist `reports/.cache/{KEY}-jira.json` with `requirements` (R1â€¦Rn), `remoteLinks` / `confluenceLinks` (`pageId` when wiki URLs present).
-5. If the story is thin, fetch linked issues via `issuelinks` / JQL â€” do not invent requirements.
+4. Persist `reports/.cache/{KEY}-jira.json` with `requirements` (R1…Rn), `remoteLinks` / `confluenceLinks` (`pageId` when wiki URLs present).
+5. If the story is thin, fetch linked issues via `issuelinks` / JQL — do not invent requirements.
 
 ### Step 2b: Fetch Confluence / LADR (when linked)
 
-**Skip** when no wiki/LADR signals â€” proceed **Jira only**.
+**Skip** when no wiki/LADR signals — proceed **Jira only**.
 
 When description, comments, or remote links reference Confluence / LADR / ESS:
 
@@ -86,15 +87,15 @@ Details: [references/ladr-confluence-requirements.md](references/ladr-confluence
 
 ### Step 3: Extract requirements
 
-**Always â€” Jira:** user story, acceptance criteria as **R1â€¦Rn**, scope, dependencies, environments.
+**Always — Jira:** user story, acceptance criteria as **R1…Rn**, scope, dependencies, environments.
 
-**When LADR attached (`jira_and_ladr` mode):** also list **L1â€¦Ln** from `ladrRequirements` (ESS task+status or passport scenario text). Do not drop Jira AC â€” cover **both**.
+**When LADR attached (`jira_and_ladr` mode):** also list **L1…Ln** from `ladrRequirements` (ESS task+status or passport scenario text). Do not drop Jira AC — cover **both**.
 
 **When no LADR:** extract Jira only; do not invent L-items.
 
 List **assumptions** and **open questions** separately when AC or LADR is incomplete.
 
-**FR vs NFR (for coverage validator §5):** Behavior AC (passport retained, must deliver, …) is functional. SIT/staging validation-only AC may set `"section": "non-functional"` on that item in `{KEY}-jira.json` — report shows **NFR (validation)**.
+**FR vs NFR (for coverage validator §5):** Behavior AC (passport retained, must deliver, …) is functional. SIT/staging validation-only AC may set `"section": "non-functional"` on that item in `{KEY}-jira.json` — the coverage report shows **NFR (validation)** and caps mapping confidence at **medium** (PR unit tests are not SIT proof).
 
 ### Step 4: Identify scenarios
 
@@ -102,11 +103,9 @@ List **assumptions** and **open questions** separately when AC or LADR is incomp
 
 **Jira + LADR:** same categories for each **R*** item **plus** at least one scenario per **L*** milestone (ESS task+status in Then; passport labels in steps when applicable).
 
-For each acceptance criterion / LADR item, derive at minimum:
-
 | Category | When to include |
 |----------|-----------------|
-| Happy path | Always â€” primary success flow |
+| Happy path | Always — primary success flow |
 | Negative | Invalid input, missing data, unauthorized action |
 | Edge / boundary | Limits, empty states, duplicates, timing |
 | Role / permission | Multiple actors or access levels mentioned |
@@ -120,7 +119,7 @@ One AC may map to multiple test cases; combine trivial checks only when clarity 
 Follow [testcase-template.md](testcase-template.md) exactly (11 columns).
 
 - **Summary**: `{ISSUE-KEY}_{descriptive title}` on row 1 only.
-- **3 rows per case**: row 1 = metadata + `Given:` in Step Summary; rows 2â€“3 = `When:` / `Then:` in Step Summary only.
+- **3 rows per case**: row 1 = metadata + `Given:` in Step Summary; rows 2–3 = `When:` / `Then:` in Step Summary only.
 - **Story**: issue key on row 1.
 - **Status**: leave blank for new test cases (merged across 3 rows in Excel).
 - Include **R*** / **L*** reference in Summary or Step Summary where helpful (required for coverage-validator §5 trace, §6 review, and QA scope mapping).
@@ -133,7 +132,7 @@ Follow [testcase-template.md](testcase-template.md) exactly (11 columns).
 Show the user a complete draft before writing any file. The draft must include:
 
 - **Story summary**: key, title, link, issue type, status
-- **Requirements extracted**: Jira R1â€¦Rn; when LADR linked, also L1â€¦Ln with task/status
+- **Requirements extracted**: Jira R1…Rn; when LADR linked, also L1…Ln with task/status
 - **Source mode**: `jira_only` or `jira_and_ladr`
 - **Assumptions / gaps**: anything not specified in Jira or LADR
 - **Full QMetry table**: all rows in markdown (Summary through TestData Dependent)
@@ -143,7 +142,7 @@ Show the user a complete draft before writing any file. The draft must include:
 
 ### Step 7: Write output (after approval)
 
-**Only** `testcases/<ISSUE-KEY>-testcases.xlsx` â€” do **not** write `.tsv` or `.md` under `testcases/`.
+**Only** `testcases/<ISSUE-KEY>-testcases.xlsx` — do **not** write `.tsv` or `.md` under `testcases/`.
 
 1. Ensure `openpyxl` is available: `pip install -r requirements.txt` (once per environment).
 2. Write QMetry rows to cache (intermediate, not a user deliverable):
@@ -160,7 +159,7 @@ python scripts/write_testcase_excel.py <ISSUE-KEY>
 
 | File | Purpose |
 |------|---------|
-| `testcases/<ISSUE-KEY>-testcases.xlsx` | **Deliverable** â€” QMetry import |
+| `testcases/<ISSUE-KEY>-testcases.xlsx` | **Deliverable** — QMetry import |
 | `reports/.cache/<ISSUE-KEY>-testcases-source.tsv` | Internal source for Excel build (optional to keep) |
 
 Optional (only if asked): add a Jira comment with test case summary via `addCommentToJiraIssue`.
@@ -170,7 +169,7 @@ Optional (only if asked): add a Jira comment with test case summary via `addComm
 - **Given/When/Then** steps are specific and pass/fail decidable.
 - **Then** states observable outcomes, not subjective judgments.
 - No duplicate cases that differ only in wording.
-- Do not fabricate endpoints, UI labels, or business rules â€” note TBD in Summary or Step Summary.
+- Do not fabricate endpoints, UI labels, or business rules — note TBD in Summary or Step Summary.
 - Redact secrets; use placeholders in **Given** steps.
 
 ## Additional resources
