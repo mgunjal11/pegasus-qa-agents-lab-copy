@@ -77,7 +77,3 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 | `prepare_testcase_writer_context.py` | `jira_and_ladr` vs `jira_only` for testcase writer |
 | `build_coverage_report.py` | HTML report + `apply_report_ui_enhancements()` |
 | `build_recommended_actions_list()` | §8 Dev/QA actions (in `coverage_report_helpers.py`) |
-
-## Jira template
-
-`docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Jira-Template.docx` — regenerate with `python scripts/generate_jira_template_for_coverage_validator.py`.

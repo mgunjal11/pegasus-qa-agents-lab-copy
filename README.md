@@ -16,8 +16,6 @@ A centralized lab for **AI-driven QA agents** on the WBD Media Supply Chain (MSC
 
 **One registration per agent** — workflow skills live under `.cursor/skills/coverage-validator/` and `bug-filing/` (not duplicate slash entries).
 
-**Coverage validator guide deck:** `python scripts/generate_coverage_validator_ppt.py` → `docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx`
-
 ---
 
 ## Quick start (new teammate)
@@ -38,7 +36,6 @@ Open **this repo** as the workspace root.
 python -m venv .venv
 .venv\Scripts\activate          # Windows
 pip install -r requirements.txt
-pip install python-pptx         # optional — coverage validator PPT only
 ```
 
 ### 3. Atlassian MCP (all three agents)
@@ -100,8 +97,6 @@ Place Excel under `testplans/` when Jira comments reference SharePoint — see [
 |--------|------|
 | HTML report | `reports/{ISSUE-KEY}-{MM-DD-YYYY-HH-MM-SS}-{TZ}.html` |
 | Cache (reuse runs) | `reports/.cache/{ISSUE-KEY}-*.json` |
-| Guide PPT | `docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx` |
-| Directory guide (Word) | `docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Directory-Guide.docx` |
 
 ### Report highlights (HTML)
 
@@ -123,7 +118,7 @@ Full workflow: [.cursor/skills/coverage-validator/SKILL.md](.cursor/skills/cover
 
 Skill: [.cursor/skills/jira-story-testcases/SKILL.md](.cursor/skills/jira-story-testcases/SKILL.md)
 
-When coverage validator finds **no Jira test plan** (`no_testplan`), Step **4b** auto-invokes testcase writer per [`references/testplan-missing-fallback.md`](.cursor/skills/coverage-validator/references/testplan-missing-fallback.md) — `write_testcase_excel.py` → `testcases/{KEY}-testcases.xlsx`, then re-fetch test plan (`workspace_generated` in §3).
+When coverage validator finds **no Jira test plan**, it auto-invokes testcase writer (`write_testcase_excel.py`) in `--auto --write` mode.
 
 ---
 
@@ -167,12 +162,10 @@ scripts/
   write_testcase_excel.py     # Cache TSV → QMetry FF2.0 xlsx
   fetch_jira_testplan.py
   build_coverage_report.py
-  generate_coverage_validator_ppt.py
-  generate_coverage_validator_directory_guide.py
 testcases/             # Generated xlsx (gitignored contents)
 testplans/             # Local Excel when Jira references SharePoint
 reports/               # HTML reports + .cache/
-docs/                  # Generated PPT and Word guides
+docs/                  # Optional notes (primary deliverables are HTML + xlsx)
 ```
 
 ---
@@ -187,8 +180,6 @@ docs/                  # Generated PPT and Word guides
 | `prefetch_coverage_inputs.py` | Batch `gh` PR view/diff/checks → cache (`--mode from-cache` to reuse) |
 | `build_coverage_report.py` | HTML report + §8 Dev/QA actions |
 | `install_coverage_validator_permissions.py` | Merge allowlist into `~/.cursor/permissions.json` |
-| `generate_coverage_validator_ppt.py` | Management guide deck |
-| `generate_coverage_validator_directory_guide.py` | Word directory guide |
 
 ---
 
@@ -209,9 +200,6 @@ docs/                  # Generated PPT and Word guides
 ```bash
 python scripts/sync_pegasus_qa_agents_lab.py --publish
 cd pegasus-qa-agents-lab
-python scripts/generate_coverage_validator_directory_guide.py
-# Keep polished slides 1–10 from reports/…-Guide.pptx; refresh tail from latest HTML:
-python scripts/generate_coverage_validator_ppt.py --report-html reports/MSC-205625-<latest>.html
 git add -A && git commit -m "Sync agents, skills, docs" && git push origin main
 ```
 

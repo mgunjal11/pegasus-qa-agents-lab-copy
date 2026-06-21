@@ -39,8 +39,6 @@ SCRIPTS = [
     "jira_env.py",
     "prefetch_coverage_inputs.py",
     "install_coverage_validator_permissions.py",
-    "generate_coverage_validator_ppt.py",
-    "generate_coverage_validator_directory_guide.py",
     "verify_jira_credentials.py",
     "testplan_evidence.py",
     "testplan_gwt.py",
@@ -57,7 +55,6 @@ SCRIPTS = [
     "patch_report_template.py",
     "map_requirements_to_diff.py",
     "build_coverage_report.py",
-    "generate_jira_template_for_coverage_validator.py",
     "test_confluence_remote_links.py",
     "test_map_requirements_to_diff.py",
     "test_ci_template_fields.py",
@@ -69,7 +66,6 @@ SCRIPTS = [
     "regen_msc204417_report.py",
     "regen_msc205625_report.py",
     "build_msc195138_report.py",
-    "ppt_report_from_html.py",
     "sync_pegasus_qa_agents_lab.py",
 ]
 
@@ -110,6 +106,10 @@ def remove_stale(lab: Path) -> None:
         lab / ".cursor/agents/msc-code-coverage-validator.md",
         lab / ".cursor/commands/msc-code-coverage-validator.md",
         lab / "docs/MSC-Code-Coverage-Validator-Guide.pptx",
+        lab / "docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx",
+        lab / "docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Directory-Guide.docx",
+        lab / "reports/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx",
+        lab / "MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx",
     ]
     for path in stale_paths:
         if path.is_dir():
@@ -164,13 +164,6 @@ def main() -> None:
     write_gitignore(LAB)
     write_agents_md(LAB)
     copy_lab_readme_templates(LAB)
-    docs = LAB / "docs"
-    docs.mkdir(exist_ok=True)
-    ppt = ROOT / "docs" / "MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx"
-    if not ppt.exists():
-        ppt = ROOT / "reports" / "MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx"
-    if ppt.exists():
-        shutil.copy2(ppt, docs / ppt.name)
     # Lab nested inside TestCursor: drop .cursor so Cursor does not double-register agents/skills.
     if not keep_cursor and LAB.resolve().parent == ROOT.resolve():
         lab_cursor = LAB / ".cursor"
