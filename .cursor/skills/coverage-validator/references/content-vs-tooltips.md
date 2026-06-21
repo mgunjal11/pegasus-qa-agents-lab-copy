@@ -14,7 +14,7 @@ When enhancing the coverage validator or testcase writer, **change report data a
 | §7 Assumptions | `build_assumptions_list()` — **max 3 bullets** (open questions, mapping review, scoring) |
 | §8 Recommended actions | `build_recommended_actions_list()` — **Dev** and **QA** sub-lists |
 | Summary QA scope cards | `_format_qa_scope_summary()`, `_format_qa_scope_detail()` |
-| §5 trace rows | `render_requirement_rows_from_mapping()` + `mapping_evidence.py` + `classify_requirement_type()` + `adjust_nfr_validation_evidence()` |
+| §5 trace rows | `render_requirement_rows_from_mapping()` + `_summarize_trace_evidence()` display (compact Evidence; mapping cache unchanged) + `mapping_evidence.py` + `classify_requirement_type()` + `adjust_nfr_validation_evidence()` |
 | Verdict, coverage % | `build_coverage_report.py`, mapping cache |
 | Cache meta (header) | `build_cache_meta_line()` — includes optional pytest execution summary |
 | Testcase writer output | `write_testcase_excel.py`, cache TSV only |
@@ -29,7 +29,8 @@ When enhancing the coverage validator or testcase writer, **change report data a
 
 ## Allowed layout CSS (no tooltip text changes)
 
-- `TOOLTIP_LAYOUT_FIX_CSS` in `apply_report_ui_enhancements()` — positioning/stacking only (e.g. §6 **Correctly implemented** h3 opens below icon so popup is not clipped under section banner)
+- `TOOLTIP_LAYOUT_FIX_CSS` in `apply_report_ui_enhancements()` — positioning/stacking only (e.g. §6 **Correctly implemented** h3 opens below icon)
+- `TRACE_SECTION_CSS` — §5 table/evidence **display** styling (compact list, `.evidence-more`); not tooltip strings
 - `inject_recommended_actions_styles()` — §8 Dev/QA group headings
 - `inject_recommended_actions_markup()` — unwrap legacy `<ol>` around action groups
 - `.badge-fr` / `.badge-nfr` in trace section CSS — §5 requirement type badges (not tooltip strings)

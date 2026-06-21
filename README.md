@@ -195,7 +195,7 @@ When Jira **references** SharePoint/Domino Excel but does not attach the file, c
 - **Summary** — QA scope remaining, Open gaps (condensed when ≥5 gaps)
 - **§3** — Honest `testPlanSummaryNote`; **No execution evidence** for `workspace_generated` plans
 - **§4** — Dev vs QA handoff; dev-covered list omits misleading **None** badge
-- **§5** — FR / NFR / Process badges; symbol/pytest evidence; **NFR SIT validation capped at medium**
+- **§5** — FR / NFR / Process badges; **compact Evidence** (2 paths + 1 test + `+N more`; full path on hover); NFR SIT capped at medium
 - **§6** — Correctly implemented + Gaps (SIT, CI, test plan)
 - **§7** — Assumptions (max 3 bullets)
 - **§8** — Dev and QA recommended actions
@@ -278,7 +278,8 @@ docs/
 | `fetch_jira_testplan.py` | Download/parse test plan; honest summary note |
 | `prefetch_coverage_inputs.py` | Batch `gh` PR view/diff/checks → cache |
 | `map_requirements_to_diff.py` | Requirement → PR diff; FR/NFR; NFR SIT evidence caps |
-| `mapping_evidence.py` | Symbol + pytest-name scoring for §5 Evidence |
+| `mapping_evidence.py` | Symbol + pytest-name scoring; `rank_matched_files()` |
+| `test_trace_evidence.py` | Unit tests for compact §5 Evidence display |
 | `cache_freshness.py` | Stale mapping detection; auto-remap on build |
 | `execute_pr_tests.py` | Optional local pytest on PR test files |
 | `build_coverage_report.py` | HTML report; `--rerun`; `--execute-tests` |
@@ -298,7 +299,8 @@ docs/
 | Open gaps note condensed | When ≥5 gaps, card summarizes — see **§6** for full list |
 | CI coverage **NA** | Link PR; re-run prefetch |
 | `--execute-tests` skipped | Set `testRepoRoot` or `COVERAGE_TEST_REPO_ROOT` to local clone |
-| §6 Correctly implemented tooltip hidden under banner | Regenerate report — `TOOLTIP_LAYOUT_FIX_CSS` opens review-panel h3 tooltips below the icon |
+| §6 Correctly implemented tooltip hidden under banner | Regenerate report — review-panel h3 tooltips open below icon (`TOOLTIP_LAYOUT_FIX_CSS`) |
+| §5 Evidence lists too many files | Regenerate report — `_summarize_trace_evidence()` shows 2 paths + 1 test + `+N more` |
 | Garbled em dash in §6 | Regenerate report (UTF-8 HTML) |
 
 ---

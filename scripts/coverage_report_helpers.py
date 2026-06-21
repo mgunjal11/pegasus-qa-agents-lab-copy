@@ -1119,18 +1119,82 @@ def build_recommended_actions_list(
     )
 
 
+def _compact_evidence_path(path: str) -> str:
+    """Short §5 Evidence label; full path goes in the HTML title attribute."""
+    norm = str(path).replace("\\", "/")
+    parts = [p for p in norm.split("/") if p]
+    if len(parts) <= 2:
+        return norm
+    return "/".join(parts[-2:])
+
+
+def _summarize_trace_evidence(
+    matched_files: list[str],
+    matched_tests: list[str] | None = None,
+    *,
+    max_files: int = 2,
+    max_tests: int = 1,
+) -> tuple[list[tuple[str, str, str]], int]:
+    """
+    Compact Evidence list for §5 — prefer src + one test module; drop fixtures/samples/json.
+    Returns ([(display_label, kind, full_value), ...], hidden_count).
+    """
+    from mapping_evidence import _is_weak_evidence_path, rank_matched_files
+
+    files = [f for f in (matched_files or []) if f and not str(f).startswith("symbol:")]
+    tests = [t for t in (matched_tests or []) if t]
+    ranked = rank_matched_files(files, limit=24)
+    strong = [f for f in ranked if not _is_weak_evidence_path(f)]
+
+    display_files: list[str] = []
+    seen_src = False
+    for path in strong:
+        if len(display_files) >= max_files:
+            break
+        low = path.lower()
+        is_src = "/src/" in low or low.startswith("src/")
+        if is_src:
+            if seen_src:
+                continue
+            seen_src = True
+        if path not in display_files:
+            display_files.append(path)
+
+    file_stems = {Path(f).stem.lower() for f in display_files}
+    display_tests: list[str] = []
+    for name in tests:
+        if len(display_tests) >= max_tests:
+            break
+        low = name.lower()
+        if low in file_stems:
+            continue
+        if any(low.startswith(stem.replace("test_", "")) or stem in low for stem in file_stems):
+            continue
+        display_tests.append(name)
+
+    hidden = max(0, len(strong) - len(display_files)) + max(0, len(tests) - len(display_tests))
+    hidden += sum(1 for f in ranked if _is_weak_evidence_path(f))
+
+    items: list[tuple[str, str, str]] = []
+    for path in display_files:
+        items.append((_compact_evidence_path(path), "file", path))
+    for name in display_tests:
+        label = name if len(name) <= 44 else f"{name[:41]}…"
+        items.append((label, "test", name))
+    return items, hidden
+
+
 def _render_trace_evidence_cell(
     matched_files: list[str],
     confidence: str,
     evidence_note: str = "",
     matched_tests: list[str] | None = None,
 ) -> str:
-    """Evidence column: file list + optional matched test names + mapping confidence."""
+    """Evidence column: compact file/test list + mapping confidence (display-only summary)."""
     conf = confidence or "low"
-    files = [f for f in (matched_files or []) if f and not str(f).startswith("symbol:")]
-    tests = [t for t in (matched_tests or []) if t]
-    if not files and not tests:
-        note = (evidence_note or "").strip()
+    note = (evidence_note or "").strip()
+    items, hidden = _summarize_trace_evidence(matched_files, matched_tests)
+    if not items:
         body = (
             f'<p class="evidence-note">{esc(note)}</p>'
             if note
@@ -1142,20 +1206,21 @@ def _render_trace_evidence_cell(
             f'<span class="conf-badge" title="Mapping confidence for cited evidence">'
             f"{esc(conf)}</span></td>"
         )
-    items = "".join(f"<li><code>{esc(f)}</code></li>" for f in files[:6])
-    if tests:
-        items += "".join(
-            f'<li><code>{esc(t)}()</code> <span class="evidence-tag">test</span></li>' for t in tests[:4]
-        )
-    extra = ""
-    if len(files) > 6:
-        extra = f'<li class="evidence-more">+{len(files) - 6} more file(s)</li>'
-    note = (evidence_note or "").strip()
-    note_html = f'<p class="evidence-note">{esc(note)}</p>' if note and not tests else ""
+    rows: list[str] = []
+    for label, kind, full in items:
+        title = f' title="{esc(full)}"' if full != label else ""
+        if kind == "test":
+            rows.append(
+                f'<li><code{title}>{esc(label)}</code> <span class="evidence-tag">test</span></li>'
+            )
+        else:
+            rows.append(f"<li><code{title}>{esc(label)}</code></li>")
+    extra = f'<li class="evidence-more">+{hidden} more</li>' if hidden > 0 else ""
+    note_html = f'<p class="evidence-note">{esc(note)}</p>' if note and not any(i[1] == "test" for i in items) else ""
     return (
         f'<td class="evidence-cell">'
         f"{note_html}"
-        f'<ul class="evidence-list">{items}{extra}</ul>'
+        f'<ul class="evidence-list">{"".join(rows)}{extra}</ul>'
         f'<span class="conf-badge">{esc(conf)}</span></td>'
     )
 
@@ -2440,7 +2505,7 @@ TOOLTIP_LAYOUT_FIX_BLOCK_RE = re.compile(
     re.MULTILINE,
 )
 
-TRACE_SECTION_CSS_MARKER = "/* trace section visibility v2 */"
+TRACE_SECTION_CSS_MARKER = "/* trace section visibility v3 — compact evidence */"
 
 TRACE_SECTION_CSS = """
     """ + TRACE_SECTION_CSS_MARKER + """
@@ -2530,6 +2595,13 @@ TRACE_SECTION_CSS = """
       color: #6366f1;
       font-weight: 600;
       margin-left: 0.15rem;
+    }
+    .section-trace .evidence-more {
+      font-size: 0.75rem;
+      color: #64748b;
+      list-style: none;
+      margin-left: -1rem;
+      padding-top: 0.15rem;
     }
 """
 

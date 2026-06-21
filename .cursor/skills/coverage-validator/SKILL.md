@@ -544,7 +544,7 @@ html = filled_template  # all {{PLACEHOLDER}} tokens replaced
 html = apply_report_ui_enhancements(html)
 ```
 
-| `{{REQUIREMENT_ROWS}}` | HTML `<tr>` rows — **FR** / **NFR** / **Process** badge on ID (+ LADR badge on `L*`); Code, Dev tests (Covered/Partial/Missing), Owner, QA scope (incl. **None** in §5), Evidence |
+| `{{REQUIREMENT_ROWS}}` | HTML `<tr>` rows — **FR** / **NFR** / **Process** badge on ID (+ LADR badge on `L*`); Code, Dev tests (Covered/Partial/Missing), Owner, QA scope (incl. **None** in §5), Evidence (compact via `_summarize_trace_evidence()`: 2 paths + 1 test + `+N more`) |
 | `{{CORRECTLY_IMPLEMENTED_LIST}}` | §6 — `build_correctly_implemented_list()`: Jira/LADR rows with `codeStatus: implemented`, dev test status, primary `<code>` file |
 | `{{GAPS_LIST}}` | §6 — `build_implementation_gaps_list()`: `<li class="high|medium">` test-plan gaps, missing/partial code & dev tests, SIT validation, CI failures; drives `{{OPEN_GAPS_SUMMARY}}` |
 | `{{ASSUMPTIONS_LIST}}` | §7 — `build_assumptions_list()`: **max 3 bullets** — open questions (see §6), low/medium mapping ids (see §5), scoring disclaimer |
