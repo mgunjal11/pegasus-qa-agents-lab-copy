@@ -56,7 +56,7 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 | GitHub | **One shell:** prefetch with all `--pr` URLs, or read fresh cache — **never** N separate `gh` calls |
 | Mapping | **One shell:** `map_requirements_to_diff.py {KEY}` |
 | Report | **One shell:** `build_coverage_report.py {KEY}` — builder calls `apply_report_ui_enhancements()` |
-| Never | Hand-set `lineCoverage` instead of `{{CI_LINE_COVERAGE}}`; edit `SUMMARY_METRIC_INFO` or tooltip CSS when changing §3–§8 **content** |
+| Never | Hand-set `lineCoverage` instead of `{{CI_LINE_COVERAGE}}`; edit `SUMMARY_METRIC_INFO` tooltip **strings** when changing §3–§8 **content** (layout/position CSS in `TOOLTIP_LAYOUT_FIX_CSS` only when user reports clip/stack bugs) |
 
 ## Report builder (required)
 
@@ -73,7 +73,7 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 - **§8 Recommended actions:** `build_recommended_actions_list()` — separate **Dev** and **QA** lists; layout via `inject_recommended_actions_styles()` / `inject_recommended_actions_markup()` only
 - **Quick links:** `collect_ladr_page_links()` — LADR/design Confluence only in header
 - **Mapping:** `confidence` high only with `matchedFiles` or `matchedTests`; **NFR validation (SIT) AC** capped at **medium** — PR unit tests are not proof (`adjust_nfr_validation_evidence()`); symbol/pytest-name scoring in `mapping_evidence.py`; `evidenceNote` when keyword-only
-- **UI:** `apply_report_ui_enhancements()` — tooltips layout **v22** (do not edit tooltip copy when changing metrics)
+- **UI:** `apply_report_ui_enhancements()` — tooltips layout **v22** (tooltip **copy** unchanged; §6 review-panel h3 positioning CSS in `TOOLTIP_LAYOUT_FIX_CSS` only when fixing clip/stack issues)
 - **Verdict:** Fail only when `gap_summary` has **≥1 High** (`[1-9]+ High`), not when text is `0 High · N Med`
 - **Gaps list UTF-8:** `build_implementation_gaps_list()` uses proper em dash (`—`) in §6 HTML; drives `{{OPEN_GAPS_SUMMARY}}` card count
 

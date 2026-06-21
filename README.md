@@ -298,6 +298,7 @@ docs/
 | Open gaps note condensed | When ≥5 gaps, card summarizes — see **§6** for full list |
 | CI coverage **NA** | Link PR; re-run prefetch |
 | `--execute-tests` skipped | Set `testRepoRoot` or `COVERAGE_TEST_REPO_ROOT` to local clone |
+| §6 Correctly implemented tooltip hidden under banner | Regenerate report — `TOOLTIP_LAYOUT_FIX_CSS` opens review-panel h3 tooltips below the icon |
 | Garbled em dash in §6 | Regenerate report (UTF-8 HTML) |
 
 ---

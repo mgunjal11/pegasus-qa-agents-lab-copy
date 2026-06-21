@@ -2291,7 +2291,7 @@ TOOLTIP_LAYOUT_FIX_CSS = """
     .summary-groups > div:first-child .summary-group-title:has(.metric-info-tip:focus-within) {
       z-index: 200 !important;
     }
-    /* Review panel h3 titles (same row layout as metric labels) */
+    /* Review panel h3 titles — open below icon (upward was clipped under §6 section-head banner) */
     .review-panel h3 .heading-label-row {
       position: relative !important;
       overflow: visible !important;
@@ -2300,12 +2300,27 @@ TOOLTIP_LAYOUT_FIX_CSS = """
       position: static !important;
     }
     .review-panel h3 .heading-label-row .metric-info-tip > .metric-info-tooltip {
-      top: auto !important;
-      bottom: calc(100% + 10px) !important;
+      top: calc(100% + 10px) !important;
+      bottom: auto !important;
       left: 0 !important;
       right: auto !important;
       transform: none !important;
       z-index: 700 !important;
+    }
+    .section-review .review-panel:has(h3 .metric-info-tip:hover),
+    .section-review .review-panel:has(h3 .metric-info-tip:focus-within) {
+      z-index: 920 !important;
+      position: relative;
+    }
+    .section-review .section-body:has(.review-panel h3 .metric-info-tip:hover),
+    .section-review .section-body:has(.review-panel h3 .metric-info-tip:focus-within) {
+      z-index: 910 !important;
+      position: relative;
+      overflow: visible !important;
+    }
+    .review-panel h3 .heading-label-row .metric-info-tip:hover,
+    .review-panel h3 .heading-label-row .metric-info-tip:focus-within {
+      z-index: 930 !important;
     }
     /* Release readiness: wider tooltip + stack above §1 body */
     .release-score-row,

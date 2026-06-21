@@ -235,6 +235,16 @@ def test_trace_section_lead_tooltip():
     assert 'aria-label="About Requirements traceability intro"' in out
 
 
+def test_review_panel_h3_tooltip_opens_below_section_banner():
+    """§6 Correctly implemented tooltip must not clip under green section-head banner."""
+    out = apply_report_ui_enhancements(MINIMAL_REPORT)
+    block = out.split(".review-panel h3 .heading-label-row .metric-info-tip > .metric-info-tooltip")[1][:400]
+    assert "top: calc(100% + 10px)" in block
+    assert "bottom: auto" in block
+    assert "section-review .section-body:has(.review-panel h3 .metric-info-tip:hover)" in out
+    assert 'aria-label="About ✓ Correctly implemented"' in out or "Correctly implemented" in out
+
+
 def test_strip_then_reapply_tooltips():
     with_tips = apply_report_ui_enhancements(MINIMAL_REPORT)
     stripped = strip_report_tooltips(with_tips)

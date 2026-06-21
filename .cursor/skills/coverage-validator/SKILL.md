@@ -518,7 +518,7 @@ Never put PR title or dev tests in the CI status column.
 
 **Report UI enhancements (mandatory before write)**
 
-After replacing all placeholders, pass the HTML through **`coverage_report_helpers.apply_report_ui_enhancements(html)`** — idempotent; strips legacy tooltips then injects fresh markup (layout **v22** (summary group titles open below; metric-grid row-anchored tooltips)).
+After replacing all placeholders, pass the HTML through **`coverage_report_helpers.apply_report_ui_enhancements(html)`** — idempotent; strips legacy tooltips then injects fresh markup (layout **v22** — summary group titles open below; metric-grid row-anchored tooltips; §6 review-panel h3 tooltips open below icon to avoid banner clip).
 
 The helper adds (idempotent — safe on template or post-builder HTML):
 
@@ -535,7 +535,7 @@ Always call the helper once before write. Do not hand-roll tooltip HTML in repor
 
 **Regression tests:** `python -m pytest scripts/test_report_ui_enhancements.py scripts/test_summary_metric_info.py scripts/test_quick_links.py scripts/test_qa_scope_handoff.py scripts/test_implementation_review.py scripts/test_requirement_type.py scripts/test_confluence_requirements.py scripts/test_fetch_jira_testplan_summary.py scripts/test_testplan_evidence.py -q`
 
-**Content vs tooltips:** When updating §3/§8 or testcase-writer integration, edit data builders only — see [references/content-vs-tooltips.md](references/content-vs-tooltips.md). Do not change `SUMMARY_METRIC_INFO` or tooltip injection unless the user requests a UI/tooltip change.
+**Content vs tooltips:** When updating §3–§8 or testcase-writer integration, edit data builders only — see [references/content-vs-tooltips.md](references/content-vs-tooltips.md). Do not change `SUMMARY_METRIC_INFO` tooltip **strings** unless the user requests copy changes; positioning/stacking CSS in `TOOLTIP_LAYOUT_FIX_CSS` is allowed for clip bugs (e.g. §6 Correctly implemented).
 
 ```python
 from coverage_report_helpers import apply_report_ui_enhancements, render_pr_rows_from_prefetch

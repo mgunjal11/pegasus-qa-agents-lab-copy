@@ -29,6 +29,7 @@ When enhancing the coverage validator or testcase writer, **change report data a
 
 ## Allowed layout CSS (no tooltip text changes)
 
+- `TOOLTIP_LAYOUT_FIX_CSS` in `apply_report_ui_enhancements()` — positioning/stacking only (e.g. §6 **Correctly implemented** h3 opens below icon so popup is not clipped under section banner)
 - `inject_recommended_actions_styles()` — §8 Dev/QA group headings
 - `inject_recommended_actions_markup()` — unwrap legacy `<ol>` around action groups
 - `.badge-fr` / `.badge-nfr` in trace section CSS — §5 requirement type badges (not tooltip strings)
