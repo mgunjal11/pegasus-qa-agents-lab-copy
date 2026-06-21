@@ -101,7 +101,7 @@ Place Excel under `testplans/` when Jira comments reference SharePoint — see [
 ### Report highlights (HTML)
 
 - **Summary — QA scope remaining** — count with scope breakdown (e.g. `4 E2E · 1 Manual`); note lists Jira/LADR ids and linked test plan case ids (`{{QA_SCOPE_DETAIL}}`)
-- **Summary — Open gaps** — severity count unchanged; note names gaps (test plan, missing code/dev tests, CI failing) via `build_open_gaps_detail()` — not tooltip copy
+- **Summary — Open gaps** — severity count from `build_implementation_gaps_list()`; note via `build_open_gaps_detail()` — named gaps when **&lt; 5** total; theme summary + **see §6 for full list** when **≥ 5** (not tooltip copy)
 - **§3** — Honest `testPlanSummaryNote`; Evidence **No execution evidence** for locally generated QMetry plans (`workspace_generated`)
 - **§4** — **Covered by dev tests** omits **None** badge (internal `qaScope: none` unchanged); QA handoff skips dev-covered requirements and limits execute-test-plan bullets to QA-scoped TCs
 - **§5** — Jira `R*` + LADR `L*` trace rows; **Dev tests** = Covered / Partial / Missing only; **QA scope** column still shows **None** when dev-covered
@@ -196,6 +196,7 @@ docs/                  # Optional notes (primary deliverables are HTML + xlsx)
 | Test plan 0% but xlsx existed | Re-run `write_testcase_excel.py {KEY}` then `fetch_jira_testplan.py` |
 | `â€"` garbled text in §6 Gaps | Regenerate report — `build_implementation_gaps_list()` uses UTF-8 em dash |
 | Test plan **Pending** / `referenced_not_local` | Add Excel under `testplans/` |
+| Open gaps note lists partial gap themes only | When **≥ 5** gaps, card note is condensed — open **§6 Implementation review** for the full gap list |
 | CI coverage **NA** | Link PR; re-run prefetch; Sonar PR comment fallback when logs expired |
 
 ---

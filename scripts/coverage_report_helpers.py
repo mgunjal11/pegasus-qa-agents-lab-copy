@@ -536,13 +536,80 @@ def _format_qa_scope_detail(
     return " · ".join(parts)
 
 
-def build_open_gaps_detail(
+def _parse_open_gaps_summary_counts(gap_summary: str | None) -> tuple[int, int]:
+    """Parse ``2 High · 10 Med`` from Open gaps card summary."""
+    if not gap_summary or gap_summary.strip().lower() == "none":
+        return 0, 0
+    high_m = re.search(r"(\d+)\s+High", gap_summary)
+    med_m = re.search(r"(\d+)\s+Med", gap_summary)
+    return (
+        int(high_m.group(1)) if high_m else 0,
+        int(med_m.group(1)) if med_m else 0,
+    )
+
+
+def _open_gap_card_themes(
     mapping: dict[str, Any],
     tp: dict[str, Any],
     *,
     prefetch: dict[str, Any] | None = None,
-) -> str:
-    """One-line note under Open gaps card — names IDs/themes, not tooltip text."""
+) -> list[str]:
+    """High-level gap themes for condensed Open gaps card note."""
+    themes: list[str] = []
+    cov = tp.get("coverage") or {}
+    if cov.get("uncoveredJiraRequirements") or cov.get("uncoveredLadrRequirements"):
+        themes.append("Test plan gaps")
+
+    for req in mapping.get("requirements") or []:
+        code = str(req.get("codeStatus") or "").lower()
+        dev = str(req.get("devTestStatus") or "").lower()
+        owner = str(req.get("owner") or "").lower()
+        text = str(req.get("text") or "")
+
+        if code == "missing":
+            if "Missing PR code" not in themes:
+                themes.append("Missing PR code")
+        elif code == "partial":
+            if "Partial PR code" not in themes:
+                themes.append("Partial PR code")
+
+        if _is_qa_sit_validation_requirement(text):
+            if "SIT validation" not in themes:
+                themes.append("SIT validation")
+        elif dev == "missing" and owner != "qa":
+            if "Missing dev tests" not in themes:
+                themes.append("Missing dev tests")
+        elif dev == "partial" and owner in ("dev", "shared"):
+            if "Partial dev tests" not in themes:
+                themes.append("Partial dev tests")
+
+    if prefetch:
+        for pr in prefetch.get("prs") or []:
+            checks = str(pr.get("checks") or "")
+            if checks and re.search(r"\b(?:fail(?:ed|ing|ure)?|failing)\b", checks.lower()):
+                if "CI failures" not in themes:
+                    themes.append("CI failures")
+                break
+
+    order = [
+        "Test plan gaps",
+        "Missing PR code",
+        "Partial PR code",
+        "Missing dev tests",
+        "Partial dev tests",
+        "SIT validation",
+        "CI failures",
+    ]
+    return [label for label in order if label in themes]
+
+
+def _open_gap_detail_line_items(
+    mapping: dict[str, Any],
+    tp: dict[str, Any],
+    *,
+    prefetch: dict[str, Any] | None = None,
+) -> list[str]:
+    """Named gap bullets for Open gaps card when the gap count is small."""
     cov = tp.get("coverage") or {}
     parts: list[str] = []
 
@@ -570,6 +637,30 @@ def build_open_gaps_detail(
                 parts.append(f"CI failing — {org}/{repo}#{num}")
                 break
 
+    return parts
+
+
+OPEN_GAPS_DETAIL_SECTION6_THRESHOLD = 5
+
+
+def build_open_gaps_detail(
+    mapping: dict[str, Any],
+    tp: dict[str, Any],
+    *,
+    prefetch: dict[str, Any] | None = None,
+    gap_summary: str | None = None,
+) -> str:
+    """One-line note under Open gaps card — names IDs/themes, not tooltip text."""
+    high_n, med_n = _parse_open_gaps_summary_counts(gap_summary)
+    total = high_n + med_n
+
+    if total >= OPEN_GAPS_DETAIL_SECTION6_THRESHOLD:
+        themes = _open_gap_card_themes(mapping, tp, prefetch=prefetch)
+        if themes:
+            return f"{', '.join(themes)} — see §6 for full list"
+        return "Multiple open gaps — see §6 for full list"
+
+    parts = _open_gap_detail_line_items(mapping, tp, prefetch=prefetch)
     if not parts:
         return "No open gaps detected"
     return " · ".join(parts[:5])

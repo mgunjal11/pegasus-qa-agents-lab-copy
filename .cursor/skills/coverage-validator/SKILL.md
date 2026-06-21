@@ -353,7 +353,7 @@ Count of Jira acceptance criteria extracted and scored: `{{REQ_MAPPED_SUMMARY}}`
 
 **Open gaps**
 
-From Implementation review gap list: `{{OPEN_GAPS_SUMMARY}}` e.g. `2 High · 2 Med`. `{{OPEN_GAPS_DETAIL}}` one-line card note from `build_open_gaps_detail()` — names uncovered Jira/LADR test-plan ids, missing PR code/dev tests, and CI failures when present (not tooltip copy). Class `{{OPEN_GAPS_CLASS}}`: `metric-fail` if any High/Critical, `metric-warn` if Medium only, `metric-good` if none.
+From Implementation review gap list: `{{OPEN_GAPS_SUMMARY}}` e.g. `2 High · 2 Med`. `{{OPEN_GAPS_DETAIL}}` one-line card note from `build_open_gaps_detail(gap_summary=…)` — when total gaps **&lt; 5** (High+Med), names uncovered Jira/LADR ids, missing PR code/dev tests, and CI failures; when **≥ 5**, shows gap **themes** plus **see §6 for full list** (full bullets in §6 `{{GAPS_LIST}}`). Not tooltip copy. Class `{{OPEN_GAPS_CLASS}}`: `metric-fail` if any High/Critical, `metric-warn` if Medium only, `metric-good` if none.
 
 **Test requirement coverage %** *(internal only — not shown in summary)*
 
@@ -473,7 +473,7 @@ Read [report-template.html](report-template.html) and produce a **complete, self
 | `{{REQ_COVERAGE_CLASS}}`, `{{DEV_COVERAGE_CLASS}}` | `metric-good` (≥85%), `metric-warn` (70–84.9%), `metric-fail` (<70%), `metric-na` |
 | `{{REQ_COVERAGE_DETAIL}}`, `{{DEV_COVERAGE_DETAIL}}` | e.g. `3.5/5 scored`, `4/5 dev-owned — 2 unit, 2 integration` |
 | `{{REQ_MAPPED_SUMMARY}}`, `{{REQ_MAPPED_DETAIL}}`, `{{REQ_MAPPED_CLASS}}` | e.g. `3/3 acceptance criteria`, `R1–R3`, `metric-good` |
-| `{{OPEN_GAPS_SUMMARY}}`, `{{OPEN_GAPS_DETAIL}}`, `{{OPEN_GAPS_CLASS}}` | e.g. `2 High · 2 Med`, named gap themes (test plan / code / CI), `metric-warn` |
+| `{{OPEN_GAPS_SUMMARY}}`, `{{OPEN_GAPS_DETAIL}}`, `{{OPEN_GAPS_CLASS}}` | e.g. `0 High · 10 Med`; note = themes + **see §6 for full list** when ≥5 gaps, else named IDs; `metric-warn` |
 | `{{QA_SCOPE_SUMMARY}}` | e.g. `5 item(s) (4 E2E · 1 Manual)` — use `metric-neutral` card (no purple) |
 | `{{QA_SCOPE_DETAIL}}` | Card note under QA scope remaining — Jira/LADR ids + test plan case ids |
 | `{{QA_HANDOFF_LIST}}` | `<li>` items — QA scenarios not covered by dev tests |

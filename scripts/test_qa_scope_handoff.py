@@ -194,12 +194,61 @@ def test_open_gaps_detail_names_requirements_and_ci():
             }
         ]
     }
-    detail = build_open_gaps_detail(mapping, tp, prefetch=prefetch)
+    detail = build_open_gaps_detail(
+        mapping, tp, prefetch=prefetch, gap_summary="0 High · 3 Med"
+    )
     assert "Test plan gap — Jira R4" in detail
     assert "Test plan gap — LADR L5" in detail
     assert "No PR code — R3" in detail
     assert "No dev tests — R4" in detail
     assert "CI failing" in detail
+    assert "§6" not in detail
+
+
+def test_open_gaps_detail_high_count_points_to_section_6():
+    mapping = {
+        "requirements": [
+            {
+                "id": "R3",
+                "text": "Pick-genie logic",
+                "codeStatus": "implemented",
+                "devTestStatus": "partial",
+                "owner": "shared",
+            },
+            {
+                "id": "R4",
+                "text": "Fix must be validated in SIT using provided test data",
+                "codeStatus": "partial",
+                "devTestStatus": "partial",
+                "owner": "qa",
+            },
+        ]
+    }
+    tp = {
+        "coverage": {
+            "uncoveredJiraRequirements": ["R4"],
+            "uncoveredLadrRequirements": ["L5"],
+        }
+    }
+    prefetch = {
+        "prs": [
+            {
+                "org": "wbd-msc",
+                "repo": "demo",
+                "number": 1,
+                "checks": "build failed",
+            }
+        ]
+    }
+    detail = build_open_gaps_detail(
+        mapping, tp, prefetch=prefetch, gap_summary="0 High · 10 Med"
+    )
+    assert "see §6 for full list" in detail
+    assert "Test plan gaps" in detail
+    assert "Partial dev tests" in detail
+    assert "SIT validation" in detail
+    assert "CI failures" in detail
+    assert "Test plan gap — Jira R4" not in detail
 
 
 def test_build_qa_ownership_fields_includes_scope_detail(tmp_path: Path):

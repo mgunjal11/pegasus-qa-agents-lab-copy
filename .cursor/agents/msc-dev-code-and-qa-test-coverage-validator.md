@@ -50,7 +50,7 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 - **No PR:** `build_branch_compare_pr_note()` + `render_branch_compare_pr_rows()` when `branchCompare` in prefetch
 - **§3 test plan:** `build_testplan_report_fields()` — `testPlanSummaryNote` via `build_testplan_summary_note()` (honest source; no Domino boilerplate on `workspace_generated` plans); Evidence via `render_testplan_evidence()` — **`testPlanSource: workspace_generated`** → **No execution evidence**; LADR trace, gaps, split metrics
 - **§4 Dev vs QA:** `build_qa_ownership_fields()` — if dev test status is **Covered**, `qaScope` is **none** internally; **Covered by dev tests** bullets omit the **None** badge (show `proven by PR unit/integration tests` only); **QA handoff** still shows E2E/Manual badges; do **not** ask QA to execute test plan cases mapped only to dev-covered `R*`/`L*`
-- **Summary QA cards:** `{{QA_SCOPE_SUMMARY}}` scope breakdown (e.g. `5 item(s) (4 E2E · 1 Manual)`); `{{QA_SCOPE_DETAIL}}` names Jira/LADR ids + test plan case ids; `{{OPEN_GAPS_DETAIL}}` names test-plan gaps, missing code/dev tests, CI failures — **card notes only** (not tooltip copy)
+- **Summary QA cards:** `{{QA_SCOPE_SUMMARY}}` scope breakdown (e.g. `5 item(s) (4 E2E · 1 Manual)`); `{{QA_SCOPE_DETAIL}}` names Jira/LADR ids + test plan case ids; `{{OPEN_GAPS_DETAIL}}` from `build_open_gaps_detail(gap_summary=…)` — named gaps when **&lt; 5** total (High+Med); theme summary + **see §6 for full list** when **≥ 5** — **card notes only** (not tooltip copy)
 - **§5 traceability:** Jira `R*` + LADR `L*` rows (LADR badge); **Dev tests** column = Covered / Partial / Missing only (no Unit/Integration tier badges); **QA scope** column still shows **None** when dev-covered
 - **§6 Implementation review:** `build_correctly_implemented_list()` — Jira + LADR with PR file evidence; `build_implementation_gaps_list()` — feeds `{{GAPS_LIST}}` and **Open gaps** summary count; partial code/dev tests, SIT validation, CI failures
 - **§7 Assumptions:** `build_assumptions_list()` — mapping confidence, test-plan source notes, token-overlap disclaimer
@@ -82,5 +82,6 @@ When the user runs `/msc-dev-code-and-qa-test-coverage-validator {KEY}` (or `$AR
 | `build_coverage_report.py` | HTML report + `apply_report_ui_enhancements()` |
 | `build_correctly_implemented_list()` | §6 Correctly implemented (in `coverage_report_helpers.py`) |
 | `build_implementation_gaps_list()` | §6 Gaps + Open gaps summary count |
+| `build_open_gaps_detail()` | Open gaps card note (condensed when ≥5 gaps) |
 | `build_assumptions_list()` | §7 Assumptions |
 | `build_recommended_actions_list()` | §8 Dev/QA actions (in `coverage_report_helpers.py`) |

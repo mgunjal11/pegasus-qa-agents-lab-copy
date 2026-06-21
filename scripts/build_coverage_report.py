@@ -110,7 +110,9 @@ def build_report(
     gaps_html, gap_summary, gap_class = build_implementation_gaps_list(
         mapping, tp, prefetch=prefetch
     )
-    gaps_detail = build_open_gaps_detail(mapping, tp, prefetch=prefetch)
+    gaps_detail = build_open_gaps_detail(
+        mapping, tp, prefetch=prefetch, gap_summary=gap_summary
+    )
     implemented_html = build_correctly_implemented_list(mapping)
     assumptions_html = build_assumptions_list(mapping, tp)
     if analysis and analysis.get("gapsList"):

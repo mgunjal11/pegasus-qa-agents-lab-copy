@@ -10,7 +10,7 @@ When enhancing the coverage validator or testcase writer, **change report data a
 | §3 Evidence column | `render_testplan_evidence()`, `testplan_evidence.py` (`testPlanSource: workspace_generated`) |
 | §4 Dev vs QA handoff | `build_qa_ownership_fields()` |
 | §6 Implementation review | `build_correctly_implemented_list()`, `build_implementation_gaps_list()` |
-| §6 Open gaps summary card | `build_implementation_gaps_list()` (count) + `build_open_gaps_detail()` (one-line note) |
+| §6 Open gaps summary card | `build_implementation_gaps_list()` (count) + `build_open_gaps_detail(gap_summary=…)` — condensed note with **see §6 for full list** when ≥5 gaps |
 | §7 Assumptions | `build_assumptions_list()` |
 | §8 Recommended actions | `build_recommended_actions_list()` — **Dev** and **QA** sub-lists |
 | Summary QA scope cards | `_format_qa_scope_summary()`, `_format_qa_scope_detail()` |
