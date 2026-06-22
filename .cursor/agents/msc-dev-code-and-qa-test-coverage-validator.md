@@ -8,59 +8,31 @@ description: >-
 model: inherit
 ---
 
-**Pipeline:** preflight (once) → Jira/Confluence → test plan → GitHub prefetch (`--skip-if-fresh`) → map → build report. Full workflow: `.cursor/skills/coverage-validator/SKILL.md`. **Never** edit tooltip copy when changing report content.
+Follow **`.cursor/skills/coverage-validator/SKILL.md`** for the full workflow (Steps 0–9), report placeholders, and references. **Never** edit tooltip copy when changing report content — [content-vs-tooltips.md](.cursor/skills/coverage-validator/references/content-vs-tooltips.md).
 
-## First run (5 min)
-
-| Step | Action |
-|------|--------|
-| **0** | **Preflight** — `python scripts/preflight_coverage_validator.py MSC-1234 --verify-jira` (fixes missing `gh`, `.env`, allowlist before first report) |
-| **1** | **Atlassian MCP** — Cursor Settings → MCP → `user-atlassian` → sign in for `wbdstreaming.atlassian.net` |
-| **2** | **GitHub CLI** — install [cli.github.com](https://cli.github.com) → `gh auth login` |
-| **3** | **Jira REST `.env`** — when test plan is a **Jira attachment**: copy `.env.example` → `.env`; set `ATLASSIAN_EMAIL`, `ATLASSIAN_API_TOKEN`, token expiry (365 days). See README Configuration |
-| **4** | **Allowlist** — `python scripts/install_coverage_validator_permissions.py` |
-| **5** | **Defaults** (optional) — copy `validator.defaults.example.json` → `.coverage-validator.defaults.json`; set `testPlanPath`, `timezone`, `verdictMode`, optional `testRepoRoot` |
-| **6** | **Run** — `/msc-dev-code-and-qa-test-coverage-validator MSC-1234` |
-
-Optional: `testRepoRoot` + `build_coverage_report.py {KEY} --execute-tests`. NFR SIT AC stays capped at **medium**.
-
-## Slash command pipeline (`--auto --write`)
+## First run (once)
 
 | Step | Action |
 |------|--------|
-| **0** | Merge flags → manifest → `.coverage-validator.defaults.json` |
-| **1** | Resolve `{KEY}` |
-| **2** | **Parallel MCP:** `getJiraIssue` + `getJiraIssueRemoteIssueLinks` (+ Confluence when linked) → `{KEY}-jira.json` |
-| **3** | `fetch_confluence_requirements.py {KEY} --from-jira-cache` |
-| **4** | `fetch_jira_testplan.py {KEY} --from-jira-cache` |
-| **4b** | `no_testplan` → `@msc-testcase-writer {KEY}` + `write_testcase_excel.py` + re-fetch ([testplan-missing-fallback.md](.cursor/skills/coverage-validator/references/testplan-missing-fallback.md)) |
-| **5** | `prefetch_coverage_inputs.py {KEY} --pr URL … --skip-if-fresh` (one shell; all PRs) |
-| **6** | `map_requirements_to_diff.py {KEY}` |
-| **7** | `build_coverage_report.py {KEY}` [`--rerun`] [`--execute-tests`] — uses `verdictMode` from manifest/defaults |
-| **8** | Manifest `lastReportFile` updated |
+| **0** | `python scripts/preflight_coverage_validator.py MSC-1234 --verify-jira` |
+| **1** | Atlassian MCP → `user-atlassian` → `wbdstreaming.atlassian.net` |
+| **2** | [cli.github.com](https://cli.github.com) → `gh auth login` |
+| **3** | Jira attachment download: `.env.example` → `.env` (`ATLASSIAN_EMAIL`, `ATLASSIAN_API_TOKEN`, 365-day expiry) — README Configuration |
+| **4** | `python scripts/install_coverage_validator_permissions.py` |
+| **5** | Optional: `validator.defaults.example.json` → `.coverage-validator.defaults.json` |
+| **6** | `/msc-dev-code-and-qa-test-coverage-validator MSC-1234` |
 
-## Auto-run rules
+## Slash invoke (`--auto --write`)
 
-| Rule | Do this |
-|------|---------|
-| Preflight | Run step 0 on first setup or after auth errors |
+Execute SKILL **Steps 0–9** end-to-end without mid-run confirmation. Highlights: parallel Jira MCP → Confluence + test plan shells → `prefetch_coverage_inputs.py --skip-if-fresh` → `map_requirements_to_diff.py` → `build_coverage_report.py` (`verdictMode` from defaults/manifest). If `no_testplan` → `@msc-testcase-writer {KEY}` per [testplan-missing-fallback.md](.cursor/skills/coverage-validator/references/testplan-missing-fallback.md).
+
+## Auto-run (mandatory)
+
+| Rule | Do |
+|------|-----|
 | Jira | One MCP turn, parallel fetches |
-| GitHub | One prefetch shell; `--skip-if-fresh` when cache matches PR URLs |
-| Mapping / report | One shell each; `apply_report_ui_enhancements()` in builder |
-| Never | Edit `SUMMARY_METRIC_INFO` tooltip strings for content changes ([content-vs-tooltips.md](.cursor/skills/coverage-validator/references/content-vs-tooltips.md)) |
-
-## Report content (builders only — tooltips unchanged)
-
-§3 honest test plan note · §4 Dev vs QA · §5 FR/NFR + expandable Evidence · §6 review · §7 assumptions (max 3) · §8 Dev/QA actions · NFR SIT capped at medium · `verdictMode`: **pragmatic** (default) or **strict** (Pass only at 100% + zero Med gaps)
-
-## Key scripts
-
-| Script | Role |
-|--------|------|
-| `preflight_coverage_validator.py` | One-shot setup validation |
-| `prefetch_coverage_inputs.py` | Batch gh fetch; `--skip-if-fresh` |
-| `map_requirements_to_diff.py` | Requirement → PR mapping |
-| `build_coverage_report.py` | HTML report + UI enhancements |
-| `coverage_validator_config.py` | Defaults + `verdictMode` |
+| GitHub | One prefetch shell; `--skip-if-fresh` when PR URLs unchanged |
+| Shells | One turn each for map + build; builder calls `apply_report_ui_enhancements()` |
+| Never | Separate `gh` calls; edit `SUMMARY_METRIC_INFO` for content changes |
 
 **Developed by:** Mayur Gunjal

@@ -11,6 +11,8 @@ description: >-
 
 # Jira story → QMetry test cases
 
+Invoke checklist: `.cursor/agents/msc-testcase-writer.md` (First run + coverage-validator fallback). This skill has the full workflow.
+
 ## Preconditions
 
 - Atlassian MCP is enabled and authenticated (`wbdstreaming.atlassian.net`).

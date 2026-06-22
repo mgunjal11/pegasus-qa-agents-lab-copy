@@ -36,13 +36,7 @@ Pattern references: `plan-aware-review`, `pr-review`, and `plan-feature` from [m
 
 ## Preconditions
 
-See agent **First run (5 min)** for one-page setup — start with `python scripts/preflight_coverage_validator.py {KEY} --verify-jira` (MCP, `gh`, `.env`, allowlist, defaults).
-
-- **Atlassian MCP** authenticated for `wbdstreaming.atlassian.net`.
-- **`gh` CLI** installed and authenticated (`gh auth status`).
-- Read MCP tool schemas before calling `getJiraIssue`, `getJiraIssueRemoteIssueLinks`, `getConfluencePage`, or `searchJiraIssuesUsingJql`.
-- **Run options:** Read [references/run-options.md](references/run-options.md). Parse inline flags, manifest, and workspace defaults before fetching.
-- **Auto-approve:** Read [references/auto-approve-setup.md](references/auto-approve-setup.md). Run `python scripts/install_coverage_validator_permissions.py` once. Slash command `/msc-dev-code-and-qa-test-coverage-validator` defaults to `--auto --write`.
+Setup: agent **First run** + `python scripts/preflight_coverage_validator.py {KEY} --verify-jira`. Read MCP tool schemas before Jira/Confluence calls. Details: [run-options.md](references/run-options.md), [auto-approve-setup.md](references/auto-approve-setup.md).
 
 ## Run options (Step 0 — always first)
 
@@ -59,48 +53,20 @@ Parse the user message and merge options from (highest priority wins):
 | **from-cache** (`--from-cache`) | Repeat run | Use fresh `reports/.cache/{KEY}-prefetch.json` and optional jira cache; skip gh if not stale |
 | **interactive** | Default when no flags | Ask once for missing PR URL/repo; confirm before write unless `--write` |
 
-**Default for `/msc-dev-code-and-qa-test-coverage-validator` slash command:** treat as **`--auto --write`** unless the user opts out.
-
-**Minimize Allow/Run prompts (mandatory agent behavior):**
-
-1. Install allowlist once: `python scripts/install_coverage_validator_permissions.py` (see [auto-approve-setup.md](references/auto-approve-setup.md)).
-2. **One MCP turn** — call `getJiraIssue` and `getJiraIssueRemoteIssueLinks` in parallel (never sequential round-trips).
-3. **One shell turn** — `python scripts/fetch_coverage_github.py {KEY} ...` or read cache; never N separate `gh` invocations.
-4. **`--from-cache`** when `reports/.cache/{KEY}-prefetch.json` is fresh.
+**Default for `/msc-dev-code-and-qa-test-coverage-validator`:** **`--auto --write`**. Minimize prompts: allowlist ([auto-approve-setup.md](references/auto-approve-setup.md)), one parallel Jira MCP turn, one prefetch shell (`--skip-if-fresh` when cache matches), read [run-options.md](references/run-options.md).
 
 **Cache paths:** `reports/.cache/{ISSUE-KEY}-prefetch.json`, `{ISSUE-KEY}-jira.json`, `{ISSUE-KEY}-testplan.json`, `{ISSUE-KEY}-confluence.json`, `{ISSUE-KEY}-mapping.json`, `{ISSUE-KEY}-manifest.json`
 
-**GitHub prefetch (recommended to avoid repeated gh approvals):**
+**Prefetch:**
 
 ```bash
-python scripts/prefetch_coverage_inputs.py {ISSUE-KEY} --pr {PR_URL}
+python scripts/prefetch_coverage_inputs.py {ISSUE-KEY} --pr {PR_URL} --skip-if-fresh
 python scripts/prefetch_coverage_inputs.py {ISSUE-KEY} --repo {org}/{repo} --search-pr
 ```
 
-Then run validation: `@msc-dev-code-and-qa-test-coverage-validator {ISSUE-KEY} --from-cache --auto`
+Reuse: `@msc-dev-code-and-qa-test-coverage-validator {ISSUE-KEY} --from-cache --auto`
 
-**Batch fetches in auto mode:** Call `getJiraIssue` and `getJiraIssueRemoteIssueLinks` in parallel. Run all `gh` commands in one shell block or read prefetch cache. Save manifest after successful run for reuse.
-
-## Slash command pipeline (`/msc-dev-code-and-qa-test-coverage-validator`)
-
-When invoked via slash command with issue key in `$ARGUMENTS`, run **end-to-end** with **`--auto --write`** (no confirmation). Match `.cursor/commands/msc-dev-code-and-qa-test-coverage-validator.md`:
-
-| # | Step |
-|---|------|
-| 0 | Parse flags → manifest → `.coverage-validator.defaults.json` |
-| 1 | Resolve `{KEY}` |
-| 2 | **Parallel MCP:** `getJiraIssue` (`attachment`, `comment`, `issuelinks`) + `getJiraIssueRemoteIssueLinks` (+ `getConfluencePage` when wiki links); write `{KEY}-jira.json` with `pageId` on remote/confluence links |
-| 3 | `fetch_confluence_requirements.py {KEY} --from-jira-cache` |
-| 4 | `fetch_jira_testplan.py {KEY} --from-jira-cache` |
-| 4b | If `status` is **`no_testplan`** → `/msc-testcase-writer {KEY}` (see [testplan-missing-fallback.md](references/testplan-missing-fallback.md)); re-run `fetch_jira_testplan.py` |
-| 5 | **One shell:** `prefetch_coverage_inputs.py {KEY} --pr URL … --skip-if-fresh` (multiple `--pr`) or `--from-cache`; branch-only: `fetch_coverage_github.py {KEY} --repo org/repo --compare develop` |
-| 6 | `map_requirements_to_diff.py {KEY}` (`--skip-if-fresh`; symbol/test evidence via `mapping_evidence.py`; NFR SIT validation capped in `finalize_mapping_evidence()`) |
-| 7 | `build_coverage_report.py {KEY}` [`--rerun` force/stale remap] [`--execute-tests` optional local pytest] [`--analysis` optional] |
-| 8 | Manifest `lastReportFile` (builder writes timestamped HTML) |
-
-Never issue multiple separate `gh` invocations; use prefetch cache or one prefetch script call.
-
-## Workflow
+## Workflow (`--auto --write` — agent invokes Steps 0–9 below)
 
 ```
 Task Progress:
@@ -209,8 +175,6 @@ In **`fetch-only`** mode, after Jira + GitHub cache writes, print cache paths an
 For CI line coverage, see [references/github-coverage.md](references/github-coverage.md).
 
 Record: changed file paths, test files in diff (tag each as **unit** or **integration** using path/framework heuristics), CI pass/fail, and any coverage numbers from check output or bot comments.
-
-In **`fetch-only`** mode, write cache to `reports/.cache/{KEY}-jira.json` (issue markdown, fields, remote links, attachments, extracted requirements) and stop unless GitHub prefetch is also requested.
 
 ### Step 5: Fetch and parse attached test plan
 
@@ -437,12 +401,11 @@ Use **`NA`** when no attachment and no local fallback. Populate `{{TESTPLAN_COVE
 
 Apply `{{TESTPLAN_COVERAGE_CLASS}}` using the same tiers as dev coverage.
 
-**Verdict** — factor test plan gaps and open-gap severity:
+**Verdict** — `build_coverage_report.py` `_verdict()`; override via **`verdictMode`** in manifest/defaults (`pragmatic` default | `strict` = Pass only at 100% + zero Med gaps):
 
-- **Fail** when `gap_summary` contains **one or more High gaps** — match `[1-9]\d* High`, **not** the substring `High` inside `0 High · N Med` (builder uses this regex in `_verdict()`).
-- **Fail** when dev code coverage < 50%.
-- **Pass with gaps** when test plan < 85% or dev code < 100%, or only Medium gaps.
-- **Pass** when requirements, dev tests, and test plan alignment are satisfactory.
+- **Fail** when `gap_summary` has **≥1 High** (`[1-9]\d* High`, not `0 High · N Med`) or dev code &lt; 50%.
+- **Pass with gaps** — pragmatic: test plan &lt; 85% or dev code &lt; 100%, or Medium gaps only; strict: any Med gap or &lt; 100% dev/test plan.
+- **Pass** when alignment is satisfactory (strict requires no Med gaps and 100%).
 
 ### Step 8: Build HTML report
 
