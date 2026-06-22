@@ -48,6 +48,11 @@ Cursor **Settings → MCP** → enable **Atlassian** (`user-atlassian`) and sign
 
 ### 4. GitHub CLI (coverage validator)
 
+Install and authenticate [GitHub CLI](https://cli.github.com):
+
+1. Download and install from [cli.github.com](https://cli.github.com)
+2. Authenticate:
+
 ```bash
 gh auth login
 gh auth status
@@ -57,10 +62,43 @@ gh auth status
 
 If the story has a **test plan Excel attached on the Jira issue** (not only a SharePoint link), Python scripts download the file via the **Jira REST API**. That requires a local `.env` file — Atlassian MCP alone does not download attachment binaries.
 
+**Your steps (one-time setup)**
+
+**1. Create API token**
+
+- Open [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
+- **Create API token** and copy it (shown once)
+
+When prompted for expiration, choose **365 days (1 year)** — see [Configuration → Jira REST API credentials](#jira-rest-api-credentials-env) for renewal and optional expiry dates in `.env`.
+
+**2. Create `.env` in the repo root**
+
+Windows (PowerShell):
+
+```powershell
+cd C:\path\to\pegasus-qa-agents-lab
+Copy-Item .env.example .env
+notepad .env
+```
+
+macOS / Linux:
+
 ```bash
+cd ~/pegasus-qa-agents-lab
 cp .env.example .env
-# Edit .env — set ATLASSIAN_EMAIL, ATLASSIAN_API_TOKEN, and expiry dates (365 days)
-# See Configuration → Jira REST API credentials
+# edit .env in your editor
+```
+
+**Set:**
+
+```bash
+ATLASSIAN_EMAIL=your.name@wbd.com
+ATLASSIAN_API_TOKEN=paste-token-here
+```
+
+**3. Verify**
+
+```bash
 python scripts/verify_jira_credentials.py MSC-204417
 ```
 
