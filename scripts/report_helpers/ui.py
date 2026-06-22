@@ -830,6 +830,7 @@ TRACE_SECTION_CSS = """
     }
     .badge-nfr { background: #fef3c7; color: #92400e; }
     .badge-fr { background: #ecfdf5; color: #047857; }
+    .badge-gap-fill { background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd; }
     .section-trace .evidence-tag {
       font-size: 0.68rem;
       color: #6366f1;

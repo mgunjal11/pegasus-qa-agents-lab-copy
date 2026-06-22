@@ -11,6 +11,7 @@ from typing import Any
 from testplan_gwt import steps_for_display
 from testplan_evidence import extract_testcase_evidence_ids, has_mascot_links
 
+from fetch_jira_testplan import is_gap_supplement_tc
 from report_helpers.common import REPORT_AGENT_NAME, REPORT_DEVELOPER, esc
 
 
@@ -92,13 +93,49 @@ def ladr_coverage_badge(mapped: bool) -> str:
     return '<span class="badge badge-missing">Gap</span>'
 
 
-def render_ladr_traceability_rows(traceability: list[dict[str, Any]]) -> str:
+def gap_fill_tc_badge(*, title: str | None = None) -> str:
+    tip = title or "Added to cover uncovered Jira acceptance criteria or LADR scenarios (gap supplement)"
+    return (
+        f'<span class="badge badge-gap-fill" title="{esc(tip)}">Gap fill</span>'
+    )
+
+
+def render_testplan_tc_id_cell(tc: dict[str, Any]) -> str:
+    tid = esc(str(tc.get("id") or ""))
+    if is_gap_supplement_tc(tc):
+        return f"{tid} {gap_fill_tc_badge()}"
+    return tid
+
+
+def format_tc_ids_plain(tc_ids: list[str], test_cases: list[dict[str, Any]]) -> str:
+    """Comma-separated TC ids with (Gap fill) suffix for supplement cases."""
+    by_id = {str(tc.get("id") or ""): tc for tc in test_cases}
+    parts: list[str] = []
+    for tid in sorted(set(tc_ids), key=lambda x: (len(x), x)):
+        tc = by_id.get(tid, {"id": tid})
+        if is_gap_supplement_tc(tc):
+            parts.append(f"{tid} (Gap fill)")
+        else:
+            parts.append(tid)
+    return ", ".join(parts)
+
+
+def render_ladr_traceability_rows(
+    traceability: list[dict[str, Any]],
+    test_cases: list[dict[str, Any]] | None = None,
+) -> str:
     if not traceability:
         return '<tr><td colspan="4">—</td></tr>'
+    by_id = {str(tc.get("id") or ""): tc for tc in (test_cases or [])}
     rows = []
     for row in traceability:
         tc_ids = row.get("testCaseIds") or []
-        tc_cell = esc(", ".join(tc_ids)) if tc_ids else "—"
+        if tc_ids:
+            tc_cell = ", ".join(
+                render_testplan_tc_id_cell(by_id.get(tid, {"id": tid})) for tid in tc_ids
+            )
+        else:
+            tc_cell = "—"
         rows.append(
             f"<tr>"
             f"<td>{esc(row.get('id', ''))}</td>"
@@ -157,7 +194,7 @@ def render_ladr_traceability_block(testplan_cache: dict[str, Any]) -> str:
         "<tr><th>LADR ID</th><th>Requirement</th><th>Test case(s)</th><th>Status</th></tr>"
         "</thead>"
         "<tbody>"
-        f"{render_ladr_traceability_rows(traceability)}"
+        f"{render_ladr_traceability_rows(traceability, testplan_cache.get('testCases') or [])}"
         "</tbody>"
         "</table>"
         "</div>"
@@ -517,6 +554,7 @@ def _format_qa_scope_detail(
     reqs: list[dict[str, Any]],
     reqs_needing_qa: set[str],
     tc_ids: list[str],
+    test_cases: list[dict[str, Any]] | None = None,
 ) -> str:
     """One-line note under QA scope remaining card (not the hover tooltip)."""
     if not reqs_needing_qa:
@@ -538,7 +576,7 @@ def _format_qa_scope_detail(
     if ladr_ids:
         parts.append(f"LADR: {', '.join(ladr_ids)}")
     if tc_ids:
-        tc_sorted = ", ".join(sorted(set(tc_ids), key=lambda x: (len(x), x)))
+        tc_sorted = format_tc_ids_plain(tc_ids, test_cases or [])
         parts.append(f"Test plan cases: {tc_sorted}")
     return " · ".join(parts)
 
@@ -929,7 +967,7 @@ def build_qa_ownership_fields(issue_key: str, root: Path | None = None) -> dict[
 
     if qa_items:
         if tc_ids:
-            tc_sorted = ", ".join(sorted(set(tc_ids), key=lambda x: (len(x), x)))
+            tc_sorted = format_tc_ids_plain(tc_ids, tp.get("testCases") or [])
             qa_items.append(
                 f'<li class="medium">Execute attached test plan case(s) for QA-scoped requirements only: '
                 f"<strong>{esc(tc_sorted)}</strong> — skip scenarios mapped only to dev-covered acceptance criteria.</li>"
@@ -942,7 +980,7 @@ def build_qa_ownership_fields(issue_key: str, root: Path | None = None) -> dict[
 
     n_qa = len(reqs_needing_qa)
     summary = _format_qa_scope_summary(reqs, reqs_needing_qa)
-    detail = _format_qa_scope_detail(reqs, reqs_needing_qa, tc_ids)
+    detail = _format_qa_scope_detail(reqs, reqs_needing_qa, tc_ids, tp.get("testCases") or [])
 
     if not dev_items:
         dev_items.append(
@@ -1079,7 +1117,7 @@ def build_recommended_actions_list(
                 f"<li><strong>Verify {esc(rid)}</strong> — {snippet} ({esc(scope)}).</li>"
             )
         if qa_tc_ids:
-            tc_sorted = ", ".join(sorted(set(qa_tc_ids), key=lambda x: (len(x), x)))
+            tc_sorted = format_tc_ids_plain(qa_tc_ids, tp.get("testCases") or [])
             qa_actions.append(
                 f"<li><strong>Execute test plan</strong> — run {esc(tc_sorted)} for QA-scoped acceptance criteria only (see §4).</li>"
             )
@@ -1366,7 +1404,7 @@ def render_testplan_rows(
         )
         rows.append(
             f"<tr>"
-            f"<td>{esc(tc.get('id', ''))}</td>"
+            f"<td>{render_testplan_tc_id_cell(tc)}</td>"
             f"<td>{esc(scenario)}</td>"
             f"<td>{esc(', '.join(tc.get('mapped_requirements') or []) or '—')}</td>"
             f"<td>{gwt_quality_badge(steps)}</td>"

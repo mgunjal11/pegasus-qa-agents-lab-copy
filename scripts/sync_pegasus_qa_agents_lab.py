@@ -86,6 +86,8 @@ SCRIPTS = [
     "test_fetch_jira_story.py",
     "test_jira_env_setup.py",
     "test_fetch_jira_testplan_summary.py",
+    "test_fetch_jira_testplan_merge.py",
+    "test_gap_fill_tc_marker.py",
     "test_dev_tests_pr_column.py",
     "regen_msc204417_report.py",
     "regen_msc205625_report.py",

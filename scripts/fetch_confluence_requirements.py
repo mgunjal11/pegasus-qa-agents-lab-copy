@@ -58,7 +58,9 @@ def main() -> int:
             }
         )
     )
-    return 0 if payload.get("ladrRequirements") or payload.get("status") == "no_links" else 1
+    # status "ok" covers linked pages with no LADR/ESS (e.g. deployment notes) — still a valid cache
+    status = payload.get("status")
+    return 0 if payload.get("ladrRequirements") or status in ("ok", "no_links") else 1
 
 
 if __name__ == "__main__":

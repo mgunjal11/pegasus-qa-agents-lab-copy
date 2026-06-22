@@ -80,6 +80,7 @@ TESTPLAN_NAME_RE = re.compile(
 TESTPLAN_EXT = {".xlsx", ".xls", ".tsv", ".csv", ".txt"}
 REQ_ID_RE = re.compile(r"\bR(\d+)\b", re.IGNORECASE)
 GWT_RE = re.compile(r"^(Given|When|Then|Than|Tehn|Them)\s*:?\s*", re.IGNORECASE)
+TC_ID_NUM_RE = re.compile(r"^TC(\d+)$", re.IGNORECASE)
 ISSUE_KEY_RE = re.compile(r"\b(MSC-\d+)\b", re.IGNORECASE)
 SHAREPOINT_URL_RE = re.compile(r"https://[^\s\"']*sharepoint\.com[^\s\"']*", re.IGNORECASE)
 XLSX_FILE_PARAM_RE = re.compile(r"file=([^&\"'\s]+\.xlsx)", re.IGNORECASE)
@@ -133,6 +134,7 @@ class TestCase:
     mapped_requirements: list[str] = field(default_factory=list)
     source_file: str = ""
     source_sheet: str = ""
+    gap_supplement: bool = False
     section: str = ""
     comment: str = ""
     evidence_text: str = ""
@@ -1155,6 +1157,56 @@ def resolve_testplan_files(
     return downloaded, meta, testplan_refs, auth_error
 
 
+def _tc_id_num(tc_id: str) -> int | None:
+    match = TC_ID_NUM_RE.match((tc_id or "").strip())
+    return int(match.group(1)) if match else None
+
+
+def _is_gap_supplement_source(source_file: str) -> bool:
+    return "gap-supplement" in (source_file or "").lower()
+
+
+def _is_gap_supplement_case(tc: TestCase) -> bool:
+    return bool(getattr(tc, "gap_supplement", False)) or _is_gap_supplement_source(tc.source_file)
+
+
+def is_gap_supplement_tc(tc: TestCase | dict[str, Any]) -> bool:
+    """True when a test case was added via gap-supplement Excel (uncovered R/L fill)."""
+    if isinstance(tc, dict):
+        if tc.get("gap_supplement") or tc.get("gapSupplement"):
+            return True
+        return _is_gap_supplement_source(str(tc.get("source_file") or ""))
+    return _is_gap_supplement_case(tc)
+
+
+def renumber_gap_supplement_cases(cases: list[TestCase]) -> None:
+    """Continue TC ids for gap-supplement rows after the primary attached/local plan.
+
+    Gap supplement Excel always starts at TC1 when generated; merging with a Jira
+    attachment that also has TC1–TCn would duplicate ids in §3 and LADR traceability.
+    """
+    if not cases:
+        return
+    gap_cases = [tc for tc in cases if _is_gap_supplement_case(tc)]
+    if not gap_cases:
+        return
+    primary_cases = [tc for tc in cases if not _is_gap_supplement_case(tc)]
+    if not primary_cases:
+        return
+
+    max_num = 0
+    for tc in primary_cases:
+        num = _tc_id_num(tc.id)
+        if num is not None:
+            max_num = max(max_num, num)
+
+    next_num = max_num
+    for tc in gap_cases:
+        next_num += 1
+        tc.id = f"TC{next_num}"
+        tc.gap_supplement = True
+
+
 def enrich_jira_cache_testplan_refs(issue_key: str) -> list[dict[str, Any]]:
     """Update jira cache with extracted testPlanReferences from stored comments."""
     path = jira_cache_path(issue_key)
@@ -1218,6 +1270,8 @@ def main() -> int:
                 sheets_used.append(cases[0].source_sheet)
         except Exception as exc:  # noqa: BLE001
             parse_errors.append(f"{path.name} [{sheet or 'default'}]: {exc}")
+
+    renumber_gap_supplement_cases(all_cases)
 
     jira_requirements = extract_requirements(jira_cache if jira_cache.exists() else None)
     jira_data = load_json(jira_cache) if jira_cache.exists() else {}
