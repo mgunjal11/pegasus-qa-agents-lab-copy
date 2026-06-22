@@ -22,7 +22,7 @@ ROOT = SCRIPTS.parent
 sys.path.insert(0, str(SCRIPTS))
 
 from coverage_validator_config import load_coverage_defaults  # noqa: E402
-from jira_env import credentials_hint, jira_email, jira_token, load_dotenv  # noqa: E402
+from jira_env import credentials_hint, ensure_env_from_example, jira_email, jira_token, load_dotenv  # noqa: E402
 
 
 def _check_python() -> dict[str, Any]:
@@ -65,17 +65,22 @@ def _check_gh() -> dict[str, Any]:
     return {"id": "gh", "label": "GitHub CLI auth", "ok": ok, "detail": detail}
 
 
-def _check_jira_env() -> dict[str, Any]:
+def _check_jira_env(env_bootstrap: dict[str, Any] | None = None) -> dict[str, Any]:
     load_dotenv(ROOT / ".env")
     email = jira_email()
     token = jira_token()
     ok = bool(email and token)
+    detail = credentials_hint() if not ok else f"email set ({email})"
+    if env_bootstrap and env_bootstrap.get("created"):
+        detail = f"{env_bootstrap['message']} — {detail}" if not ok else f"{env_bootstrap['message']}; {detail}"
+    elif env_bootstrap and not (ROOT / ".env").exists():
+        detail = env_bootstrap.get("message", detail)
     return {
         "id": "jira_env",
         "label": "Jira REST .env (attachment download)",
         "ok": ok,
         "required": False,
-        "detail": credentials_hint() if not ok else f"email set ({email})",
+        "detail": detail,
     }
 
 
@@ -165,11 +170,12 @@ def _check_template() -> dict[str, Any]:
 
 
 def run_preflight(issue_key: str | None = None, *, verify_jira: bool = False) -> dict[str, Any]:
+    env_bootstrap = ensure_env_from_example(ROOT)
     checks = [
         _check_python(),
         _check_openpyxl(),
         _check_gh(),
-        _check_jira_env(),
+        _check_jira_env(env_bootstrap),
         _check_defaults(),
         _check_permissions(),
         _check_template(),
@@ -184,6 +190,7 @@ def run_preflight(issue_key: str | None = None, *, verify_jira: bool = False) ->
         "ok": len(required_fail) == 0,
         "ready": len([c for c in checks if not c["ok"]]) == 0,
         "checks": checks,
+        "envBootstrap": env_bootstrap,
         "requiredFailures": [c["id"] for c in required_fail],
         "optionalFailures": [c["id"] for c in optional_fail],
         "next": (

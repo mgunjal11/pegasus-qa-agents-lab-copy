@@ -17,6 +17,59 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def ensure_gitignore_env(root: Path | None = None) -> dict[str, Any]:
+    """Ensure repo .gitignore lists .env (credentials must not be committed)."""
+    base = root or repo_root()
+    ignore_path = base / ".gitignore"
+    entry = ".env"
+    if not ignore_path.exists():
+        ignore_path.write_text(f"{entry}\n", encoding="utf-8")
+        return {"path": str(ignore_path), "added": True, "created": True}
+    text = ignore_path.read_text(encoding="utf-8")
+    lines = {ln.strip() for ln in text.splitlines() if ln.strip() and not ln.strip().startswith("#")}
+    if entry in lines:
+        return {"path": str(ignore_path), "added": False, "created": False}
+    suffix = "" if text.endswith("\n") or not text else "\n"
+    ignore_path.write_text(f"{text}{suffix}{entry}\n", encoding="utf-8")
+    return {"path": str(ignore_path), "added": True, "created": False}
+
+
+def ensure_env_from_example(root: Path | None = None) -> dict[str, Any]:
+    """
+    Copy .env.example → .env when .env is missing (never overwrite existing .env).
+
+    Returns {"created": bool, "envPath": str, "examplePath": str | None, "message": str}.
+    """
+    import shutil
+
+    base = root or repo_root()
+    env_path = base / ".env"
+    example_path = base / ".env.example"
+    ensure_gitignore_env(base)
+
+    if env_path.exists():
+        return {
+            "created": False,
+            "envPath": str(env_path),
+            "examplePath": str(example_path) if example_path.exists() else None,
+            "message": ".env already exists — edit credentials in place (not committed to git)",
+        }
+    if not example_path.exists():
+        return {
+            "created": False,
+            "envPath": str(env_path),
+            "examplePath": None,
+            "message": ".env.example missing — create .env manually with ATLASSIAN_EMAIL and ATLASSIAN_API_TOKEN",
+        }
+    shutil.copy2(example_path, env_path)
+    return {
+        "created": True,
+        "envPath": str(env_path),
+        "examplePath": str(example_path),
+        "message": "Created .env from .env.example — set ATLASSIAN_EMAIL and ATLASSIAN_API_TOKEN",
+    }
+
+
 def load_dotenv(path: Path | None = None) -> bool:
     """Load KEY=VALUE pairs from repo .env into os.environ (does not override existing)."""
     env_path = path or repo_root() / ".env"

@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Write Cursor permissions files for msc-dev-code-and-qa-test-coverage-validator auto-approve."""
 import json
+import sys
 from pathlib import Path
+
+SCRIPTS = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPTS))
+from jira_env import ensure_env_from_example  # noqa: E402
 
 PERMS = {
     "mcpAllowlist": [
@@ -30,6 +35,12 @@ EXAMPLE = {
 }
 
 root = Path(__file__).resolve().parents[1]
+env_status = ensure_env_from_example(root)
+if env_status.get("created"):
+    print(env_status["message"])
+    print(f"  Edit: {env_status['envPath']}")
+elif not (root / ".env").exists():
+    print(env_status.get("message", "Create .env with Jira credentials"))
 (root / ".cursor" / "permissions.json").write_text(
     json.dumps(PERMS, indent=2) + "\n", encoding="utf-8"
 )
