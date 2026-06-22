@@ -25,7 +25,14 @@ def main() -> int:
         print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
         return 1
 
+    expiry = result.get("tokenExpiry")
+    if expiry and expiry.get("message") and not expiry.get("expired"):
+        print(f"Note: {expiry['message']}", file=sys.stderr)
+
     print(json.dumps(result, indent=2))
+    if result.get("tokenExpiry", {}).get("expired"):
+        print(f"\n{result['tokenExpiry']['message']}", file=sys.stderr)
+        return 1
     if result["attachmentCount"] == 0:
         print(
             f"\nAuth OK, but {result['issueKey']} has no attachments yet.\n"

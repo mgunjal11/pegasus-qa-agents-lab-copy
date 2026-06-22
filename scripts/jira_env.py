@@ -51,6 +51,42 @@ def jira_auth_header() -> dict[str, str] | None:
     return {"Authorization": f"Basic {base64.b64encode(raw).decode()}"}
 
 
+def jira_token_expires() -> str | None:
+    return os.environ.get("ATLASSIAN_API_TOKEN_EXPIRES") or os.environ.get("JIRA_API_TOKEN_EXPIRES")
+
+
+def jira_token_expiry_status() -> dict[str, Any] | None:
+    """Return expiry metadata from .env (optional reminder fields)."""
+    raw = jira_token_expires()
+    if not raw:
+        return None
+    from datetime import date
+
+    try:
+        expires = date.fromisoformat(raw.strip())
+    except ValueError:
+        return {"expires": raw, "valid": False, "message": f"Invalid ATLASSIAN_API_TOKEN_EXPIRES: {raw!r} (use YYYY-MM-DD)"}
+    today = date.today()
+    days_left = (expires - today).days
+    if days_left < 0:
+        return {
+            "expires": raw,
+            "valid": False,
+            "expired": True,
+            "daysLeft": days_left,
+            "message": f"ATLASSIAN_API_TOKEN expired on {raw}. Create a new token (365 days) at id.atlassian.com.",
+        }
+    if days_left <= 30:
+        return {
+            "expires": raw,
+            "valid": True,
+            "expired": False,
+            "daysLeft": days_left,
+            "message": f"Token expires in {days_left} day(s) on {raw}. Plan renewal at id.atlassian.com.",
+        }
+    return {"expires": raw, "valid": True, "expired": False, "daysLeft": days_left}
+
+
 def credentials_hint() -> str:
     return (
         "Set ATLASSIAN_EMAIL + ATLASSIAN_API_TOKEN in .env (copy .env.example) "
@@ -154,7 +190,7 @@ def verify_credentials(issue_key: str = "MSC-205625", site: str = "wbdstreaming.
     data = json.loads(jira_get(url).decode())
     fields = data.get("fields") or {}
     attachments = fields.get("attachment") or []
-    return {
+    result: dict[str, Any] = {
         "ok": True,
         "issueKey": data.get("key", issue_key),
         "summary": fields.get("summary"),
@@ -162,3 +198,10 @@ def verify_credentials(issue_key: str = "MSC-205625", site: str = "wbdstreaming.
         "attachments": [{"filename": a.get("filename"), "size": a.get("size")} for a in attachments],
         "email": jira_email(),
     }
+    expiry = jira_token_expiry_status()
+    if expiry:
+        result["tokenExpiry"] = expiry
+        if expiry.get("expired"):
+            result["ok"] = False
+            result["error"] = expiry.get("message")
+    return result

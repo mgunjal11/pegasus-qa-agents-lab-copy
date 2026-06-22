@@ -59,7 +59,8 @@ If the story has a **test plan Excel attached on the Jira issue** (not only a Sh
 
 ```bash
 cp .env.example .env
-# Edit .env — see Configuration → Jira REST API credentials
+# Edit .env — set ATLASSIAN_EMAIL, ATLASSIAN_API_TOKEN, and expiry dates (365 days)
+# See Configuration → Jira REST API credentials
 python scripts/verify_jira_credentials.py MSC-204417
 ```
 
@@ -122,13 +123,23 @@ Same credentials are used by `fetch_confluence_requirements.py` when fetching Co
 
 #### Jira REST API credentials (`.env`)
 
-**1. Create an Atlassian API token**
+**1. Generate an Atlassian API token (1-year expiry)**
 
-1. Sign in at [wbdstreaming.atlassian.net](https://wbdstreaming.atlassian.net).
-2. Open [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
-3. **Create API token** — copy the token immediately (shown once).
+Atlassian API tokens **expire in 1–365 days** (maximum **1 year**). Always choose **365 days** when creating a token for this lab so you renew once per year.
+
+| Step | Action |
+|------|--------|
+| 1 | Sign in with your WBD account at [wbdstreaming.atlassian.net](https://wbdstreaming.atlassian.net). |
+| 2 | Open **[Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens)** (same account as Jira). |
+| 3 | Click **Create API token** (classic token is sufficient for Jira attachment download). |
+| 4 | **Label** — e.g. `pegasus-qa-agents-lab` or `msc-coverage-validator`. |
+| 5 | **Expiration** — select **365 days** (1 year). This is the maximum Atlassian allows; tokens cannot be extended past one year. |
+| 6 | Click **Create**, then **Copy** the token immediately — it is shown **once** and cannot be recovered. |
+| 7 | Store the token in a password manager until you paste it into `.env`. |
 
 Use your **WBD Atlassian account email** (the address you use to log into Jira), not a service account, unless your team provides one.
+
+Official reference: [Manage API tokens for your Atlassian account](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/).
 
 **2. Create `.env` from the example**
 
@@ -136,12 +147,14 @@ Use your **WBD Atlassian account email** (the address you use to log into Jira),
 cp .env.example .env
 ```
 
-**3. Set required variables**
+**3. Set required and recommended variables**
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `ATLASSIAN_EMAIL` | **Yes** | Your Atlassian account email (e.g. `you@wbd.com`) |
-| `ATLASSIAN_API_TOKEN` | **Yes** | API token from [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens) |
+| `ATLASSIAN_API_TOKEN` | **Yes** | API token copied from step 1 |
+| `ATLASSIAN_API_TOKEN_CREATED` | Recommended | Date you created the token (`YYYY-MM-DD`) |
+| `ATLASSIAN_API_TOKEN_EXPIRES` | Recommended | Expiry date from Atlassian UI — **creation date + 365 days** |
 
 Optional aliases (same values — scripts accept either name):
 
@@ -155,7 +168,11 @@ Example `.env` (never commit this file):
 ```bash
 ATLASSIAN_EMAIL=you@wbd.com
 ATLASSIAN_API_TOKEN=ATATT3xFfGF0...your-token-here
+ATLASSIAN_API_TOKEN_CREATED=2026-06-17
+ATLASSIAN_API_TOKEN_EXPIRES=2027-06-17
 ```
+
+Set `ATLASSIAN_API_TOKEN_EXPIRES` to the **exact expiry date** shown in the Atlassian token list after you choose **365 days**. `verify_jira_credentials.py` warns when the date is in the past.
 
 **4. Verify credentials**
 
@@ -165,7 +182,11 @@ python scripts/verify_jira_credentials.py MSC-204417
 
 Expected success output includes `"ok": true`, your `issueKey`, and `attachmentCount` ≥ 1 when the issue has Excel attached. If auth works but `attachmentCount` is 0, attach the test plan on Jira or use `testplans/` for a local copy.
 
-**5. Security**
+**5. Renew annually**
+
+Before `ATLASSIAN_API_TOKEN_EXPIRES`, repeat step 1 (create a new token with **365 days**), update `.env`, and re-run `verify_jira_credentials.py`. Revoke the old token in the Atlassian UI after confirming the new one works.
+
+**6. Security**
 
 - `.env` is listed in `.gitignore` — **never commit** tokens to GitHub.
 - Prefer `.env` in the repo root (same folder as `scripts/`).
@@ -385,6 +406,7 @@ docs/
 | Symptom | Fix |
 |---------|-----|
 | `Jira credentials missing` / HTTP 401 on test plan fetch | Create `.env` from `.env.example`; set `ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN`; run `verify_jira_credentials.py {KEY}` |
+| API token expired (401 after working previously) | Create new token at [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens) with **365 days**; update `.env` and `ATLASSIAN_API_TOKEN_EXPIRES`; revoke old token |
 | Test plan **Pending** / attachment not downloaded | Confirm Excel is **attached** on Jira (not link-only); verify token; re-run `fetch_jira_testplan.py {KEY} --from-jira-cache` |
 | Test plan **Pending** / `referenced_not_local` | No Jira attachment — add Excel under `testplans/`; set `testPlanPath` in defaults |
 | Test plan 0% but xlsx existed | Re-run `write_testcase_excel.py {KEY}` then `fetch_jira_testplan.py` |
