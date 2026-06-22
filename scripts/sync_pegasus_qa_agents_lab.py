@@ -63,11 +63,14 @@ SCRIPTS = [
     "test_verdict_mode.py",
     "test_preflight_coverage_validator.py",
     "test_coverage_pipeline_golden.py",
+    "test_semantic_and_run_validator.py",
     "patch_trace_section_template.py",
     "test_summary_metric_info.py",
     "patch_report_footer.py",
     "patch_report_template.py",
     "map_requirements_to_diff.py",
+    "semantic_mapping_boost.py",
+    "run_coverage_validator.py",
     "build_coverage_report.py",
     "execute_pr_tests.py",
     "test_confluence_remote_links.py",
@@ -106,6 +109,7 @@ PERMISSIONS = {
         "python scripts/map_requirements_to_diff.py",
         "python scripts/build_coverage_report.py",
         "python scripts/preflight_coverage_validator.py",
+        "python scripts/run_coverage_validator.py",
         "python scripts/execute_pr_tests.py",
         "python scripts/generate_qmetry_excel.py",
         "python scripts/write_testcase_excel.py",
@@ -159,6 +163,7 @@ def main() -> None:
         src = ROOT / "scripts" / name
         if src.exists():
             shutil.copy2(src, LAB / "scripts" / name)
+    copy_report_helpers(LAB)
     (LAB / "testcases").mkdir(exist_ok=True)
     (LAB / "reports").mkdir(exist_ok=True)
     (LAB / "reports" / ".cache").mkdir(exist_ok=True)
@@ -218,6 +223,16 @@ def copy_lab_readme_templates(lab: Path) -> None:
         if src.exists():
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
+
+
+def copy_report_helpers(lab: Path) -> None:
+    src = ROOT / "scripts" / "report_helpers"
+    dst = lab / "scripts" / "report_helpers"
+    if not src.exists():
+        return
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst)
 
 
 def copy_test_fixtures(lab: Path) -> None:

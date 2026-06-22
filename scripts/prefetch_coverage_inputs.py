@@ -51,7 +51,13 @@ def gh_json(args: list[str]) -> Any:
         **_GH_SUBPROCESS,
     )
     if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or f"gh failed: {' '.join(args)}")
+        err = result.stderr.strip() or f"gh failed: {' '.join(args)}"
+        if "auth" in err.lower() or "not logged" in err.lower():
+            err += (
+                "\nRun: python scripts/preflight_coverage_validator.py  "
+                "and gh auth login (https://cli.github.com)"
+            )
+        raise RuntimeError(err)
     return json.loads(result.stdout)
 
 

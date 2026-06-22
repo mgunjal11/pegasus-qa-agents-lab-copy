@@ -589,6 +589,7 @@ def map_requirements(
     issue_key: str,
     *,
     root: Path | None = None,
+    semantic_boost: bool | None = None,
 ) -> dict[str, Any]:
     base = root or repo_root()
     key = issue_key.upper()
@@ -761,6 +762,21 @@ def map_requirements(
     }
     exec_path = base / "reports" / ".cache" / f"{key}-test-execution.json"
     execution = _load_json(exec_path) if exec_path.exists() else None
+
+    if semantic_boost is None:
+        from coverage_validator_config import load_coverage_defaults
+
+        semantic_boost = bool(load_coverage_defaults(base).get("semanticMappingBoost", True))
+    if semantic_boost:
+        from semantic_mapping_boost import apply_semantic_boost
+
+        payload = apply_semantic_boost(
+            payload,
+            diff_blob=diff_blob,
+            confluence=confluence,
+            testplan=tp,
+        )
+
     return finalize_mapping_evidence(payload, execution)
 
 
@@ -784,6 +800,12 @@ def main() -> int:
         default=None,
         help="Max mapping age in hours (default: manifest cacheMaxAgeHours or 24)",
     )
+    parser.add_argument(
+        "--semantic-boost",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Second-pass semantic evidence boost (default: workspace semanticMappingBoost or on)",
+    )
     args = parser.parse_args()
     key = args.issue_key.upper()
     if args.skip_if_fresh and not args.rerun:
@@ -795,7 +817,7 @@ def main() -> int:
             out = mapping_cache_path(key)
             print(json.dumps({"output": str(out.resolve()), "skipped": True, "reason": reason}))
             return 0
-    payload = map_requirements(key)
+    payload = map_requirements(key, semantic_boost=args.semantic_boost)
     out = mapping_cache_path(key)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

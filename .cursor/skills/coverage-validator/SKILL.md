@@ -36,7 +36,7 @@ Pattern references: `plan-aware-review`, `pr-review`, and `plan-feature` from [m
 
 ## Preconditions
 
-Setup: agent **First run** + `python scripts/preflight_coverage_validator.py {KEY} --verify-jira`. Read MCP tool schemas before Jira/Confluence calls. Details: [run-options.md](references/run-options.md), [auto-approve-setup.md](references/auto-approve-setup.md).
+Setup: agent **First run** + preflight runs automatically via `run_coverage_validator.py` (or `python scripts/preflight_coverage_validator.py {KEY} --verify-jira` manually). Read MCP tool schemas before Jira/Confluence calls. Details: [run-options.md](references/run-options.md), [auto-approve-setup.md](references/auto-approve-setup.md).
 
 ## Run options (Step 0 — always first)
 
@@ -63,6 +63,14 @@ Parse the user message and merge options from (highest priority wins):
 python scripts/prefetch_coverage_inputs.py {ISSUE-KEY} --pr {PR_URL} --skip-if-fresh
 python scripts/prefetch_coverage_inputs.py {ISSUE-KEY} --repo {org}/{repo} --search-pr
 ```
+
+**Orchestrated pipeline** (auto-preflight, semantic mapping boost, build):
+
+```bash
+python scripts/run_coverage_validator.py {ISSUE-KEY} --auto --write --skip-if-fresh --verify-jira
+```
+
+Requires warm `reports/.cache/{KEY}-jira.json` from Step 2 MCP fetch. Mapping uses optional `--semantic-boost` (default on via `semanticMappingBoost` in defaults).
 
 Reuse: `@msc-dev-code-and-qa-test-coverage-validator {ISSUE-KEY} --from-cache --auto`
 

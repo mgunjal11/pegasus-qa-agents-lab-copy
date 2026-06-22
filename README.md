@@ -58,15 +58,21 @@ gh auth login
 gh auth status
 ```
 
-### 4b. Preflight (coverage validator — recommended)
+### 4b. Preflight (coverage validator — automatic)
 
-Validate setup before the first report:
+Preflight runs automatically when you use `run_coverage_validator.py` or on auth failures during prefetch. To validate setup manually:
 
 ```bash
 python scripts/preflight_coverage_validator.py MSC-204417 --verify-jira
 ```
 
 Checks Python, openpyxl, `gh` auth, `.env`, allowlist, and report template. Fix any **FAIL** items before running the validator.
+
+**One-shot pipeline** (after Jira MCP fetch):
+
+```bash
+python scripts/run_coverage_validator.py MSC-204417 --auto --write --skip-if-fresh --verify-jira
+```
 
 ### 5. Jira API credentials (coverage validator — when test plan is a Jira attachment)
 
@@ -276,6 +282,7 @@ cp .cursor/skills/coverage-validator/validator.defaults.example.json .coverage-v
 | `testPlanFilename` | string | Display name when Jira references SharePoint |
 | `testRepoRoot` | string | Absolute or workspace-relative path to a **local clone** of the service repo — enables `build_coverage_report.py {KEY} --execute-tests` |
 | `verdictMode` | string | `pragmatic` (default) \| `strict` — **strict** requires 100% dev + test plan coverage and zero Medium gaps for **Pass** |
+| `semanticMappingBoost` | boolean | `true` (default) — second-pass semantic evidence for §5/§6 mapping (comments, Confluence ESS, test-plan steps) |
 
 Example:
 
@@ -439,8 +446,11 @@ docs/
 | `verify_jira_credentials.py` | Verify `ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN` against a Jira issue |
 | `upload_jira_testplan.py` | Upload local Excel test plan to a Jira issue (optional) |
 | `prefetch_coverage_inputs.py` | Batch `gh` PR view/diff/checks → cache; `--skip-if-fresh` |
-| `preflight_coverage_validator.py` | One-shot setup validation before first run |
-| `coverage_validator_config.py` | Workspace defaults + `verdictMode` loader |
+| `preflight_coverage_validator.py` | One-shot setup validation (also auto-run by orchestrator) |
+| `run_coverage_validator.py` | Auto-preflight + confluence → test plan → prefetch → map → build |
+| `semantic_mapping_boost.py` | Optional second-pass semantic evidence for requirement mapping |
+| `coverage_validator_config.py` | Workspace defaults + `verdictMode` / `semanticMappingBoost` loader |
+| `coverage_report_helpers.py` | Facade over `report_helpers/` (sections + ui tooltips) |
 | `map_requirements_to_diff.py` | Requirement → PR diff; FR/NFR; NFR SIT evidence caps |
 | `mapping_evidence.py` | Symbol + pytest-name scoring; `rank_matched_files()` |
 | `test_trace_evidence.py` | Unit tests for compact §5 Evidence display |
