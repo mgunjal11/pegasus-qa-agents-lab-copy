@@ -1,0 +1,24 @@
+{
+  "issueKey": "MSC-FIXTURE",
+  "fetchedAt": "2026-06-22T00:00:00+00:00",
+  "testPlanSource": "workspace_generated",
+  "testCaseCount": 1,
+  "coverage": {
+    "testCaseCount": 1,
+    "completeGwtCount": 1,
+    "requirementCount": 1,
+    "requirementsCovered": 1,
+    "testplanCoveragePct": 100.0
+  },
+  "testPlanSummaryNote": "Locally generated fixture plan.",
+  "testCases": [
+    {
+      "id": "TC1",
+      "section": "fixture",
+      "summary": "Golden path",
+      "mappedRequirements": ["R1"],
+      "gwtComplete": true,
+      "steps": {"given": "Given: setup", "when": "When: act", "then": "Then: verify"}
+    }
+  ]
+}

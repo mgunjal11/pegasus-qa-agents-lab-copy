@@ -19,6 +19,7 @@ PERMS = {
         "python scripts/fetch_confluence_requirements.py",
         "python scripts/map_requirements_to_diff.py",
         "python scripts/build_coverage_report.py",
+        "python scripts/preflight_coverage_validator.py",
         "mkdir",
     ],
 }

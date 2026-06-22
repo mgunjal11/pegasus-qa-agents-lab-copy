@@ -1,0 +1,11 @@
+{
+  "issueKey": "MSC-FIXTURE",
+  "fetchedAt": "2026-06-22T00:00:00+00:00",
+  "summary": "Fixture story for golden pipeline test",
+  "status": "In Progress",
+  "issuetype": "Story",
+  "requirements": [
+    {"id": "R1", "text": "Example requirement for golden test"}
+  ],
+  "attachments": []
+}

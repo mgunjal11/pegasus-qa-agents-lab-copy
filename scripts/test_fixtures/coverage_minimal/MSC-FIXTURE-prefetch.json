@@ -1,0 +1,18 @@
+{
+  "issueKey": "MSC-FIXTURE",
+  "fetchedAt": "2026-06-22T00:00:00+00:00",
+  "repo": "wbd-msc/example",
+  "prUrls": ["https://github.com/wbd-msc/example/pull/1"],
+  "prs": [
+    {
+      "url": "https://github.com/wbd-msc/example/pull/1",
+      "number": 1,
+      "repo": "wbd-msc/example",
+      "state": "MERGED",
+      "title": "Fixture PR",
+      "fileCount": 2,
+      "testFileCount": 1,
+      "devTests": "test_example.py"
+    }
+  ]
+}

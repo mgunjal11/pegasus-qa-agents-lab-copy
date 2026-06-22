@@ -46,6 +46,7 @@ from coverage_report_helpers import (  # noqa: E402
     testplan_coverage_class,
 )
 from coverage_report_timestamp import report_paths  # noqa: E402
+from coverage_validator_config import get_verdict_mode, load_coverage_defaults  # noqa: E402
 
 SKILL_TEMPLATE = (
     ROOT / ".cursor/skills/coverage-validator/report-template.html"
@@ -66,10 +67,35 @@ def _metric_class(pct: Any) -> str:
     return "metric-fail"
 
 
-def _verdict(req_pct: float | None, tp_pct: float | None, gap_summary: str) -> tuple[str, str, str]:
+def _verdict(
+    req_pct: float | None,
+    tp_pct: float | None,
+    gap_summary: str,
+    *,
+    mode: str = "pragmatic",
+) -> tuple[str, str, str]:
     has_high = bool(re.search(r"[1-9]\d*\s+High", gap_summary or ""))
+    has_med = bool(re.search(r"[1-9]\d*\s+Med", gap_summary or ""))
+    gap_none = not gap_summary or gap_summary.strip().lower() == "none"
+
     if has_high or (req_pct is not None and req_pct < 50):
         return "Fail", "fail", "Critical gaps in code or test plan mapping"
+
+    if mode == "strict":
+        if (req_pct is not None and req_pct < 100) or (tp_pct is not None and tp_pct < 100) or has_med:
+            return (
+                "Pass with gaps",
+                "pass-gaps",
+                "Strict mode: 100% dev/test plan coverage and zero medium gaps required for Pass",
+            )
+        if gap_none and (req_pct is None or req_pct >= 100) and (tp_pct is None or tp_pct >= 100):
+            return "Pass", "pass", "Requirements, dev tests, and test plan alignment are satisfactory"
+        return (
+            "Pass with gaps",
+            "pass-gaps",
+            "Strict mode: remaining gaps — see sections below",
+        )
+
     if (tp_pct is not None and tp_pct < 85) or (req_pct is not None and req_pct < 100):
         return "Pass with gaps", "pass-gaps", "Implementation or test plan has remaining gaps — see sections below"
     return "Pass", "pass", "Requirements, dev tests, and test plan alignment are satisfactory"
@@ -137,7 +163,16 @@ def build_report(
     if analysis and analysis.get("gapsList"):
         gaps_html = analysis["gapsList"]
 
-    verdict, verdict_class, rationale = _verdict(req_pct, tp_pct, gap_summary)
+    manifest: dict[str, Any] = {}
+    manifest_path = base / "reports" / ".cache" / f"{key}-manifest.json"
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            manifest = {}
+    verdict_mode = get_verdict_mode(base, manifest)
+
+    verdict, verdict_class, rationale = _verdict(req_pct, tp_pct, gap_summary, mode=verdict_mode)
     if analysis:
         verdict = analysis.get("verdict", verdict)
         verdict_class = analysis.get("verdictClass", verdict_class)

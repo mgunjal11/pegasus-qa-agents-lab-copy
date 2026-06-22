@@ -109,3 +109,38 @@ def load_manifest_max_age(issue_key: str, root: Path | None = None) -> int:
         return int(data.get("cacheMaxAgeHours") or 24)
     except (TypeError, ValueError):
         return 24
+
+
+def is_prefetch_fresh(
+    issue_key: str,
+    pr_urls: list[str],
+    root: Path | None = None,
+    *,
+    max_age_hours: int = 24,
+) -> tuple[bool, str]:
+    """Prefetch cache matches PR URLs and is within max_age_hours."""
+    base = root or repo_root()
+    key = issue_key.upper()
+    path = base / "reports" / ".cache" / f"{key}-prefetch.json"
+    if not path.exists():
+        return False, "prefetch cache missing"
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False, "prefetch cache unreadable"
+
+    cached_urls = sorted(str(u).strip() for u in (data.get("prUrls") or []) if u)
+    wanted = sorted(str(u).strip() for u in pr_urls if u)
+    if cached_urls != wanted:
+        return False, "prefetch PR URL list changed"
+
+    fetched = cache_timestamp(path)
+    if not fetched:
+        return False, "prefetch timestamp missing"
+
+    age_h = (datetime.now(timezone.utc) - fetched).total_seconds() / 3600
+    if age_h > max_age_hours:
+        return False, f"prefetch older than {max_age_hours}h"
+
+    return True, "prefetch cache fresh"

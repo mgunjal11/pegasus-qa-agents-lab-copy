@@ -36,7 +36,7 @@ Pattern references: `plan-aware-review`, `pr-review`, and `plan-feature` from [m
 
 ## Preconditions
 
-See agent **First run (5 min)** for one-page setup (MCP, `gh`, allowlist, defaults, `testplans/`).
+See agent **First run (5 min)** for one-page setup — start with `python scripts/preflight_coverage_validator.py {KEY} --verify-jira` (MCP, `gh`, `.env`, allowlist, defaults).
 
 - **Atlassian MCP** authenticated for `wbdstreaming.atlassian.net`.
 - **`gh` CLI** installed and authenticated (`gh auth status`).
@@ -93,7 +93,7 @@ When invoked via slash command with issue key in `$ARGUMENTS`, run **end-to-end*
 | 3 | `fetch_confluence_requirements.py {KEY} --from-jira-cache` |
 | 4 | `fetch_jira_testplan.py {KEY} --from-jira-cache` |
 | 4b | If `status` is **`no_testplan`** → `/msc-testcase-writer {KEY}` (see [testplan-missing-fallback.md](references/testplan-missing-fallback.md)); re-run `fetch_jira_testplan.py` |
-| 5 | **One shell:** `prefetch_coverage_inputs.py {KEY} --pr URL …` (multiple `--pr`) or `--from-cache`; branch-only: `fetch_coverage_github.py {KEY} --repo org/repo --compare develop` |
+| 5 | **One shell:** `prefetch_coverage_inputs.py {KEY} --pr URL … --skip-if-fresh` (multiple `--pr`) or `--from-cache`; branch-only: `fetch_coverage_github.py {KEY} --repo org/repo --compare develop` |
 | 6 | `map_requirements_to_diff.py {KEY}` (`--skip-if-fresh`; symbol/test evidence via `mapping_evidence.py`; NFR SIT validation capped in `finalize_mapping_evidence()`) |
 | 7 | `build_coverage_report.py {KEY}` [`--rerun` force/stale remap] [`--execute-tests` optional local pytest] [`--analysis` optional] |
 | 8 | Manifest `lastReportFile` (builder writes timestamped HTML) |

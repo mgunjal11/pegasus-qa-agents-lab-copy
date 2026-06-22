@@ -1,0 +1,33 @@
+{
+  "issueKey": "MSC-FIXTURE",
+  "fetchedAt": "2026-06-22T00:00:00+00:00",
+  "requirementCount": 1,
+  "jiraRequirementCount": 1,
+  "ladrRequirementCount": 0,
+  "reqCoveragePct": 100.0,
+  "devTestCoveragePct": 100.0,
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Example requirement for golden test",
+      "source": "jira",
+      "codeStatus": "implemented",
+      "devTestStatus": "covered",
+      "owner": "dev",
+      "qaScope": "none",
+      "confidence": "high",
+      "matchedFiles": ["src/example.py"],
+      "matchedTests": ["test_example"],
+      "requirementType": "functional"
+    }
+  ],
+  "prs": [
+    {
+      "url": "https://github.com/wbd-msc/example/pull/1",
+      "number": 1,
+      "repo": "wbd-msc/example",
+      "state": "MERGED",
+      "devTests": "test_example.py"
+    }
+  ]
+}

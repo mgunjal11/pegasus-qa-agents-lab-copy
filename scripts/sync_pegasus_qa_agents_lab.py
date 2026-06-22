@@ -41,6 +41,8 @@ SCRIPTS = [
     "install_coverage_validator_permissions.py",
     "verify_jira_credentials.py",
     "upload_jira_testplan.py",
+    "preflight_coverage_validator.py",
+    "coverage_validator_config.py",
     "testplan_evidence.py",
     "testplan_gwt.py",
     "test_testplan_evidence.py",
@@ -58,6 +60,9 @@ SCRIPTS = [
     "cache_freshness.py",
     "test_mapping_evidence.py",
     "test_cache_freshness.py",
+    "test_verdict_mode.py",
+    "test_preflight_coverage_validator.py",
+    "test_coverage_pipeline_golden.py",
     "patch_trace_section_template.py",
     "test_summary_metric_info.py",
     "patch_report_footer.py",
@@ -100,6 +105,7 @@ PERMISSIONS = {
         "python scripts/fetch_confluence_requirements.py",
         "python scripts/map_requirements_to_diff.py",
         "python scripts/build_coverage_report.py",
+        "python scripts/preflight_coverage_validator.py",
         "python scripts/execute_pr_tests.py",
         "python scripts/generate_qmetry_excel.py",
         "python scripts/write_testcase_excel.py",
@@ -175,6 +181,7 @@ def main() -> None:
     write_gitignore(LAB)
     write_agents_md(LAB)
     copy_lab_readme_templates(LAB)
+    copy_test_fixtures(LAB)
     # Lab nested inside TestCursor: drop .cursor so Cursor does not double-register agents/skills.
     if not keep_cursor and LAB.resolve().parent == ROOT.resolve():
         lab_cursor = LAB / ".cursor"
@@ -213,6 +220,16 @@ def copy_lab_readme_templates(lab: Path) -> None:
             shutil.copy2(src, dst)
 
 
+def copy_test_fixtures(lab: Path) -> None:
+    src = ROOT / "scripts" / "test_fixtures"
+    dst = lab / "scripts" / "test_fixtures"
+    if not src.exists():
+        return
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst)
+
+
 _AGENTS_MD = """# Pegasus QA Agents Lab
 
 Three Cursor agents for MSC QA on [wbdstreaming.atlassian.net](https://wbdstreaming.atlassian.net).
@@ -220,7 +237,7 @@ Three Cursor agents for MSC QA on [wbdstreaming.atlassian.net](https://wbdstream
 | Agent | Invoke | Output |
 |-------|--------|--------|
 | **msc-testcase-writer** | `@msc-testcase-writer MSC-1234` | `testcases/{KEY}-testcases.xlsx` (QMetry FF2.0) |
-| **msc-dev-code-and-qa-test-coverage-validator** | `@msc-dev-code-and-qa-test-coverage-validator MSC-1234` | HTML report; §5 expandable Evidence (+N more); NFR SIT capped at medium; optional `--execute-tests`; §7 brief |
+| **msc-dev-code-and-qa-test-coverage-validator** | `@msc-dev-code-and-qa-test-coverage-validator MSC-1234` | HTML report; run `preflight_coverage_validator.py` first; §5 expandable Evidence; `verdictMode`; optional `--execute-tests` |
 | **msc-jira-bug** | `@msc-jira-bug` + defect description | MSC Bug in Jira (after explicit approval) |
 
 ## Skills (workflow docs — not duplicate slash commands)

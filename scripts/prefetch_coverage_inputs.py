@@ -228,6 +228,17 @@ def main() -> int:
         dest="write_manifest",
         help="Skip manifest file",
     )
+    parser.add_argument(
+        "--skip-if-fresh",
+        action="store_true",
+        help="Skip gh fetch when prefetch cache matches --pr URLs and is within cacheMaxAgeHours",
+    )
+    parser.add_argument(
+        "--cache-max-age",
+        type=int,
+        default=None,
+        help="Max prefetch age in hours (default: manifest or 24)",
+    )
     args = parser.parse_args()
 
     issue_key = args.issue_key.strip().upper()
@@ -251,8 +262,19 @@ def main() -> int:
             )
             return 1
 
+    from cache_freshness import is_prefetch_fresh, load_manifest_max_age
+
     cache_dir = Path("reports/.cache")
     cache_dir.mkdir(parents=True, exist_ok=True)
+    max_age = args.cache_max_age if args.cache_max_age is not None else load_manifest_max_age(issue_key)
+
+    if args.skip_if_fresh and pr_urls:
+        fresh, reason = is_prefetch_fresh(issue_key, pr_urls, max_age_hours=max_age)
+        if fresh:
+            out_path = cache_dir / f"{issue_key}-prefetch.json"
+            print(out_path.resolve())
+            print(f"Skipped prefetch ({reason})", file=sys.stderr)
+            return 0
 
     prs: list[dict[str, Any]] = []
     inferred_repo = args.repo

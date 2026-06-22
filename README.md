@@ -58,6 +58,16 @@ gh auth login
 gh auth status
 ```
 
+### 4b. Preflight (coverage validator — recommended)
+
+Validate setup before the first report:
+
+```bash
+python scripts/preflight_coverage_validator.py MSC-204417 --verify-jira
+```
+
+Checks Python, openpyxl, `gh` auth, `.env`, allowlist, and report template. Fix any **FAIL** items before running the validator.
+
 ### 5. Jira API credentials (coverage validator — when test plan is a Jira attachment)
 
 If the story has a **test plan Excel attached on the Jira issue** (not only a SharePoint link), Python scripts download the file via the **Jira REST API**. That requires a local `.env` file — Atlassian MCP alone does not download attachment binaries.
@@ -265,6 +275,7 @@ cp .cursor/skills/coverage-validator/validator.defaults.example.json .coverage-v
 | `testPlanSheet` | string | Worksheet name, e.g. `Inc as full` |
 | `testPlanFilename` | string | Display name when Jira references SharePoint |
 | `testRepoRoot` | string | Absolute or workspace-relative path to a **local clone** of the service repo — enables `build_coverage_report.py {KEY} --execute-tests` |
+| `verdictMode` | string | `pragmatic` (default) \| `strict` — **strict** requires 100% dev + test plan coverage and zero Medium gaps for **Pass** |
 
 Example:
 
@@ -427,7 +438,9 @@ docs/
 | `fetch_jira_testplan.py` | Download Jira attachment / parse local plan; honest summary note |
 | `verify_jira_credentials.py` | Verify `ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN` against a Jira issue |
 | `upload_jira_testplan.py` | Upload local Excel test plan to a Jira issue (optional) |
-| `prefetch_coverage_inputs.py` | Batch `gh` PR view/diff/checks → cache |
+| `prefetch_coverage_inputs.py` | Batch `gh` PR view/diff/checks → cache; `--skip-if-fresh` |
+| `preflight_coverage_validator.py` | One-shot setup validation before first run |
+| `coverage_validator_config.py` | Workspace defaults + `verdictMode` loader |
 | `map_requirements_to_diff.py` | Requirement → PR diff; FR/NFR; NFR SIT evidence caps |
 | `mapping_evidence.py` | Symbol + pytest-name scoring; `rank_matched_files()` |
 | `test_trace_evidence.py` | Unit tests for compact §5 Evidence display |
