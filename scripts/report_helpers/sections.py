@@ -1526,7 +1526,7 @@ def format_dev_tests_summary(test_paths: list[str], *, max_items: int = 6) -> st
         if not raw:
             continue
         name = Path(raw).name
-        if name == "conftest.py" and is_test_diff_path(raw):
+        if name == "conftest.py":
             has_conftest = True
             continue
         if not is_dev_test_module_path(raw):

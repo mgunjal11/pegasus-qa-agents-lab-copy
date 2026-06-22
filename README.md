@@ -68,7 +68,7 @@ python scripts/preflight_coverage_validator.py MSC-204417 --verify-jira
 
 Checks Python, openpyxl, `gh` auth, `.env`, allowlist, and report template. Fix any **FAIL** items before running the validator.
 
-**One-shot pipeline** (after Jira MCP fetch):
+**One-shot pipeline** (Jira fetch included):
 
 ```bash
 python scripts/run_coverage_validator.py MSC-204417 --auto --write --skip-if-fresh --verify-jira
@@ -447,8 +447,10 @@ docs/
 | `upload_jira_testplan.py` | Upload local Excel test plan to a Jira issue (optional) |
 | `prefetch_coverage_inputs.py` | Batch `gh` PR view/diff/checks → cache; `--skip-if-fresh` |
 | `preflight_coverage_validator.py` | One-shot setup validation (also auto-run by orchestrator) |
-| `run_coverage_validator.py` | Auto-preflight + confluence → test plan → prefetch → map → build |
-| `semantic_mapping_boost.py` | Optional second-pass semantic evidence for requirement mapping |
+| `run_coverage_validator.py` | Auto-preflight + Jira fetch → confluence → test plan → prefetch → map → build |
+| `fetch_jira_story.py` | Jira REST → `{KEY}-jira.json` (requirements, attachments, PR URLs); `--from-mcp-json` |
+| `jira_story.py` | Jira cache normalization + R1…Rn requirement extraction |
+| `semantic_mapping_boost.py` | Optional enhanced evidence pass for requirement mapping |
 | `coverage_validator_config.py` | Workspace defaults + `verdictMode` / `semanticMappingBoost` loader |
 | `coverage_report_helpers.py` | Facade over `report_helpers/` (sections + ui tooltips) |
 | `map_requirements_to_diff.py` | Requirement → PR diff; FR/NFR; NFR SIT evidence caps |

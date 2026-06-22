@@ -61,7 +61,7 @@ def test_render_pr_rows():
 
 def test_pr_table_header_has_info_icons():
     header = render_pr_table_header_row()
-    assert header.count('class="metric-info-tip"') == 6
+    assert header.count('class="metric-info-tip"') == 7
     assert "Dev tests" in header
     assert "CI status" in header
 

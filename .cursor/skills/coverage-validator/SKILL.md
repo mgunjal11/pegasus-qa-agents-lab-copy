@@ -64,13 +64,13 @@ python scripts/prefetch_coverage_inputs.py {ISSUE-KEY} --pr {PR_URL} --skip-if-f
 python scripts/prefetch_coverage_inputs.py {ISSUE-KEY} --repo {org}/{repo} --search-pr
 ```
 
-**Orchestrated pipeline** (auto-preflight, semantic mapping boost, build):
+**Orchestrated pipeline** (auto-preflight, Jira REST fetch, enhanced evidence mapping, build):
 
 ```bash
 python scripts/run_coverage_validator.py {ISSUE-KEY} --auto --write --skip-if-fresh --verify-jira
 ```
 
-Requires warm `reports/.cache/{KEY}-jira.json` from Step 2 MCP fetch. Mapping uses optional `--semantic-boost` (default on via `semanticMappingBoost` in defaults).
+`fetch_jira_story.py` writes `reports/.cache/{KEY}-jira.json` (requirements R1…Rn, attachments, PR URLs, test plan refs). Use `--from-mcp-json` when REST is unavailable. Mapping uses `--semantic-boost` (default on via `semanticMappingBoost` in defaults).
 
 Reuse: `@msc-dev-code-and-qa-test-coverage-validator {ISSUE-KEY} --from-cache --auto`
 
@@ -100,22 +100,22 @@ Accept: issue key (`MSC-1234`), browse URL, ARI from search, or `issueKey` in ma
 
 Skip when `--skip-jira` and fresh `reports/.cache/{KEY}-jira.json` exists.
 
-Otherwise:
+Otherwise run (preferred — one command with orchestrator):
 
-1. Resolve `cloudId`: pass `wbdstreaming.atlassian.net` first; if that fails, call `getAccessibleAtlassianResources`.
-2. Call `getJiraIssue` with `responseContentFormat: "markdown"`.
-3. Request fields: `summary`, `description`, `issuetype`, `status`, `priority`, `components`, `labels`, `comment`, `issuelinks`, `attachment`, and acceptance-criteria custom fields visible in the response (common hint: `customfield_10037`).
-4. In **`fetch-only`** or **`auto`** mode, also call `getJiraIssueRemoteIssueLinks` in parallel with step 2.
-5. Persist **attachment metadata** and **comment bodies** (plain text or ADF flattened) in `reports/.cache/{KEY}-jira.json` — required for SharePoint test plan links and sheet names (e.g. *Inc as full*). Run `python scripts/fetch_jira_testplan.py {KEY} --from-jira-cache` to auto-populate `testPlanReferences` in the cache.
-6. Extract discrete **requirement items** from:
-   - Acceptance criteria (bullets, numbered lists, Given/When/Then)
-   - User story scope in description
-   - Explicit in-scope / out-of-scope statements
-   - Non-functional requirements when stated (performance, security, logging)
+```bash
+python scripts/fetch_jira_story.py {ISSUE-KEY}
+python scripts/fetch_jira_story.py {ISSUE-KEY} --skip-if-fresh
+```
 
-Number each item `R1`, `R2`, … List **assumptions** and **gaps** when AC is incomplete.
+Uses Jira REST (`.env` credentials). Writes `reports/.cache/{KEY}-jira.json` with summary, description, attachments, comments, **requirements R1…Rn**, PR URLs, and test plan references.
 
-In **`fetch-only`** mode, write cache to `reports/.cache/{KEY}-jira.json` (issue markdown, fields, remote links, extracted requirements) and stop unless GitHub prefetch is also requested.
+**MCP alternative** when REST is unavailable: call `getJiraIssue` + `getJiraIssueRemoteIssueLinks`, save JSON, then:
+
+```bash
+python scripts/fetch_jira_story.py {ISSUE-KEY} --from-mcp-json path/to/issue.json
+```
+
+Requirement extraction order: explicit `R1:` lines → acceptance-criteria custom fields → AC section bullets → bug inference (Expected/Actual/SIT/test data).
 
 ### Step 2b: Fetch Confluence / LADR requirements
 

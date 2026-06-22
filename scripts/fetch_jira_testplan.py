@@ -340,7 +340,7 @@ def load_run_options(issue_key: str) -> dict[str, Any]:
 
 
 def adf_to_text(node: Any) -> str:
-    """Flatten Atlassian Document Format to plain text."""
+    """Flatten Atlassian Document Format to plain text (includes link/card URLs)."""
     if node is None:
         return ""
     if isinstance(node, str):
@@ -350,9 +350,20 @@ def adf_to_text(node: Any) -> str:
     if not isinstance(node, dict):
         return str(node)
     parts: list[str] = []
-    if node.get("type") == "text" and node.get("text"):
+    node_type = node.get("type")
+    attrs = node.get("attrs") or {}
+    if node_type == "text" and node.get("text"):
         parts.append(str(node["text"]))
-    for key in ("content", "marks"):
+        for mark in node.get("marks") or []:
+            if isinstance(mark, dict) and mark.get("type") == "link":
+                href = (mark.get("attrs") or {}).get("href")
+                if href:
+                    parts.append(str(href))
+    if node_type in ("inlineCard", "blockCard") and attrs.get("url"):
+        parts.append(str(attrs["url"]))
+    if node_type == "media" and attrs.get("url"):
+        parts.append(str(attrs["url"]))
+    for key in ("content",):
         if key in node:
             parts.append(adf_to_text(node[key]))
     return " ".join(p for p in parts if p)

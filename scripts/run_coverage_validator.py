@@ -3,7 +3,7 @@
 Orchestrate coverage-validator shell pipeline with automatic preflight.
 
 Runs preflight first, then confluence → test plan → prefetch → map → semantic boost → build.
-Jira MCP fetch remains an agent step; this script requires a warm jira cache unless --skip-jira-check.
+Jira MCP fetch remains optional (--from-mcp-json); default uses fetch_jira_story.py (REST).
 
   python scripts/run_coverage_validator.py MSC-205625 --auto --write
   python scripts/run_coverage_validator.py MSC-205625 --preflight-only
@@ -57,13 +57,28 @@ def _run(cmd: list[str], *, label: str) -> dict[str, Any]:
         return {"stdout": result.stdout.strip()}
 
 
+def _load_manifest(key: str) -> dict[str, Any]:
+    path = _cache_dir(key) / f"{key.upper()}-manifest.json"
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
 def _prefetch_args(key: str, args: argparse.Namespace, defaults: dict[str, Any]) -> list[str]:
     cmd = [sys.executable, str(SCRIPTS / "prefetch_coverage_inputs.py"), key]
-    pr = args.pr or defaults.get("prUrl") or defaults.get("pr")
-    repo = args.repo or defaults.get("repo")
-    if pr:
-        cmd.extend(["--pr", str(pr)])
-    elif repo:
+    manifest = _load_manifest(key)
+    pr_urls = list(args.pr_urls or []) if hasattr(args, "pr_urls") else []
+    if not pr_urls and args.pr:
+        pr_urls = [args.pr]
+    if not pr_urls:
+        pr_urls = list(manifest.get("prUrls") or [])
+    for url in pr_urls:
+        cmd.extend(["--pr", str(url)])
+    repo = args.repo or defaults.get("repo") or manifest.get("repo")
+    if not pr_urls and repo:
         cmd.extend(["--repo", str(repo)])
         if defaults.get("searchPrIfMissing", True) and not args.no_search_pr:
             cmd.append("--search-pr")
@@ -89,13 +104,19 @@ def run_pipeline(key: str, args: argparse.Namespace) -> dict[str, Any]:
     if args.preflight_only:
         return {"preflight": preflight, "skipped": True}
 
+    steps: list[dict[str, Any]] = [{"preflight": preflight}]
+
+    if args.fetch_jira:
+        jira_cmd = [sys.executable, str(SCRIPTS / "fetch_jira_story.py"), key]
+        if args.skip_if_fresh:
+            jira_cmd.append("--skip-if-fresh")
+        steps.append(_run(jira_cmd, label="jira"))
+
     if not args.skip_jira_check and not _jira_cache_exists(key):
         raise RuntimeError(
-            f"Missing reports/.cache/{key}-jira.json — fetch Jira via Atlassian MCP first, "
-            f"then re-run run_coverage_validator.py {key}"
+            f"Missing reports/.cache/{key}-jira.json after fetch — "
+            f"check .env credentials or pass --from-mcp-json to fetch_jira_story.py"
         )
-
-    steps: list[dict[str, Any]] = [{"preflight": preflight}]
 
     if not args.skip_testplan:
         steps.append(
@@ -140,6 +161,12 @@ def main() -> int:
     parser.add_argument("--write", action="store_true", help="Write HTML report")
     parser.add_argument("--preflight-only", action="store_true")
     parser.add_argument("--skip-jira-check", action="store_true")
+    parser.add_argument(
+        "--fetch-jira",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Fetch Jira story via fetch_jira_story.py before pipeline (default: on)",
+    )
     parser.add_argument("--skip-testplan", action="store_true")
     parser.add_argument("--skip-if-fresh", action="store_true", default=True)
     parser.add_argument("--no-search-pr", action="store_true")

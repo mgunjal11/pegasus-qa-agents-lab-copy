@@ -20,6 +20,7 @@ def test_format_dev_tests_summary_prioritizes_pytest_modules():
     summary = format_dev_tests_summary(paths)
     assert "test_passport_manager.py" in summary
     assert "test_incrementals.py" in summary
+    assert "conftest.py" in summary
     assert summary.index("test_passport_manager") < summary.index("conftest")
 
 

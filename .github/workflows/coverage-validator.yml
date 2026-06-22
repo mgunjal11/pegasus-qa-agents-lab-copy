@@ -1,0 +1,38 @@
+# Run coverage validator on a Jira issue key (manual / scheduled).
+# Requires: ATLASSIAN_EMAIL, ATLASSIAN_API_TOKEN, gh auth in repo secrets or self-hosted runner.
+name: Coverage validator
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_key:
+        description: Jira issue key (e.g. MSC-205625)
+        required: true
+        type: string
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Preflight
+        env:
+          ATLASSIAN_EMAIL: ${{ secrets.ATLASSIAN_EMAIL }}
+          ATLASSIAN_API_TOKEN: ${{ secrets.ATLASSIAN_API_TOKEN }}
+        run: python scripts/preflight_coverage_validator.py ${{ inputs.issue_key }} --verify-jira
+      - name: Run coverage validator
+        env:
+          ATLASSIAN_EMAIL: ${{ secrets.ATLASSIAN_EMAIL }}
+          ATLASSIAN_API_TOKEN: ${{ secrets.ATLASSIAN_API_TOKEN }}
+        run: |
+          python scripts/run_coverage_validator.py ${{ inputs.issue_key }} --auto --write --skip-if-fresh --verify-jira
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ inputs.issue_key }}
+          path: reports/${{ inputs.issue_key }}*.html

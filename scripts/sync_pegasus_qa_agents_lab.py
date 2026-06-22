@@ -33,6 +33,8 @@ SCRIPTS = [
     "ci_coverage.py",
     "fetch_coverage_github.py",
     "fetch_jira_testplan.py",
+    "fetch_jira_story.py",
+    "jira_story.py",
     "fetch_confluence_requirements.py",
     "confluence_requirements.py",
     "test_confluence_requirements.py",
@@ -79,6 +81,7 @@ SCRIPTS = [
     "test_ci_coverage.py",
     "prepare_testcase_writer_context.py",
     "test_prepare_testcase_writer_context.py",
+    "test_fetch_jira_story.py",
     "test_fetch_jira_testplan_summary.py",
     "test_dev_tests_pr_column.py",
     "regen_msc204417_report.py",
@@ -109,6 +112,7 @@ PERMISSIONS = {
         "python scripts/map_requirements_to_diff.py",
         "python scripts/build_coverage_report.py",
         "python scripts/preflight_coverage_validator.py",
+        "python scripts/fetch_jira_story.py",
         "python scripts/run_coverage_validator.py",
         "python scripts/execute_pr_tests.py",
         "python scripts/generate_qmetry_excel.py",
@@ -186,6 +190,7 @@ def main() -> None:
     write_gitignore(LAB)
     write_agents_md(LAB)
     copy_lab_readme_templates(LAB)
+    copy_github_workflow(LAB)
     copy_test_fixtures(LAB)
     # Lab nested inside TestCursor: drop .cursor so Cursor does not double-register agents/skills.
     if not keep_cursor and LAB.resolve().parent == ROOT.resolve():
@@ -233,6 +238,15 @@ def copy_report_helpers(lab: Path) -> None:
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
+
+
+def copy_github_workflow(lab: Path) -> None:
+    src = ROOT / "scripts" / "templates" / "coverage-validator-ci.yml"
+    if not src.exists():
+        return
+    dst_dir = lab / ".github" / "workflows"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst_dir / "coverage-validator.yml")
 
 
 def copy_test_fixtures(lab: Path) -> None:
