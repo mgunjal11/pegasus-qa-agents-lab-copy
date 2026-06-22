@@ -85,7 +85,7 @@ Task Progress:
 - [ ] Step 3: Resolve linked GitHub PR(s)
 - [ ] Step 4: Fetch PR changes and CI status
 - [ ] Step 5: Fetch and parse attached QMetry test plan (unless `--skip-testplan`)
-- [ ] Step 5a: If `no_testplan` → `/msc-testcase-writer` + re-fetch (unless `skipTestcaseGeneration`)
+- [ ] Step 5a: If `no_testplan` or uncovered R/L → auto-generate via `generate_testcases_from_requirements.py` (or `/msc-testcase-writer` on exit 2)
 - [ ] Step 6: Map requirements to code, tests, test plan cases, and dev/QA ownership
 - [ ] Step 7: Compute coverage percentages (including dev test and test plan coverage)
 - [ ] Step 8: Build HTML report with dev vs QA and test plan sections; run `apply_report_ui_enhancements()`
@@ -221,21 +221,24 @@ Parse output: `testCases` (include `section`, `summary`, `mascot_links`, `eviden
 
 When `status` is `referenced_not_local`, set `{{TESTPLAN_COVERAGE_PCT}}` to **Pending**, populate `{{TESTPLAN_NOTE}}` with the referenced filename and sheet (not "no QMetry attachment"). When `status` is `no_testplan`, use **`NA`** until Step 5a generates a local plan.
 
-### Step 5a: Missing Jira test plan → `/msc-testcase-writer`
+### Step 5a: Missing or partial test plan → auto-generate (or `/msc-testcase-writer`)
 
 Read [references/testplan-missing-fallback.md](references/testplan-missing-fallback.md).
 
-After the first `fetch_jira_testplan.py` run, if `reports/.cache/{KEY}-testplan.json` has **`status: "no_testplan"`** (no Jira attachment, no comment/SharePoint reference, no existing `testcases/{KEY}-testcases.xlsx`):
+**Default (`run_coverage_validator.py`):** orchestrator runs `generate_testcases_from_requirements.py` automatically:
 
-1. **Do not** invoke testcase writer when `status` is `referenced_not_local` — user must add `testplans/{filename}` per [jira-testplan-validation.md](references/jira-testplan-validation.md).
-2. When manifest/defaults **`generateTestPlanIfMissing`** is true (default in `--auto --write`) and **`skipTestcaseGeneration`** is false:
-   - Run **`/msc-testcase-writer {KEY}`** using `.cursor/skills/jira-story-testcases/SKILL.md` and `.cursor/agents/msc-testcase-writer.md`.
-   - In **`--auto --write`**, skip testcase-writer approval (Step 6) — write `reports/.cache/{KEY}-testcases-source.tsv`, run `python scripts/write_testcase_excel.py {KEY}` (only `testcases/{KEY}-testcases.xlsx` in `testcases/`).
-   - Cover Jira **R1…Rn** and linked LADR scenarios where Confluence cache exists.
-3. Re-run: `python scripts/fetch_jira_testplan.py {KEY} --from-jira-cache` (loads generated `testcases/` files).
-4. Set `{{TESTPLAN_NOTE}}` to mention **generated via msc-testcase-writer (not on Jira)** when reporting — data/note only; **do not** edit tooltip HTML/CSS in `coverage_report_helpers.py` or `apply_report_ui_enhancements()`.
+| Situation | Script output | Re-fetch |
+|-----------|---------------|----------|
+| `no_testplan` | `testcases/{KEY}-testcases.xlsx` | Yes |
+| `ok` with uncovered R/L (`fillTestPlanGaps`) | `testcases/{KEY}-gap-supplement.xlsx` merged at fetch | Yes |
 
-In **interactive** mode (no `--auto`), offer `/msc-testcase-writer {KEY}` with normal user approval before writing files.
+Flags: `--no-auto-generate-testplan`, `--no-fill-testplan-gaps`. Defaults: `generateTestPlanIfMissing`, `fillTestPlanGaps`, `skipTestcaseGeneration`.
+
+**Fallback:** exit **2** / `needs_testcase_writer` when auto-generate is off or produces zero cases — invoke **`/msc-testcase-writer {KEY}`** (richer LLM scenarios), then re-run orchestrator.
+
+Manual gap-only: `python scripts/generate_testcases_from_requirements.py {KEY} --gap-only from-testplan --write-excel`
+
+Set `{{TESTPLAN_NOTE}}` to mention **generated locally** (not on Jira) for workspace-generated plans — data only; **do not** edit tooltip HTML/CSS.
 
 ### Step 5b: Map requirements to PR diff (automated)
 

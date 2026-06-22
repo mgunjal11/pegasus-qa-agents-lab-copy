@@ -92,6 +92,71 @@ def _testcase_xlsx_path(key: str) -> Path:
     return ROOT / "testcases" / f"{key.upper()}-testcases.xlsx"
 
 
+def _auto_generate_enabled(
+    defaults: dict[str, Any],
+    manifest: dict[str, Any],
+    args: argparse.Namespace,
+) -> bool:
+    if args.skip_testplan:
+        return False
+    if manifest.get("skipTestcaseGeneration") or defaults.get("skipTestcaseGeneration"):
+        return False
+    if getattr(args, "no_auto_generate_testplan", False):
+        return False
+    gen = manifest.get("generateTestPlanIfMissing")
+    if gen is None:
+        gen = defaults.get("generateTestPlanIfMissing", True)
+    return bool(gen)
+
+
+def _fill_gaps_enabled(
+    defaults: dict[str, Any],
+    manifest: dict[str, Any],
+    args: argparse.Namespace,
+) -> bool:
+    if args.skip_testplan:
+        return False
+    if getattr(args, "no_fill_testplan_gaps", False):
+        return False
+    fill = manifest.get("fillTestPlanGaps")
+    if fill is None:
+        fill = defaults.get("fillTestPlanGaps", True)
+    return bool(fill)
+
+
+def _uncovered_requirement_ids(key: str) -> list[str]:
+    tp = _load_testplan_cache(key)
+    cov = tp.get("coverage") if isinstance(tp.get("coverage"), dict) else {}
+    ids: list[str] = []
+    for field in ("uncoveredRequirements", "uncoveredJiraRequirements", "uncoveredLadrRequirements"):
+        for item in cov.get(field) or []:
+            rid = str(item).strip().upper()
+            if rid and rid not in ids:
+                ids.append(rid)
+    return ids
+
+
+def _run_generate_testcases(
+    key: str,
+    *,
+    gap_only: str | None = None,
+    write_excel: bool = True,
+) -> dict[str, Any]:
+    cmd = [sys.executable, str(SCRIPTS / "generate_testcases_from_requirements.py"), key]
+    if gap_only:
+        cmd.extend(["--gap-only", gap_only])
+    if write_excel:
+        cmd.append("--write-excel")
+    return _run(cmd, label="generate-testcases")
+
+
+def _refetch_testplan(key: str, label: str = "testplan-refetch") -> dict[str, Any]:
+    return _run(
+        [sys.executable, str(SCRIPTS / "fetch_jira_testplan.py"), key, "--from-jira-cache"],
+        label=label,
+    )
+
+
 def _should_invoke_testcase_writer(
     key: str,
     defaults: dict[str, Any],
@@ -193,17 +258,50 @@ def run_pipeline(key: str, args: argparse.Namespace) -> dict[str, Any]:
             steps.append(testplan_result)
 
         if _should_invoke_testcase_writer(key, defaults, manifest, args):
-            return {
-                "issueKey": key,
-                "status": "needs_testcase_writer",
-                "testplanStatus": "no_testplan",
-                "steps": len(steps),
-                "message": (
-                    f"No Jira test plan for {key}. Invoke @msc-testcase-writer {key} "
-                    f"(see testplan-missing-fallback.md), then re-run this script."
-                ),
-                "preflight": preflight,
-            }
+            if _auto_generate_enabled(defaults, manifest, args):
+                gen_result = _run_generate_testcases(key, gap_only=None)
+                steps.append(gen_result)
+                if gen_result.get("generatedCases", 0) > 0 or _testcase_xlsx_path(key).exists():
+                    testplan_result = _refetch_testplan(key)
+                    steps.append(testplan_result)
+                else:
+                    return {
+                        "issueKey": key,
+                        "status": "needs_testcase_writer",
+                        "testplanStatus": "no_testplan",
+                        "steps": len(steps),
+                        "message": (
+                            f"Auto-generate produced no cases for {key}. "
+                            f"Invoke @msc-testcase-writer {key}, then re-run."
+                        ),
+                        "preflight": preflight,
+                    }
+            else:
+                return {
+                    "issueKey": key,
+                    "status": "needs_testcase_writer",
+                    "testplanStatus": "no_testplan",
+                    "steps": len(steps),
+                    "message": (
+                        f"No Jira test plan for {key}. Invoke @msc-testcase-writer {key} "
+                        f"(see testplan-missing-fallback.md), then re-run this script."
+                    ),
+                    "preflight": preflight,
+                }
+        elif (
+            testplan_result.get("status") == "ok"
+            and _fill_gaps_enabled(defaults, manifest, args)
+        ):
+            uncovered = _uncovered_requirement_ids(key)
+            if uncovered:
+                gap_result = _run_generate_testcases(
+                    key,
+                    gap_only=",".join(uncovered),
+                )
+                steps.append(gap_result)
+                if gap_result.get("generatedCases", 0) > 0:
+                    testplan_result = _refetch_testplan(key, label="testplan-gap-refetch")
+                    steps.append(testplan_result)
 
     steps.append(_run(_prefetch_args(key, args, defaults), label="prefetch"))
 
@@ -255,6 +353,16 @@ def main() -> int:
         "--verify-jira",
         action="store_true",
         help="Smoke-test Jira REST during preflight",
+    )
+    parser.add_argument(
+        "--no-auto-generate-testplan",
+        action="store_true",
+        help="Do not auto-generate QMetry cases when Jira test plan is missing",
+    )
+    parser.add_argument(
+        "--no-fill-testplan-gaps",
+        action="store_true",
+        help="Do not auto-generate supplement cases for uncovered R/L in attached plan",
     )
     args = parser.parse_args()
 

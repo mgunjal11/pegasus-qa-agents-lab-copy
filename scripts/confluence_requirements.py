@@ -625,6 +625,13 @@ def map_testcases_to_requirements(
         norm = _normalize(haystack)
         mapped: set[str] = set()
 
+        maps_match = re.search(r"\(maps\s+([RL\d,\s]+)\)", haystack, re.IGNORECASE)
+        if maps_match:
+            for part in re.split(r"[,\s]+", maps_match.group(1)):
+                rid = part.strip().upper()
+                if rid:
+                    mapped.add(rid)
+
         # Explicit R# in summary
         for req in requirements:
             rid = req["id"]

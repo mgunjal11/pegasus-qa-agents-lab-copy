@@ -1100,6 +1100,19 @@ def resolve_testplan_files(
         except RuntimeError as exc:
             auth_error = str(exc)
 
+    gap_supplement = repo_root() / "testcases" / f"{issue_key}-gap-supplement.xlsx"
+    if gap_supplement.exists():
+        downloaded.append((gap_supplement, "QMetry Template"))
+        meta.append(
+            {
+                "filename": gap_supplement.name,
+                "source": "gap_supplement",
+                "sheet": "QMetry Template",
+                "localFound": True,
+                "localPath": str(gap_supplement),
+            }
+        )
+
     if not downloaded and testplan_refs:
         att_names = {a.get("filename") for a in attachments if a.get("filename")}
         refs_to_use = testplan_refs
@@ -1191,7 +1204,8 @@ def main() -> int:
     ]
     if jira_files and not args.attachment:
         allowed = set(jira_files)
-        files = [(p, s) for p, s in files if p.name in allowed]
+        gap_name = f"{issue_key}-gap-supplement.xlsx"
+        files = [(p, s) for p, s in files if p.name in allowed or p.name == gap_name]
 
     all_cases: list[TestCase] = []
     parse_errors: list[str] = []
