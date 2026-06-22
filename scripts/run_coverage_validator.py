@@ -67,6 +67,53 @@ def _load_manifest(key: str) -> dict[str, Any]:
         return {}
 
 
+def _load_jira_pr_urls(key: str) -> list[str]:
+    path = _cache_dir(key) / f"{key.upper()}-jira.json"
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return list(data.get("prUrls") or [])
+
+
+def _load_testplan_cache(key: str) -> dict[str, Any]:
+    path = _cache_dir(key) / f"{key.upper()}-testplan.json"
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _testcase_xlsx_path(key: str) -> Path:
+    return ROOT / "testcases" / f"{key.upper()}-testcases.xlsx"
+
+
+def _should_invoke_testcase_writer(
+    key: str,
+    defaults: dict[str, Any],
+    manifest: dict[str, Any],
+    args: argparse.Namespace,
+) -> bool:
+    """Step 5a — agent must run @msc-testcase-writer when no Jira plan and no local xlsx."""
+    if args.skip_testplan:
+        return False
+    if manifest.get("skipTestcaseGeneration") or defaults.get("skipTestcaseGeneration"):
+        return False
+    gen = manifest.get("generateTestPlanIfMissing")
+    if gen is None:
+        gen = defaults.get("generateTestPlanIfMissing", True)
+    if not gen:
+        return False
+    tp = _load_testplan_cache(key)
+    if tp.get("status") != "no_testplan":
+        return False
+    return not _testcase_xlsx_path(key).exists()
+
+
 def _prefetch_args(key: str, args: argparse.Namespace, defaults: dict[str, Any]) -> list[str]:
     cmd = [sys.executable, str(SCRIPTS / "prefetch_coverage_inputs.py"), key]
     manifest = _load_manifest(key)
@@ -75,6 +122,8 @@ def _prefetch_args(key: str, args: argparse.Namespace, defaults: dict[str, Any])
         pr_urls = [args.pr]
     if not pr_urls:
         pr_urls = list(manifest.get("prUrls") or [])
+    if not pr_urls:
+        pr_urls = _load_jira_pr_urls(key)
     for url in pr_urls:
         cmd.extend(["--pr", str(url)])
     repo = args.repo or defaults.get("repo") or manifest.get("repo")
@@ -125,12 +174,36 @@ def run_pipeline(key: str, args: argparse.Namespace) -> dict[str, Any]:
                 label="confluence",
             )
         )
-        steps.append(
-            _run(
-                [sys.executable, str(SCRIPTS / "fetch_jira_testplan.py"), key, "--from-jira-cache"],
-                label="testplan",
-            )
+        testplan_result = _run(
+            [sys.executable, str(SCRIPTS / "fetch_jira_testplan.py"), key, "--from-jira-cache"],
+            label="testplan",
         )
+        steps.append(testplan_result)
+
+        manifest = _load_manifest(key)
+        # Local xlsx may exist from a prior testcase-writer run — re-fetch before halting.
+        if (
+            testplan_result.get("status") == "no_testplan"
+            and _testcase_xlsx_path(key).exists()
+        ):
+            testplan_result = _run(
+                [sys.executable, str(SCRIPTS / "fetch_jira_testplan.py"), key, "--from-jira-cache"],
+                label="testplan-refetch",
+            )
+            steps.append(testplan_result)
+
+        if _should_invoke_testcase_writer(key, defaults, manifest, args):
+            return {
+                "issueKey": key,
+                "status": "needs_testcase_writer",
+                "testplanStatus": "no_testplan",
+                "steps": len(steps),
+                "message": (
+                    f"No Jira test plan for {key}. Invoke @msc-testcase-writer {key} "
+                    f"(see testplan-missing-fallback.md), then re-run this script."
+                ),
+                "preflight": preflight,
+            }
 
     steps.append(_run(_prefetch_args(key, args, defaults), label="prefetch"))
 
@@ -188,6 +261,8 @@ def main() -> int:
     try:
         result = run_pipeline(args.issue_key, args)
         print(json.dumps(result, indent=2))
+        if result.get("status") == "needs_testcase_writer":
+            return 2
         return 0
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)

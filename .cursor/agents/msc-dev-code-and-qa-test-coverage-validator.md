@@ -24,15 +24,17 @@ Preflight and Jira fetch run **automatically** inside `run_coverage_validator.py
 
 ## Slash invoke (`--auto --write`)
 
-**One shell turn** (after optional MCP if REST credentials unavailable):
+**Step 1 — orchestrator** (Jira REST fetch unless `--no-fetch-jira`):
 
 ```bash
 python scripts/run_coverage_validator.py {KEY} --auto --write --skip-if-fresh --verify-jira
 ```
 
-Runs preflight → **fetch_jira_story** → confluence → test plan → prefetch → map (enhanced evidence) → build.
+Runs preflight → **fetch_jira_story** → confluence → test plan → prefetch → map → build.
 
-If `no_testplan` → `@msc-testcase-writer {KEY}` per [testplan-missing-fallback.md](.cursor/skills/coverage-validator/references/testplan-missing-fallback.md), then re-run orchestrator.
+**Step 5a (mandatory when test plan missing):** If orchestrator exits **2** or JSON has `"status": "needs_testcase_writer"` (Jira has no QMetry attachment and no `testcases/{KEY}-testcases.xlsx`), **do not** treat the run as complete. Invoke **`@msc-testcase-writer {KEY}`** per [testplan-missing-fallback.md](.cursor/skills/coverage-validator/references/testplan-missing-fallback.md) — in `--auto --write`, skip testcase-writer approval and write Excel immediately — then **re-run Step 1**.
+
+The shell script cannot draft Given/When/Then cases; Step 5a is **agent-only** and was omitted when earlier runs used only `run_coverage_validator.py` without checking exit code 2.
 
 **MCP fallback:** `python scripts/fetch_jira_story.py {KEY} --from-mcp-json /tmp/issue.json` then orchestrator with `--no-fetch-jira`.
 
@@ -40,9 +42,9 @@ If `no_testplan` → `@msc-testcase-writer {KEY}` per [testplan-missing-fallback
 
 | Rule | Do |
 |------|-----|
-| Pipeline | Prefer single `run_coverage_validator.py` call |
+| Pipeline | Run `run_coverage_validator.py`; on `needs_testcase_writer` → `@msc-testcase-writer` → re-run orchestrator |
 | Preflight | Auto on invoke; on auth errors → `preflight_coverage_validator.py {KEY} --verify-jira` |
 | GitHub | One prefetch in orchestrator; `--skip-if-fresh` when PR URLs unchanged |
-| Never | Separate ad-hoc `gh` calls; edit `SUMMARY_METRIC_INFO` for content changes |
+| Never | Stop after `no_testplan` without testcase writer; separate ad-hoc `gh` calls; edit `SUMMARY_METRIC_INFO` for content changes |
 
 **Developed by:** Mayur Gunjal

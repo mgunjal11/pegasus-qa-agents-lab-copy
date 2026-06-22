@@ -38,6 +38,7 @@ AC_HEADING_RE = re.compile(
     r"acceptance\s+criteria|acceptance\s+conditions",
     re.IGNORECASE,
 )
+AC_NUMBERED_RE = re.compile(r"(?<![a-zA-Z0-9])AC(\d+)\s*:", re.IGNORECASE)
 BULLET_RE = re.compile(r"^(?:[-*•]|\d+[.)])\s+(.+)$")
 
 
@@ -163,6 +164,21 @@ def _extract_ac_custom_fields(fields: dict[str, Any]) -> list[dict[str, str]]:
             for i, bullet in enumerate(bullets, start=1):
                 reqs.append({"id": f"R{i}", "text": bullet})
     return _dedupe_requirements(reqs)
+
+
+def _extract_ac_numbered(texts: list[str]) -> list[dict[str, str]]:
+    """Extract AC1:, AC2:, … blocks from ADF-flattened or inline Jira descriptions."""
+    found: list[dict[str, str]] = []
+    for blob in texts:
+        if not blob or not AC_NUMBERED_RE.search(blob):
+            continue
+        parts = AC_NUMBERED_RE.split(blob)
+        for i in range(1, len(parts), 2):
+            num = parts[i]
+            body = parts[i + 1].strip() if i + 1 < len(parts) else ""
+            if len(body) > 12:
+                found.append({"id": f"R{num}", "text": body[:800]})
+    return _dedupe_requirements(found)
 
 
 def _extract_ac_section(description: str) -> list[dict[str, str]]:
@@ -300,6 +316,10 @@ def extract_requirements_from_issue(data: dict[str, Any]) -> list[dict[str, str]
         return reqs
 
     reqs = _extract_ac_custom_fields(fields)
+    if reqs:
+        return reqs
+
+    reqs = _extract_ac_numbered([description])
     if reqs:
         return reqs
 
