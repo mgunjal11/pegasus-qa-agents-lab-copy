@@ -40,6 +40,7 @@ SCRIPTS = [
     "prefetch_coverage_inputs.py",
     "install_coverage_validator_permissions.py",
     "verify_jira_credentials.py",
+    "upload_jira_testplan.py",
     "testplan_evidence.py",
     "testplan_gwt.py",
     "test_testplan_evidence.py",

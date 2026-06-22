@@ -53,7 +53,19 @@ gh auth login
 gh auth status
 ```
 
-### 5. Auto-run allowlist (coverage validator — recommended)
+### 5. Jira API credentials (coverage validator — when test plan is a Jira attachment)
+
+If the story has a **test plan Excel attached on the Jira issue** (not only a SharePoint link), Python scripts download the file via the **Jira REST API**. That requires a local `.env` file — Atlassian MCP alone does not download attachment binaries.
+
+```bash
+cp .env.example .env
+# Edit .env — see Configuration → Jira REST API credentials
+python scripts/verify_jira_credentials.py MSC-204417
+```
+
+Skip this step when the test plan is only referenced in a comment/SharePoint (use `testplans/` instead) or when the validator auto-generates cases via `@msc-testcase-writer`.
+
+### 6. Auto-run allowlist (coverage validator — recommended)
 
 ```bash
 python scripts/install_coverage_validator_permissions.py
@@ -61,14 +73,14 @@ python scripts/install_coverage_validator_permissions.py
 
 Cursor **Settings → Agents → Auto-Run → Allowlist**. Details: [.cursor/skills/coverage-validator/references/auto-approve-setup.md](.cursor/skills/coverage-validator/references/auto-approve-setup.md).
 
-### 6. Run an agent
+### 7. Run an agent
 
 ```text
 /msc-testcase-writer MSC-204417
 /msc-dev-code-and-qa-test-coverage-validator MSC-204417
 ```
 
-See [Configuration](#configuration) for optional workspace defaults, Jira credentials, and local test plans.
+See [Configuration](#configuration) for workspace defaults, **Jira REST credentials**, local test plans, and optional pytest settings.
 
 ---
 
@@ -80,11 +92,95 @@ All config files are **local** (gitignored where noted). The coverage validator 
 
 | File | Required | Gitignored | Used by |
 |------|----------|------------|---------|
-| `.coverage-validator.defaults.json` | No | Yes | Coverage validator |
-| `.env` | Recommended | Yes | Jira attachment download (`fetch_jira_testplan.py`) |
+| `.env` | **When Jira has test plan attachment** | Yes | Jira attachment download, Confluence REST fallback |
+| `.coverage-validator.defaults.json` | No | Yes | Coverage validator defaults |
 | `reports/.cache/{KEY}-manifest.json` | Auto-created | Partial | Per-issue run options + `lastReportFile` |
-| `testplans/*.xlsx` | Sometimes | Yes (contents) | Local SharePoint-referenced test plans |
+| `testplans/*.xlsx` | Sometimes | Yes (contents) | SharePoint-referenced test plans (no Jira attachment) |
 | `~/.cursor/permissions.json` | Recommended | N/A (user home) | Auto-run MCP + shell without prompts |
+
+### Jira and Atlassian authentication
+
+Two complementary setups — both may be needed for full coverage validation:
+
+| Method | Where configured | Used for |
+|--------|------------------|----------|
+| **Atlassian MCP** | Cursor **Settings → MCP** → `user-atlassian` (OAuth / sign-in) | Agent reads Jira issue text, comments, attachment **metadata**, remote Confluence links |
+| **Jira REST API** | Repo root `.env` (`ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN`) | Python scripts **download** Excel attachments, verify auth, optional Confluence REST when not using MCP cache |
+
+**MCP does not replace `.env` for attachment download.** When a QMetry/Domino workbook is attached to the Jira issue, `fetch_jira_testplan.py` calls the Jira REST API to fetch the binary file into `reports/.cache/{KEY}-testplan-files/`.
+
+#### When `.env` Jira credentials are required
+
+| Test plan source | `.env` needed? | What to do |
+|------------------|----------------|------------|
+| **Excel attached on Jira issue** | **Yes** | Set `.env` and run `verify_jira_credentials.py` |
+| **SharePoint / comment link only** (no attachment) | No | Copy workbook to `testplans/`; set `testPlanPath` / `testPlanSheet` in defaults |
+| **No test plan on Jira** | No | Validator may invoke `@msc-testcase-writer` to generate `testcases/{KEY}-testcases.xlsx` |
+| **Locally generated plan** (`workspace_generated`) | No | Uses `testcases/{KEY}-testcases.xlsx` from testcase writer |
+
+Same credentials are used by `fetch_confluence_requirements.py` when fetching Confluence/LADR pages via REST (agents normally populate `{KEY}-jira.json` and `{KEY}-confluence.json` via MCP first).
+
+#### Jira REST API credentials (`.env`)
+
+**1. Create an Atlassian API token**
+
+1. Sign in at [wbdstreaming.atlassian.net](https://wbdstreaming.atlassian.net).
+2. Open [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
+3. **Create API token** — copy the token immediately (shown once).
+
+Use your **WBD Atlassian account email** (the address you use to log into Jira), not a service account, unless your team provides one.
+
+**2. Create `.env` from the example**
+
+```bash
+cp .env.example .env
+```
+
+**3. Set required variables**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ATLASSIAN_EMAIL` | **Yes** | Your Atlassian account email (e.g. `you@wbd.com`) |
+| `ATLASSIAN_API_TOKEN` | **Yes** | API token from [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens) |
+
+Optional aliases (same values — scripts accept either name):
+
+| Variable | Alias for |
+|----------|-----------|
+| `JIRA_EMAIL` | `ATLASSIAN_EMAIL` |
+| `JIRA_API_TOKEN` | `ATLASSIAN_API_TOKEN` |
+
+Example `.env` (never commit this file):
+
+```bash
+ATLASSIAN_EMAIL=you@wbd.com
+ATLASSIAN_API_TOKEN=ATATT3xFfGF0...your-token-here
+```
+
+**4. Verify credentials**
+
+```bash
+python scripts/verify_jira_credentials.py MSC-204417
+```
+
+Expected success output includes `"ok": true`, your `issueKey`, and `attachmentCount` ≥ 1 when the issue has Excel attached. If auth works but `attachmentCount` is 0, attach the test plan on Jira or use `testplans/` for a local copy.
+
+**5. Security**
+
+- `.env` is listed in `.gitignore` — **never commit** tokens to GitHub.
+- Prefer `.env` in the repo root (same folder as `scripts/`).
+- Shell exports override `.env` only when the variable is already set in the environment before `load_dotenv()` runs.
+
+**Scripts that use Jira REST auth**
+
+| Script | Purpose |
+|--------|---------|
+| `fetch_jira_testplan.py` | Download Jira attachment → parse QMetry/Domino sheet |
+| `verify_jira_credentials.py` | Test email + token against a live issue |
+| `fetch_confluence_requirements.py` | Confluence REST fallback (same token) |
+| `upload_jira_testplan.py` | Optional — upload local Excel to a Jira issue |
+
+Implementation: `scripts/jira_env.py` (`load_dotenv`, Basic auth header).
 
 ### `.coverage-validator.defaults.json`
 
@@ -126,20 +222,12 @@ Example:
 }
 ```
 
-### `.env` (Jira API — test plan attachments)
-
-```bash
-cp .env.example .env
-python scripts/verify_jira_credentials.py MSC-204417
-```
-
-Set credentials from `.env.example` so `fetch_jira_testplan.py` can download Excel attachments from Jira when present.
-
-### Environment variables
+### Other environment variables
 
 | Variable | Overrides | Purpose |
 |----------|-----------|---------|
 | `COVERAGE_TEST_REPO_ROOT` | `testRepoRoot` in defaults | Local service clone for optional `--execute-tests` pytest run |
+| `JIRA_EMAIL` / `JIRA_API_TOKEN` | — | Aliases for `ATLASSIAN_EMAIL` / `ATLASSIAN_API_TOKEN` |
 
 ### Per-issue manifest
 
@@ -170,12 +258,12 @@ When Jira **references** SharePoint/Domino Excel but does not attach the file, c
 | Requirement | testcase-writer | jira-bug | coverage-validator |
 |-------------|-----------------|----------|-------------------|
 | Atlassian MCP | Yes | Yes | Yes |
+| `.env` Jira token (`ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN`) | No | No | **Yes when test plan is Jira attachment** |
 | `gh` CLI | No | No | **Yes** |
 | Python + `openpyxl` | Yes | No | Yes |
 | Permissions allowlist | Optional | Optional | **Recommended** |
-| `.env` Jira token | No | No | **Recommended** (attachments) |
 | `.coverage-validator.defaults.json` | No | No | **Optional** |
-| `testplans/` Excel | No | No | **Sometimes** |
+| `testplans/` Excel | No | No | **When SharePoint link only** (no attachment) |
 | `testRepoRoot` | No | No | **Optional** (`--execute-tests`) |
 
 ---
@@ -277,7 +365,9 @@ docs/
 | `write_testcase_excel.py` | Cache TSV → `testcases/{KEY}-testcases.xlsx` (QMetry FF2.0) |
 | `prepare_testcase_writer_context.py` | `jira_and_ladr` vs `jira_only` mode |
 | `fetch_confluence_requirements.py` | LADR/Confluence → `{KEY}-confluence.json` |
-| `fetch_jira_testplan.py` | Download/parse test plan; honest summary note |
+| `fetch_jira_testplan.py` | Download Jira attachment / parse local plan; honest summary note |
+| `verify_jira_credentials.py` | Verify `ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN` against a Jira issue |
+| `upload_jira_testplan.py` | Upload local Excel test plan to a Jira issue (optional) |
 | `prefetch_coverage_inputs.py` | Batch `gh` PR view/diff/checks → cache |
 | `map_requirements_to_diff.py` | Requirement → PR diff; FR/NFR; NFR SIT evidence caps |
 | `mapping_evidence.py` | Symbol + pytest-name scoring; `rank_matched_files()` |
@@ -294,9 +384,11 @@ docs/
 
 | Symptom | Fix |
 |---------|-----|
-| Duplicate `/msc-*` suggestions | Use agents only; skills are workflow folders |
+| `Jira credentials missing` / HTTP 401 on test plan fetch | Create `.env` from `.env.example`; set `ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN`; run `verify_jira_credentials.py {KEY}` |
+| Test plan **Pending** / attachment not downloaded | Confirm Excel is **attached** on Jira (not link-only); verify token; re-run `fetch_jira_testplan.py {KEY} --from-jira-cache` |
+| Test plan **Pending** / `referenced_not_local` | No Jira attachment — add Excel under `testplans/`; set `testPlanPath` in defaults |
 | Test plan 0% but xlsx existed | Re-run `write_testcase_excel.py {KEY}` then `fetch_jira_testplan.py` |
-| Test plan **Pending** / `referenced_not_local` | Add Excel under `testplans/`; set `testPlanPath` in defaults |
+| Duplicate `/msc-*` suggestions | Use agents only; skills are workflow folders |
 | §5 SIT AC shows **high** or FR instead of NFR | Re-run `map_requirements_to_diff.py` + `build_coverage_report.py --rerun` |
 | Open gaps note condensed | When ≥5 gaps, card summarizes — see **§6** for full list |
 | CI coverage **NA** | Link PR; re-run prefetch |
