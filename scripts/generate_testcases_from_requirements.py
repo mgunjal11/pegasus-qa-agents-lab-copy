@@ -348,7 +348,7 @@ def main() -> int:
             return rc
         payload["xlsx"] = str(xlsx_path.resolve())
 
-    print(json.dumps(payload, indent=2))
+    print(json.dumps(payload))
     return 0
 
 

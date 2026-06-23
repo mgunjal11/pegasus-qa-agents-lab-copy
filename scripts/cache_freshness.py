@@ -130,10 +130,16 @@ def is_prefetch_fresh(
     except (OSError, json.JSONDecodeError):
         return False, "prefetch cache unreadable"
 
-    cached_urls = sorted(str(u).strip() for u in (data.get("prUrls") or []) if u)
+    cached_requested = data.get("requestedPrUrls") or data.get("prUrls") or []
+    cached_urls = sorted(str(u).strip() for u in cached_requested if u)
     wanted = sorted(str(u).strip() for u in pr_urls if u)
     if cached_urls != wanted:
         return False, "prefetch PR URL list changed"
+
+    if data.get("prefetchErrors") and wanted:
+        cached_ok = sorted(str(u).strip() for u in (data.get("prUrls") or []) if u)
+        if cached_ok != wanted:
+            return False, "prefetch has inaccessible PRs — retry after gh auth"
 
     fetched = cache_timestamp(path)
     if not fetched:

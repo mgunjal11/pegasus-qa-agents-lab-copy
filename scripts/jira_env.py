@@ -179,6 +179,34 @@ def jira_request(
         raise RuntimeError(f"Jira HTTP {exc.code}: {body[:400]}") from exc
 
 
+def probe_github_repo(org: str, repo: str) -> dict[str, Any]:
+    """Return whether the current gh auth can read org/repo (multi-org prefetch preflight)."""
+    import shutil
+    import subprocess
+
+    full = f"{org}/{repo}"
+    if not shutil.which("gh"):
+        return {"repo": full, "ok": False, "detail": "GitHub CLI not installed"}
+    result = subprocess.run(
+        ["gh", "api", f"repos/{org}/{repo}", "--jq", ".full_name"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        return {"repo": full, "ok": True, "detail": result.stdout.strip()}
+    err = (result.stderr or result.stdout or "").strip()
+    hint = ""
+    low = err.lower()
+    if "not found" in low or "404" in low:
+        hint = (
+            f" Authorize org access: gh auth refresh -h github.com -s read:org,repo "
+            f"then approve SSO for {org} at https://github.com/orgs/{org}"
+        )
+    return {"repo": full, "ok": False, "detail": err or "repository not accessible", "hint": hint}
+
+
 def fetch_issue_attachments(issue_key: str, site: str = "wbdstreaming.atlassian.net") -> list[dict[str, Any]]:
     url = f"https://{site}/rest/api/3/issue/{issue_key}?fields=attachment"
     data = json.loads(jira_get(url).decode())

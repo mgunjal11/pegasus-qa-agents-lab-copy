@@ -52,9 +52,22 @@ def _run(cmd: list[str], *, label: str) -> dict[str, Any]:
             )
         raise RuntimeError(f"{label} failed (exit {result.returncode}): {err}{hint}")
     try:
-        return json.loads(result.stdout.strip().splitlines()[-1])
-    except (json.JSONDecodeError, IndexError):
-        return {"stdout": result.stdout.strip()}
+        stdout = result.stdout.strip()
+        if stdout:
+            try:
+                return json.loads(stdout)
+            except json.JSONDecodeError:
+                for line in reversed(stdout.splitlines()):
+                    line = line.strip()
+                    if not line.startswith("{"):
+                        continue
+                    try:
+                        return json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+    except IndexError:
+        pass
+    return {"stdout": result.stdout.strip()}
 
 
 def _load_manifest(key: str) -> dict[str, Any]:
@@ -198,6 +211,7 @@ def _prefetch_args(key: str, args: argparse.Namespace, defaults: dict[str, Any])
             cmd.append("--search-pr")
     if args.skip_if_fresh:
         cmd.append("--skip-if-fresh")
+    cmd.append("--from-jira-cache")
     return cmd
 
 

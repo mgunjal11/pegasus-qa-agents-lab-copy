@@ -1084,7 +1084,21 @@ def resolve_testplan_files(
         or run_opts.get("testPlanSheet")
         or (testplan_refs[0].get("sheet") if testplan_refs else None)
     )
-    candidates = [a for a in attachments if is_testplan_attachment(a.get("filename", ""))]
+    ref_filenames = {
+        r.get("filename")
+        for r in testplan_refs
+        if r.get("filename")
+    }
+    candidates: list[dict[str, Any]] = []
+    seen_att: set[str] = set()
+    for att in attachments:
+        fn = att.get("filename", "")
+        att_key = str(att.get("id") or fn)
+        if att_key in seen_att:
+            continue
+        if is_testplan_attachment(fn) or fn in ref_filenames:
+            seen_att.add(att_key)
+            candidates.append(att)
     for att in candidates:
         try:
             path = download_attachment(att, dest_dir)
@@ -1115,7 +1129,8 @@ def resolve_testplan_files(
             }
         )
 
-    if not downloaded and testplan_refs:
+    downloaded_names = {p.name for p, _ in downloaded}
+    if testplan_refs:
         att_names = {a.get("filename") for a in attachments if a.get("filename")}
         refs_to_use = testplan_refs
         if att_names:
@@ -1124,13 +1139,16 @@ def resolve_testplan_files(
                 refs_to_use = matched
         seen_paths: set[str] = set()
         for ref in refs_to_use:
+            filename = ref.get("filename")
+            if filename and filename in downloaded_names:
+                continue
             path, sheet = resolve_local_file(issue_key, ref, run_opts)
             sheet = sheet_override or sheet
             meta.append(
                 {
                     "source": ref.get("source", "reference"),
                     "type": ref.get("type"),
-                    "filename": ref.get("filename"),
+                    "filename": filename,
                     "sheet": sheet,
                     "url": ref.get("url"),
                     "localFound": bool(path and path.exists()),
@@ -1142,6 +1160,8 @@ def resolve_testplan_files(
                 if key not in seen_paths:
                     seen_paths.add(key)
                     downloaded.append((path, sheet))
+                    if filename:
+                        downloaded_names.add(filename)
 
     if not downloaded:
         root = repo_root()

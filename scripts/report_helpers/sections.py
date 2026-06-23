@@ -1793,6 +1793,39 @@ def render_branch_compare_pr_rows(issue_key: str, root: Path | None = None) -> s
     return "\n".join(rows)
 
 
+def build_pr_prefetch_note(issue_key: str, root: Path | None = None) -> str:
+    """§2 note for branch-compare, inaccessible PRs, and Jira dev-panel count mismatch."""
+    parts: list[str] = []
+    bc = build_branch_compare_pr_note(issue_key, root)
+    if bc:
+        parts.append(bc)
+    cache = load_prefetch_cache(issue_key, root)
+    jira = load_jira_cache(issue_key, root)
+    errors = cache.get("prefetchErrors") or []
+    if errors:
+        items = []
+        for err in errors[:5]:
+            url = esc(str(err.get("url") or ""))
+            hint = esc(str(err.get("hint") or err.get("error") or "")[:240])
+            items.append(f"<li><a href=\"{url}\" target=\"_blank\">{url}</a> — {hint}</li>")
+        parts.append(
+            '<div class="note-box"><strong>Some linked PRs were not prefetched</strong> '
+            f"(gh auth / org SSO):<ul>{''.join(items)}</ul></div>"
+        )
+    dev = jira.get("jiraDevPanel") or {}
+    extracted = len(jira.get("prUrls") or [])
+    panel_count = int(dev.get("githubPrCount") or 0)
+    if panel_count and extracted < panel_count:
+        parts.append(
+            '<div class="note-box"><strong>Jira Development panel lists '
+            f"{panel_count} GitHub PR(s)</strong> but only {extracted} URL(s) were found in "
+            "Jira text. Paste missing PR links in comments or add them to "
+            f"<code>reports/.cache/{esc(issue_key.upper())}-manifest.json</code> "
+            '<code>prUrls</code>.</div>'
+        )
+    return "".join(parts)
+
+
 def render_pr_rows_from_prefetch(
     issue_key: str,
     root: Path | None = None,
@@ -1813,6 +1846,21 @@ def render_pr_rows_from_prefetch(
             names = [n for n in (pr.get("diffNames") or []) if is_dev_test_module_path(n)]
             dev = format_dev_tests_summary(names)
         rows.append(prefetch_pr_to_row(pr, dev_tests=dev))
+    for err in cache.get("prefetchErrors") or []:
+        rows.append(
+            {
+                "url": err.get("url") or "",
+                "number": err.get("number", ""),
+                "repo": err.get("repo") or "",
+                "state": "Inaccessible",
+                "title": str(err.get("error") or "Not prefetched")[:120],
+                "dev_tests": "—",
+                "checks": err.get("hint") or "gh auth / org SSO",
+                "author": "",
+                "fileCount": "",
+                "testFileCount": "",
+            }
+        )
     return render_pr_rows(rows)
 
 
