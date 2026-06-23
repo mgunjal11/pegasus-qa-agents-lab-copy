@@ -1,6 +1,6 @@
 ﻿#!/usr/bin/env python3
 """
-Generic HTML coverage report builder for msc-dev-code-and-qa-test-coverage-validator.
+Generic HTML coverage report builder for Req2Release.
 
 Uses caches: jira, testplan, prefetch, mapping (+ optional analysis JSON for overrides).
 

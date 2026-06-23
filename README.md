@@ -13,8 +13,8 @@ AI-driven QA agents for the WBD Media Supply Chain (MSC) on Jira and GitHub. Clo
 
 | Agent | Purpose | Invoke |
 |-------|---------|--------|
-| **msc-testcase-writer** | Jira (+ LADR when linked) → QMetry FF2.0 Excel (Given/When/Then) | `@msc-testcase-writer MSC-204417` or `/msc-testcase-writer MSC-204417` |
-| **msc-dev-code-and-qa-test-coverage-validator** | Jira AC + LADR + test plan vs PR; §5 FR/NFR; NFR SIT capped at medium; optional `--execute-tests` | `@msc-dev-code-and-qa-test-coverage-validator MSC-204417` or `/msc-dev-code-and-qa-test-coverage-validator MSC-204417` |
+| **Spec2Test** | Jira (+ LADR when linked) → QMetry FF2.0 Excel (Given/When/Then) | `@Spec2Test MSC-204417` or `/Spec2Test MSC-204417` |
+| **Req2Release** | Jira AC + LADR + test plan vs PR; §5 FR/NFR; NFR SIT capped at medium; optional `--execute-tests` | `@Req2Release MSC-204417` or `/Req2Release MSC-204417` |
 | **msc-jira-bug** | Draft MSC Bug tickets (creates only after approval) | `@msc-jira-bug` + defect description |
 
 Workflow skills live under `.cursor/skills/` — they are **not** duplicate slash commands. Agent definitions: `.cursor/agents/`.
@@ -118,7 +118,7 @@ ATLASSIAN_API_TOKEN=paste-token-here
 python scripts/verify_jira_credentials.py MSC-204417
 ```
 
-Skip this step when the test plan is only referenced in a comment/SharePoint (use `testplans/` instead) or when the validator auto-generates cases via `@msc-testcase-writer`.
+Skip this step when the test plan is only referenced in a comment/SharePoint (use `testplans/` instead) or when the validator auto-generates cases via `@Spec2Test`.
 
 ### 6. Auto-run allowlist (coverage validator — recommended)
 
@@ -131,8 +131,8 @@ Cursor **Settings → Agents → Auto-Run → Allowlist**. Details: [.cursor/ski
 ### 7. Run an agent
 
 ```text
-/msc-testcase-writer MSC-204417
-/msc-dev-code-and-qa-test-coverage-validator MSC-204417
+/Spec2Test MSC-204417
+/Req2Release MSC-204417
 ```
 
 See [Configuration](#configuration) for workspace defaults, **Jira REST credentials**, local test plans, and optional pytest settings.
@@ -170,7 +170,7 @@ Two complementary setups — both may be needed for full coverage validation:
 |------------------|----------------|------------|
 | **Excel attached on Jira issue** | **Yes** | Set `.env` and run `verify_jira_credentials.py` |
 | **SharePoint / comment link only** (no attachment) | No | Copy workbook to `testplans/`; set `testPlanPath` / `testPlanSheet` in defaults |
-| **No test plan on Jira** | No | Validator may invoke `@msc-testcase-writer` to generate `testcases/{KEY}-testcases.xlsx` |
+| **No test plan on Jira** | No | Validator may invoke `@Spec2Test` to generate `testcases/{KEY}-testcases.xlsx` |
 | **Locally generated plan** (`workspace_generated`) | No | Uses `testcases/{KEY}-testcases.xlsx` from testcase writer |
 
 Same credentials are used by `fetch_confluence_requirements.py` when fetching Confluence/LADR pages via REST (agents normally populate `{KEY}-jira.json` and `{KEY}-confluence.json` via MCP first).
@@ -317,7 +317,7 @@ After a successful coverage run, `reports/.cache/{KEY}-manifest.json` stores:
 Reuse a prior run:
 
 ```text
-/msc-dev-code-and-qa-test-coverage-validator MSC-204417 --from-cache --auto
+/Req2Release MSC-204417 --from-cache --auto
 ```
 
 ### Local test plans (`testplans/`)
@@ -387,9 +387,9 @@ When the coverage validator finds **no Jira test plan** (`no_testplan`), it auto
 ## Example commands
 
 ```text
-/msc-testcase-writer MSC-204417
+/Spec2Test MSC-204417
 
-/msc-dev-code-and-qa-test-coverage-validator MSC-204417
+/Req2Release MSC-204417
 
 /msc-jira-bug Promo normalization fails on DN HD ingest — QA
 ```

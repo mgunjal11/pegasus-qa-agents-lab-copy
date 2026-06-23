@@ -3,7 +3,7 @@
 Deterministic QMetry test case generation from Jira + LADR requirement caches.
 
 Used by run_coverage_validator.py for Step 5a (no_testplan) and partial gap fill.
-LLM @msc-testcase-writer remains optional for richer scenarios; this script is one-shot safe.
+LLM @Spec2Test remains optional for richer scenarios; this script is one-shot safe.
 
   python scripts/generate_testcases_from_requirements.py MSC-213475 --write-excel
   python scripts/generate_testcases_from_requirements.py MSC-205625 --gap-only R4,L5 --write-excel

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Load Jira + LADR requirements for msc-testcase-writer drafting."""
+"""Load Jira + LADR requirements for Spec2Test drafting."""
 
 from __future__ import annotations
 

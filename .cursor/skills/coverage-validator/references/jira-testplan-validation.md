@@ -82,7 +82,7 @@ Cache: `reports/.cache/{KEY}-testplan.json`
 
 When `status` is **`no_testplan`** (not `referenced_not_local`):
 
-1. Coverage validator invokes **`/msc-testcase-writer {KEY}`** when `generateTestPlanIfMissing` is true (default in `--auto --write`).
+1. Coverage validator invokes **`/Spec2Test {KEY}`** when `generateTestPlanIfMissing` is true (default in `--auto --write`).
 2. Writes `reports/.cache/{KEY}-testcases-source.tsv` + `testcases/{KEY}-testcases.xlsx` via `write_testcase_excel.py`.
 3. Re-runs `fetch_jira_testplan.py` — script priority **4** loads `testcases/{KEY}-testcases.xlsx`.
 4. Report §3 note should state plan was **generated locally** (not attached on Jira). Does not change report tooltip markup.
@@ -140,7 +140,7 @@ For each mapped pair (`R{n}` ↔ `TC{x}`):
 | `workspace_generated` | **No execution evidence** — `testplan_evidence.py` skips step extraction (`include_steps=False`) |
 | `referenced_not_local` | Pending / setup hint until local file added |
 
-**Report note** — `testPlanSummaryNote` from `build_testplan_summary_note()` — filename/sheet only when actually parsed; generated plans state local msc-testcase-writer origin (not Domino defaults).
+**Report note** — `testPlanSummaryNote` from `build_testplan_summary_note()` — filename/sheet only when actually parsed; generated plans state local Spec2Test origin (not Domino defaults).
 
 ## Report placeholders
 

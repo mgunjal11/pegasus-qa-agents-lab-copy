@@ -5,13 +5,13 @@ description: >-
   cases (11 QMetry columns, Given/When/Then, downloadable Excel with merged
   cells). When LADR/Confluence is linked, drafts cover Jira acceptance criteria
   and LADR ESS scenarios together; otherwise Jira only. Shows a full draft for
-  review before writing files. Invoke via @msc-testcase-writer KEY or
-  /msc-testcase-writer KEY on wbdstreaming.atlassian.net.
+  review before writing files. Invoke via @Spec2Test KEY or
+  /Spec2Test KEY on wbdstreaming.atlassian.net.
 ---
 
 # Jira story → QMetry test cases
 
-Invoke checklist: `.cursor/agents/msc-testcase-writer.md` (First run + coverage-validator fallback). This skill has the full workflow.
+Invoke checklist: `.cursor/agents/Spec2Test.md` (First run + coverage-validator fallback). This skill has the full workflow.
 
 ## Preconditions
 
@@ -129,7 +129,7 @@ Follow [testcase-template.md](testcase-template.md) exactly (11 columns).
 
 ### Step 6: Review gate (required)
 
-**Exception:** When invoked from **`/msc-dev-code-and-qa-test-coverage-validator`** in **`--auto --write`** mode and Jira has **no test plan** (`no_testplan`), skip this gate and write files immediately (see `.cursor/skills/coverage-validator/references/testplan-missing-fallback.md`).
+**Exception:** When invoked from **`/Req2Release`** in **`--auto --write`** mode and Jira has **no test plan** (`no_testplan`), skip this gate and write files immediately (see `.cursor/skills/coverage-validator/references/testplan-missing-fallback.md`).
 
 Show the user a complete draft before writing any file. The draft must include:
 

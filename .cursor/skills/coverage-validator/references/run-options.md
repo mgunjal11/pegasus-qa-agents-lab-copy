@@ -1,4 +1,4 @@
-# Run options — msc-dev-code-and-qa-test-coverage-validator
+# Run options — Req2Release
 
 Use these options to avoid repeated manual prompts (MCP Allow/Run clicks, PR URL re-entry, repo guessing).
 
@@ -9,12 +9,12 @@ Use these options to avoid repeated manual prompts (MCP Allow/Run clicks, PR URL
 python scripts/prefetch_coverage_inputs.py MSC-209376 --pr https://github.com/wbd-msc/my-repo/pull/42
 
 # Full validation using cache + auto mode
-@msc-dev-code-and-qa-test-coverage-validator MSC-209376 --from-cache --auto
+@Req2Release MSC-209376 --from-cache --auto
 ```
 
 ```bash
 # Or pass everything inline (agent fetches Jira via MCP once, GitHub via prefetch or gh batch)
-@msc-dev-code-and-qa-test-coverage-validator MSC-209376 --pr https://github.com/wbd-msc/my-repo/pull/42 --repo wbd-msc/my-repo --auto --write
+@Req2Release MSC-209376 --pr https://github.com/wbd-msc/my-repo/pull/42 --repo wbd-msc/my-repo --auto --write
 ```
 
 ## Modes
@@ -45,7 +45,7 @@ Modes combine: `--fetch-only` takes precedence; `--from-cache` skips gh when cac
 | `--skip-pr-search` | | Do not search Jira/heuristics when `--pr` provided |
 | `--skip-jira` | | Use cached Jira markdown only (fetch-only must have run first) |
 | `--skip-testplan` | | Skip attached test plan fetch and validation |
-| `--skip-testcase-generation` | | Do not invoke `/msc-testcase-writer` when Jira has no test plan |
+| `--skip-testcase-generation` | | Do not invoke `/Spec2Test` when Jira has no test plan |
 | `--sheet NAME` | `--sheet "Inc as full"` | Excel sheet for comment-referenced / Domino test plans |
 | `--post-jira` | | Post summary comment to Jira (default off) |
 | `--cache-max-age H` | `--cache-max-age 48` | Hours before cache is stale (default 24) |
@@ -83,7 +83,7 @@ For repeat runs on the same story, save a manifest:
 }
 ```
 
-Run: `@msc-dev-code-and-qa-test-coverage-validator --manifest reports/.cache/MSC-209376-manifest.json`
+Run: `@Req2Release --manifest reports/.cache/MSC-209376-manifest.json`
 
 After a successful run the agent may write the manifest to `reports/.cache/{ISSUE-KEY}-manifest.json` for next time.
 

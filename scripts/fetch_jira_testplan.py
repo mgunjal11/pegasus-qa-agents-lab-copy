@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fetch and parse test plans for msc-dev-code-and-qa-test-coverage-validator.
+Fetch and parse test plans for Req2Release.
 
 Sources (priority order):
   1. --attachment local file(s)
@@ -290,7 +290,7 @@ def build_testplan_summary_note(
     if is_generated_local:
         return (
             f"Local QMetry test plan {filename}{tab_part} · {count_part} {count_label} · "
-            f"generated locally via msc-testcase-writer — not attached on Jira."
+            f"generated locally via Spec2Test — not attached on Jira."
         )
 
     if ref_type == "sharepoint" or (primary_ref and comment_sheet):

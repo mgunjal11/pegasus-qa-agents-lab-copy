@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Single-shot GitHub fetch for msc-dev-code-and-qa-test-coverage-validator.
+Single-shot GitHub fetch for Req2Release.
 
 Use ONE agent Shell call instead of many gh approvals:
 

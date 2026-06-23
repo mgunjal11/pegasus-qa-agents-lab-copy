@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import html
 
-REPORT_AGENT_NAME = "msc-dev-code-and-qa-test-coverage-validator"
+REPORT_AGENT_NAME = "Req2Release"
 REPORT_DEVELOPER = "Mayur Gunjal"
 
 

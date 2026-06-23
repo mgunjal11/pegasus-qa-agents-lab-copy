@@ -8,7 +8,7 @@ Jira comment: *"Refer Inc as full sheet for Test plan and evidence"* â†’ `D
 
 1. Copy the workbook to `testplans/Domino Test Plan.xlsx`
 2. Optionally set `testPlanPath` / `testPlanSheet` in `.coverage-validator.defaults.json`
-3. Re-run `@msc-dev-code-and-qa-test-coverage-validator {KEY}`
+3. Re-run `@Req2Release {KEY}`
 
 ## Jira attachment
 
@@ -16,4 +16,4 @@ If the Excel is on the issue, set `.env` from `.env.example` so `fetch_jira_test
 
 ## No test plan on Jira
 
-Coverage validator can auto-generate QMetry cases via `@msc-testcase-writer` and `write_testcase_excel.py`.
+Coverage validator can auto-generate QMetry cases via `@Spec2Test` and `write_testcase_excel.py`.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""HTML helpers for msc-dev-code-and-qa-test-coverage-validator reports (facade)."""
+"""HTML helpers for Req2Release reports (facade)."""
 
 from __future__ import annotations
 

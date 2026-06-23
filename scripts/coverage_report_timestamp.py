@@ -1,5 +1,5 @@
 """
-Report filename timestamp for msc-dev-code-and-qa-test-coverage-validator.
+Report filename timestamp for Req2Release.
 
 Uses the worker's local timezone by default (IST, EST, etc.).
 Override via .coverage-validator.defaults.json:

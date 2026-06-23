@@ -16,9 +16,9 @@ description: >-
   --repo, --skip-testplan, and manifest files to avoid repeated manual fetches.
 ---
 
-# MSC dev code and QA test coverage validator
+# Req2Release (MSC dev code and QA test coverage validator)
 
-> **Renamed** from `msc-code-coverage-validator` / `/msc-code-coverage-validator`. Do not use the old name in docs, commands, or agent invocations.
+> **Agent slash command:** `/Req2Release` (formerly `msc-dev-code-and-qa-test-coverage-validator`). Do not use the old name in docs, commands, or agent invocations.
 
 Validate that GitHub PR(s) linked to an MSC Jira story implement the described requirements, that **attached QMetry test plans** cover the acceptance criteria, and quantify coverage at five levels, **separating dev test ownership from QA handoff**:
 
@@ -53,7 +53,7 @@ Parse the user message and merge options from (highest priority wins):
 | **from-cache** (`--from-cache`) | Repeat run | Use fresh `reports/.cache/{KEY}-prefetch.json` and optional jira cache; skip gh if not stale |
 | **interactive** | Default when no flags | Ask once for missing PR URL/repo; confirm before write unless `--write` |
 
-**Default for `/msc-dev-code-and-qa-test-coverage-validator`:** **`--auto --write`**. Minimize prompts: allowlist ([auto-approve-setup.md](references/auto-approve-setup.md)), one parallel Jira MCP turn, one prefetch shell (`--skip-if-fresh` when cache matches), read [run-options.md](references/run-options.md).
+**Default for `/Req2Release`:** **`--auto --write`**. Minimize prompts: allowlist ([auto-approve-setup.md](references/auto-approve-setup.md)), one parallel Jira MCP turn, one prefetch shell (`--skip-if-fresh` when cache matches), read [run-options.md](references/run-options.md).
 
 **Cache paths:** `reports/.cache/{ISSUE-KEY}-prefetch.json`, `{ISSUE-KEY}-jira.json`, `{ISSUE-KEY}-testplan.json`, `{ISSUE-KEY}-confluence.json`, `{ISSUE-KEY}-mapping.json`, `{ISSUE-KEY}-manifest.json`
 
@@ -72,7 +72,7 @@ python scripts/run_coverage_validator.py {ISSUE-KEY} --auto --write --skip-if-fr
 
 `fetch_jira_story.py` writes `reports/.cache/{KEY}-jira.json` (requirements R1…Rn, attachments, PR URLs, test plan refs). Use `--from-mcp-json` when REST is unavailable. Mapping uses `--semantic-boost` (default on via `semanticMappingBoost` in defaults).
 
-Reuse: `@msc-dev-code-and-qa-test-coverage-validator {ISSUE-KEY} --from-cache --auto`
+Reuse: `@Req2Release {ISSUE-KEY} --from-cache --auto`
 
 ## Workflow (`--auto --write` — agent invokes Steps 0–9 below)
 
@@ -85,7 +85,7 @@ Task Progress:
 - [ ] Step 3: Resolve linked GitHub PR(s)
 - [ ] Step 4: Fetch PR changes and CI status
 - [ ] Step 5: Fetch and parse attached QMetry test plan (unless `--skip-testplan`)
-- [ ] Step 5a: If `no_testplan` or uncovered R/L → auto-generate via `generate_testcases_from_requirements.py` (or `/msc-testcase-writer` on exit 2)
+- [ ] Step 5a: If `no_testplan` or uncovered R/L → auto-generate via `generate_testcases_from_requirements.py` (or `/Spec2Test` on exit 2)
 - [ ] Step 6: Map requirements to code, tests, test plan cases, and dev/QA ownership
 - [ ] Step 7: Compute coverage percentages (including dev test and test plan coverage)
 - [ ] Step 8: Build HTML report with dev vs QA and test plan sections; run `apply_report_ui_enhancements()`
@@ -221,7 +221,7 @@ Parse output: `testCases` (include `section`, `summary`, `mascot_links`, `eviden
 
 When `status` is `referenced_not_local`, set `{{TESTPLAN_COVERAGE_PCT}}` to **Pending**, populate `{{TESTPLAN_NOTE}}` with the referenced filename and sheet (not "no QMetry attachment"). When `status` is `no_testplan`, use **`NA`** until Step 5a generates a local plan.
 
-### Step 5a: Missing or partial test plan → auto-generate (or `/msc-testcase-writer`)
+### Step 5a: Missing or partial test plan → auto-generate (or `/Spec2Test`)
 
 Read [references/testplan-missing-fallback.md](references/testplan-missing-fallback.md).
 
@@ -234,7 +234,7 @@ Read [references/testplan-missing-fallback.md](references/testplan-missing-fallb
 
 Flags: `--no-auto-generate-testplan`, `--no-fill-testplan-gaps`. Defaults: `generateTestPlanIfMissing`, `fillTestPlanGaps`, `skipTestcaseGeneration`.
 
-**Fallback:** exit **2** / `needs_testcase_writer` when auto-generate is off or produces zero cases — invoke **`/msc-testcase-writer {KEY}`** (richer LLM scenarios), then re-run orchestrator.
+**Fallback:** exit **2** / `needs_testcase_writer` when auto-generate is off or produces zero cases — invoke **`/Spec2Test {KEY}`** (richer LLM scenarios), then re-run orchestrator.
 
 Manual gap-only: `python scripts/generate_testcases_from_requirements.py {KEY} --gap-only from-testplan --write-excel`
 
@@ -575,7 +575,7 @@ Save run options to `reports/.cache/<ISSUE-KEY>-manifest.json` for reuse.
 
 Tell the user the full path so they can open it in a browser. Include the **reuse command**:
 
-`@msc-dev-code-and-qa-test-coverage-validator {KEY} --from-cache --auto`
+`@Req2Release {KEY} --from-cache --auto`
 
 Optional: also write `reports/<ISSUE-KEY>-<TIMESTAMP>.md` if the user asks for markdown.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-One-shot preflight for msc-dev-code-and-qa-test-coverage-validator.
+One-shot preflight for Req2Release.
 
   python scripts/preflight_coverage_validator.py
   python scripts/preflight_coverage_validator.py MSC-205625 --verify-jira
@@ -194,7 +194,7 @@ def run_preflight(issue_key: str | None = None, *, verify_jira: bool = False) ->
         "requiredFailures": [c["id"] for c in required_fail],
         "optionalFailures": [c["id"] for c in optional_fail],
         "next": (
-            f"/msc-dev-code-and-qa-test-coverage-validator {issue_key}"
+            f"/Req2Release {issue_key}"
             if issue_key and len(required_fail) == 0
             else "Fix required failures above, then re-run preflight"
         ),

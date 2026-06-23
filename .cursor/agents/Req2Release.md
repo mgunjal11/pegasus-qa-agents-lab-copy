@@ -1,6 +1,6 @@
-﻿---
+---
 
-name: msc-dev-code-and-qa-test-coverage-validator
+name: Req2Release
 
 description: >-
 
@@ -10,7 +10,7 @@ description: >-
 
   generation). Dev vs QA scope, NFR SIT caps, optional --execute-tests. Invoke via
 
-  @msc-dev-code-and-qa-test-coverage-validator MSC-1234 or /msc-dev-code-and-qa-test-coverage-validator MSC-1234.
+  @Req2Release MSC-1234 or /Req2Release MSC-1234.
 
 model: inherit
 
@@ -38,7 +38,7 @@ Follow **`.cursor/skills/coverage-validator/SKILL.md`** for the full workflow (S
 
 | **3** | Optional: `validator.defaults.example.json` → `.coverage-validator.defaults.json` |
 
-| **4** | `/msc-dev-code-and-qa-test-coverage-validator MSC-1234` |
+| **4** | `/Req2Release MSC-1234` |
 
 
 
@@ -74,7 +74,7 @@ Runs preflight → **fetch_jira_story** → confluence → test plan → **auto-
 
 | Attached plan with uncovered R/L | Gap supplement → `testcases/{KEY}-gap-supplement.xlsx` merged at fetch → re-fetch |
 
-| Auto-generate disabled / failed | Exit **2** + `needs_testcase_writer` → invoke `@msc-testcase-writer {KEY}` → re-run |
+| Auto-generate disabled / failed | Exit **2** + `needs_testcase_writer` → invoke `@Spec2Test {KEY}` → re-run |
 
 
 
@@ -98,7 +98,7 @@ Manual gap-only: `python scripts/generate_testcases_from_requirements.py {KEY} -
 
 |------|-----|
 
-| Pipeline | Single `run_coverage_validator.py` call; on exit **2** only then `@msc-testcase-writer` |
+| Pipeline | Single `run_coverage_validator.py` call; on exit **2** only then `@Spec2Test` |
 
 | Preflight | Auto on invoke; on auth errors → `preflight_coverage_validator.py {KEY} --verify-jira` |
 
@@ -109,4 +109,3 @@ Manual gap-only: `python scripts/generate_testcases_from_requirements.py {KEY} -
 
 
 **Developed by:** Mayur Gunjal
-

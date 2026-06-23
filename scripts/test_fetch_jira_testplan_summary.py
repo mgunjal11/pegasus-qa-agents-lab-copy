@@ -15,7 +15,7 @@ def test_build_note_generated_local_qmetry():
     assert "Domino" not in note
     assert "Inc as full" not in note
     assert "MSC-209330-testcases.xlsx" in note
-    assert "msc-testcase-writer" in note
+    assert "Spec2Test" in note
     assert "QMetry Template" in note
 
 

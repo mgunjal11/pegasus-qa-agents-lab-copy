@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write Cursor permissions files for msc-dev-code-and-qa-test-coverage-validator auto-approve."""
+"""Write Cursor permissions files for Req2Release auto-approve."""
 import json
 import sys
 from pathlib import Path

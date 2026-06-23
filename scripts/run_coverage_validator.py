@@ -163,7 +163,7 @@ def _should_invoke_testcase_writer(
     manifest: dict[str, Any],
     args: argparse.Namespace,
 ) -> bool:
-    """Step 5a — agent must run @msc-testcase-writer when no Jira plan and no local xlsx."""
+    """Step 5a — agent must run @Spec2Test when no Jira plan and no local xlsx."""
     if args.skip_testplan:
         return False
     if manifest.get("skipTestcaseGeneration") or defaults.get("skipTestcaseGeneration"):
@@ -272,7 +272,7 @@ def run_pipeline(key: str, args: argparse.Namespace) -> dict[str, Any]:
                         "steps": len(steps),
                         "message": (
                             f"Auto-generate produced no cases for {key}. "
-                            f"Invoke @msc-testcase-writer {key}, then re-run."
+                            f"Invoke @Spec2Test {key}, then re-run."
                         ),
                         "preflight": preflight,
                     }
@@ -283,7 +283,7 @@ def run_pipeline(key: str, args: argparse.Namespace) -> dict[str, Any]:
                     "testplanStatus": "no_testplan",
                     "steps": len(steps),
                     "message": (
-                        f"No Jira test plan for {key}. Invoke @msc-testcase-writer {key} "
+                        f"No Jira test plan for {key}. Invoke @Spec2Test {key} "
                         f"(see testplan-missing-fallback.md), then re-run this script."
                     ),
                     "preflight": preflight,

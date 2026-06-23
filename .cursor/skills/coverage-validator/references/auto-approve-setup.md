@@ -1,6 +1,6 @@
 # Auto-approve setup — no more Allow/Run clicks
 
-Cursor shows **Allow** / **Run** when the agent calls MCP tools or shell commands. For `msc-dev-code-and-qa-test-coverage-validator`, configure auto-approve once using the steps below.
+Cursor shows **Allow** / **Run** when the agent calls MCP tools or shell commands. For `Req2Release`, configure auto-approve once using the steps below.
 
 > **Important:** Hooks that return `"permission": "allow"` do **not** reliably override MCP approval. Use **`permissions.json`** + **Auto-Run mode** (official path).
 
@@ -70,13 +70,13 @@ Copy [validator.defaults.example.json](../validator.defaults.example.json) → `
 ### 4. Invoke with auto mode
 
 ```
-/msc-dev-code-and-qa-test-coverage-validator MSC-204417 --auto
+/Req2Release MSC-204417 --auto
 ```
 
 Or use the slash command (defaults to `--auto --write`):
 
 ```
-/msc-dev-code-and-qa-test-coverage-validator MSC-204417
+/Req2Release MSC-204417
 ```
 
 ## Why you still see prompts (troubleshooting)
@@ -100,13 +100,13 @@ python scripts/prefetch_coverage_inputs.py MSC-204417 --repo wbd-msc/pegasus-ess
 Then agent run needs only Jira MCP (one parallel batch):
 
 ```
-/msc-dev-code-and-qa-test-coverage-validator MSC-204417 --from-cache --auto --skip-jira
+/Req2Release MSC-204417 --from-cache --auto --skip-jira
 ```
 
 Or after Jira cache exists from a prior `--fetch-only` run:
 
 ```
-/msc-dev-code-and-qa-test-coverage-validator MSC-204417 --from-cache --auto --skip-jira
+/Req2Release MSC-204417 --from-cache --auto --skip-jira
 ```
 
 ## Agent rules that reduce prompts
@@ -115,5 +115,5 @@ Even with allowlists, the agent is instructed to:
 
 1. Batch Jira MCP calls in **one turn** (parallel).
 2. Use **one shell** for all GitHub data (prefetch script or cache).
-3. Default **`--auto --write`** for `/msc-dev-code-and-qa-test-coverage-validator` invocations.
+3. Default **`--auto --write`** for `/Req2Release` invocations.
 4. Save manifest/cache for repeat runs.

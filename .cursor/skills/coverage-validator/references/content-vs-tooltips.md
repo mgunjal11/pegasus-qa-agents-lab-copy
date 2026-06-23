@@ -42,5 +42,5 @@ When enhancing the coverage validator or testcase writer, **change report data a
 |--------|----------------------|-----------------|
 | Jira attachment | Downloaded filename + sheet | Mascot / SIT Jobs IDs |
 | SharePoint/Domino local | Referenced filename + sheet | Mascot / SIT Jobs |
-| `workspace_generated` | Local QMetry + msc-testcase-writer note | **No execution evidence** (do not scrape step UUIDs) |
+| `workspace_generated` | Local QMetry + Spec2Test note | **No execution evidence** (do not scrape step UUIDs) |
 | `referenced_not_local` | Setup hint | Pending until file added |

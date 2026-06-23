@@ -1,8 +1,8 @@
-# Missing or partial Jira test plan — auto-generate + `/msc-testcase-writer` fallback
+# Missing or partial Jira test plan — auto-generate + `/Spec2Test` fallback
 
 When Jira has **no test plan attachment**, the orchestrator **auto-generates** QMetry cases via `generate_testcases_from_requirements.py` (deterministic). When an attached plan has **uncovered R/L**, it writes **`testcases/{KEY}-gap-supplement.xlsx`** and merges at fetch.
 
-**LLM fallback:** `/msc-testcase-writer` when auto-generate is disabled or exit **2** / `needs_testcase_writer`.
+**LLM fallback:** `/Spec2Test` when auto-generate is disabled or exit **2** / `needs_testcase_writer`.
 
 **Do not change** `apply_report_ui_enhancements()`, `SUMMARY_METRIC_INFO`, or report-template tooltip markup when adding this flow — only workflow, caches, and §3 narrative/notes.
 
@@ -48,16 +48,16 @@ Also skip when:
 4. Continue map + build
 5. §3 note: workspace-generated / gap supplement (not attached on Jira unless uploaded)
 
-**LLM upgrade (optional):** `@msc-testcase-writer {KEY}` for richer scenarios; `--gap-only R4,L5` via generate script CLI.
+**LLM upgrade (optional):** `@Spec2Test {KEY}` for richer scenarios; `--gap-only R4,L5` via generate script CLI.
 
 ## Interactive mode (no `--auto`)
 
-Offer auto-generate or `/msc-testcase-writer {KEY}` with normal approval before writing files.
+Offer auto-generate or `/Spec2Test {KEY}` with normal approval before writing files.
 
 When `status` is `no_testplan`:
 
 1. Tell the user no Jira test plan was found.
-2. Offer: run **`/msc-testcase-writer {KEY}`** (with normal approval gate) or attach Excel to Jira / add to `testplans/`.
+2. Offer: run **`/Spec2Test {KEY}`** (with normal approval gate) or attach Excel to Jira / add to `testplans/`.
 3. After user approves testcase writer output, re-run `fetch_jira_testplan.py` and continue validation.
 
 ## LADR-aware cases

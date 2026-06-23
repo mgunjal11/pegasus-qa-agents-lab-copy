@@ -17,8 +17,8 @@ COPY_DIRS = [
 ]
 
 COPY_FILES = [
-    (ROOT / ".cursor/agents/msc-testcase-writer.md", LAB / ".cursor/agents/msc-testcase-writer.md"),
-    (ROOT / ".cursor/agents/msc-dev-code-and-qa-test-coverage-validator.md", LAB / ".cursor/agents/msc-dev-code-and-qa-test-coverage-validator.md"),
+    (ROOT / ".cursor/agents/Spec2Test.md", LAB / ".cursor/agents/Spec2Test.md"),
+    (ROOT / ".cursor/agents/Req2Release.md", LAB / ".cursor/agents/Req2Release.md"),
     (ROOT / ".cursor/agents/msc-jira-bug.md", LAB / ".cursor/agents/msc-jira-bug.md"),
     (ROOT / "requirements.txt", LAB / "requirements.txt"),
     (ROOT / "AGENTS.md", LAB / "AGENTS.md"),
@@ -135,6 +135,8 @@ def remove_stale(lab: Path) -> None:
         lab / ".cursor/skills/msc-dev-code-and-qa-test-coverage-validator",
         lab / ".cursor/skills/jira-msc-bug",
         lab / ".cursor/agents/msc-code-coverage-validator.md",
+        lab / ".cursor/agents/msc-dev-code-and-qa-test-coverage-validator.md",
+        lab / ".cursor/agents/msc-testcase-writer.md",
         lab / ".cursor/commands/msc-code-coverage-validator.md",
         lab / "docs/MSC-Code-Coverage-Validator-Guide.pptx",
         lab / "docs/MSC-Dev-Code-and-QA-Test-Coverage-Validator-Guide.pptx",
@@ -271,8 +273,8 @@ Three Cursor agents for MSC QA on [wbdstreaming.atlassian.net](https://wbdstream
 
 | Agent | Invoke | Output |
 |-------|--------|--------|
-| **msc-testcase-writer** | `@msc-testcase-writer MSC-1234` | `testcases/{KEY}-testcases.xlsx` (QMetry FF2.0) |
-| **msc-dev-code-and-qa-test-coverage-validator** | `@msc-dev-code-and-qa-test-coverage-validator MSC-1234` | HTML report; run `preflight_coverage_validator.py` first; §5 expandable Evidence; `verdictMode`; optional `--execute-tests` |
+| **Spec2Test** | `@Spec2Test MSC-1234` | `testcases/{KEY}-testcases.xlsx` (QMetry FF2.0) |
+| **Req2Release** | `@Req2Release MSC-1234` | HTML report; run `preflight_coverage_validator.py` first; §5 expandable Evidence; `verdictMode`; optional `--execute-tests` |
 | **msc-jira-bug** | `@msc-jira-bug` + defect description | MSC Bug in Jira (after explicit approval) |
 
 ## Skills (workflow docs — not duplicate slash commands)
@@ -301,7 +303,7 @@ Jira comment: *"Refer Inc as full sheet for Test plan and evidence"* â†’ `D
 
 1. Copy the workbook to `testplans/Domino Test Plan.xlsx`
 2. Optionally set `testPlanPath` / `testPlanSheet` in `.coverage-validator.defaults.json`
-3. Re-run `@msc-dev-code-and-qa-test-coverage-validator {KEY}`
+3. Re-run `@Req2Release {KEY}`
 
 ## Jira attachment
 
@@ -309,7 +311,7 @@ If the Excel is on the issue, set `.env` from `.env.example` so `fetch_jira_test
 
 ## No test plan on Jira
 
-Coverage validator can auto-generate QMetry cases via `@msc-testcase-writer` and `write_testcase_excel.py`.
+Coverage validator can auto-generate QMetry cases via `@Spec2Test` and `write_testcase_excel.py`.
 """
 
 
