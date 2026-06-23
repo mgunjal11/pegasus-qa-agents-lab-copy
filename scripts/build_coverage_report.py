@@ -26,7 +26,6 @@ from coverage_report_helpers import (  # noqa: E402
     apply_report_ui_enhancements,
     build_assumptions_list,
     build_branch_compare_pr_note,
-    build_pr_prefetch_note,
     build_correctly_implemented_list,
     build_implementation_gaps_list,
     build_jira_readiness_block,
@@ -246,7 +245,7 @@ def build_report(
         "{{PR_NOTE}}": (
             analysis.get("prNote", "")
             if analysis and analysis.get("prNote")
-            else build_pr_prefetch_note(key, base)
+            else build_branch_compare_pr_note(key, base)
         ),
         "{{PR_ROWS}}": render_pr_rows_from_prefetch(key, base, dev_tests_by_number=dev_tests_by_number),
         "{{REQUIREMENT_ROWS}}": (

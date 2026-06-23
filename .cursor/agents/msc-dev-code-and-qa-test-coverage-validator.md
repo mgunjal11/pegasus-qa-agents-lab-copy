@@ -30,7 +30,7 @@ Follow **`.cursor/skills/coverage-validator/SKILL.md`** for the full workflow (S
 
 |------|--------|
 
-| **0** | [cli.github.com](https://cli.github.com) → `gh auth login` (+ **multi-org SSO** when stories link `discoveryinc-cs/*` or other orgs — see below) |
+| **0** | [cli.github.com](https://cli.github.com) → `gh auth login` |
 
 | **1** | Jira REST: run install or preflight — auto-copies `.env.example` → `.env` (gitignored); set `ATLASSIAN_EMAIL`, `ATLASSIAN_API_TOKEN` |
 
@@ -102,11 +102,7 @@ Manual gap-only: `python scripts/generate_testcases_from_requirements.py {KEY} -
 
 | Preflight | Auto on invoke; on auth errors → `preflight_coverage_validator.py {KEY} --verify-jira` |
 
-| GitHub | One prefetch in orchestrator; merges all Jira `prUrls`; **partial prefetch** when some orgs are inaccessible; `--skip-if-fresh` when PR URLs unchanged |
-
-| Multi-org PRs | Prefetch tries every Jira/comment PR URL. Inaccessible repos (e.g. `discoveryinc-cs/*`) are listed in §2 with SSO hint — accessible PRs still map. Fix: `gh auth refresh -h github.com -s read:org,repo` + approve org SSO |
-
-| Jira Dev panel | When Development shows **N PRs** but fewer URLs in comments, §2 note explains — paste missing PR links in Jira or `reports/.cache/{KEY}-manifest.json` `prUrls` |
+| GitHub | One prefetch in orchestrator; `--skip-if-fresh` when PR URLs unchanged |
 
 | Never | Separate ad-hoc `gh` calls; edit `SUMMARY_METRIC_INFO` for content changes |
 

@@ -15,7 +15,6 @@ Follow **`.cursor/skills/jira-story-testcases/SKILL.md`** for the full workflow 
 | Step | Action |
 |------|--------|
 | **1** | Atlassian MCP → `wbdstreaming.atlassian.net` |
-| **1b** | Multi-repo stories: ensure `gh` can read every org in linked PRs (`gh auth refresh -h github.com -s read:org,repo` + org SSO) — same as coverage validator [github-coverage.md](.cursor/skills/coverage-validator/references/github-coverage.md) |
 | **2** | `pip install -r requirements.txt` |
 | **3** | `/msc-testcase-writer MSC-1234` — draft → approval → Excel |
 

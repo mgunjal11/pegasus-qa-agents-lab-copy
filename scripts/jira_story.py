@@ -341,59 +341,20 @@ def extract_requirements_from_issue(data: dict[str, Any]) -> list[dict[str, str]
     return []
 
 
-def parse_jira_dev_panel(fields: dict[str, Any] | None) -> dict[str, Any]:
-    """Summarize Jira Development panel GitHub PR count (customfield_10000 on MSC)."""
-    if not isinstance(fields, dict):
-        return {}
-    raw = fields.get("customfield_10000")
-    if raw is None:
-        return {}
-    text = str(raw)
-    count = 0
-    m = re.search(r"stateCount=(\d+)", text)
-    if m:
-        count = int(m.group(1))
-    elif '"count":' in text:
-        m2 = re.search(r'"count"\s*:\s*(\d+)', text)
-        if m2:
-            count = int(m2.group(1))
-    is_stale = "isStale=true" in text or '"isStale":true' in text
-    return {
-        "githubPrCount": count,
-        "isStale": is_stale,
-        "source": "jira_dev_panel",
-    }
-
-
 def extract_pr_urls(data: dict[str, Any]) -> list[str]:
     urls: list[str] = []
     seen: set[str] = set()
-
-    def add(url: str) -> None:
-        norm = url.rstrip(".,)").strip()
+    for blob in collect_comment_texts(data):
+        for url in PR_URL_RE.findall(blob or ""):
+            norm = url.rstrip(".,)")
+            if norm not in seen:
+                seen.add(norm)
+                urls.append(norm)
+    for url in data.get("prUrls") or []:
+        norm = str(url).strip()
         if norm and norm not in seen:
             seen.add(norm)
             urls.append(norm)
-
-    for blob in collect_comment_texts(data):
-        for url in PR_URL_RE.findall(blob or ""):
-            add(url)
-    description = str(data.get("description") or "")
-    for url in PR_URL_RE.findall(description):
-        add(url)
-    fields = data.get("fields") if isinstance(data.get("fields"), dict) else {}
-    if isinstance(fields.get("description"), dict):
-        for url in PR_URL_RE.findall(_adf_plain(fields["description"])):
-            add(url)
-    for link in data.get("remoteLinks") or []:
-        if not isinstance(link, dict):
-            continue
-        obj = link.get("object") or {}
-        for candidate in (link.get("url"), obj.get("url"), link.get("title"), obj.get("title")):
-            for url in PR_URL_RE.findall(str(candidate or "")):
-                add(url)
-    for url in data.get("prUrls") or []:
-        add(str(url))
     return urls
 
 
@@ -522,7 +483,6 @@ def normalize_rest_issue(issue: dict[str, Any], issue_key: str) -> dict[str, Any
         if str(fk).startswith("customfield"):
             payload["fields"][fk] = fv
 
-    payload["jiraDevPanel"] = parse_jira_dev_panel(fields)
     payload["prUrls"] = extract_pr_urls(payload)
     payload["remoteLinks"] = []
     payload["confluenceLinks"] = extract_confluence_links(payload)
@@ -631,7 +591,6 @@ def fetch_issue_rest(
         "attachment",
         "labels",
         "components",
-        "customfield_10000",
     ]
     if extra_fields:
         fields.extend(extra_fields)
@@ -641,7 +600,6 @@ def fetch_issue_rest(
     payload = normalize_rest_issue(issue, issue_key)
     payload["remoteLinks"] = fetch_remote_links(issue_key, site=site)
     payload["confluenceLinks"] = extract_confluence_links(payload)
-    payload["prUrls"] = extract_pr_urls(payload)
     return payload
 
 
@@ -684,14 +642,6 @@ def build_jira_cache(
     else:
         load_dotenv(base / ".env")
         payload = fetch_issue_rest(key, site=site)
-    dev = payload.get("jiraDevPanel") or {}
-    if dev.get("githubPrCount") and len(payload.get("prUrls") or []) < int(dev["githubPrCount"]):
-        dev["extractedPrCount"] = len(payload.get("prUrls") or [])
-        dev["note"] = (
-            "Jira Development panel lists more PRs than comment/description URLs; "
-            "paste missing PR links in Jira or add them to reports/.cache/{KEY}-manifest.json prUrls."
-        )
-        payload["jiraDevPanel"] = dev
 
     if merge_prior and prior.get("requirements"):
         payload["requirements"] = merge_requirements(
@@ -700,9 +650,8 @@ def build_jira_cache(
         )
 
     if merge_prior:
-        if prior.get("prUrls"):
-            merged_prs = list(dict.fromkeys([*(payload.get("prUrls") or []), *prior["prUrls"]]))
-            payload["prUrls"] = merged_prs
+        if not payload.get("prUrls") and prior.get("prUrls"):
+            payload["prUrls"] = list(prior["prUrls"])
         if not payload.get("testPlanReferences") and prior.get("testPlanReferences"):
             payload["testPlanReferences"] = prior["testPlanReferences"]
             payload["testPlanReference"] = prior.get("testPlanReference") or prior["testPlanReferences"][0]

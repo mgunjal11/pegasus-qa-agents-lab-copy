@@ -169,70 +169,6 @@ def _check_template() -> dict[str, Any]:
     }
 
 
-def _check_gh_pr_repos(issue_key: str) -> dict[str, Any]:
-    """Probe gh access for each org/repo linked in Jira prUrls (multi-org stories)."""
-    from jira_env import probe_github_repo
-
-    cache = ROOT / "reports" / ".cache" / f"{issue_key.upper()}-jira.json"
-    if not cache.exists():
-        return {
-            "id": "gh_pr_repos",
-            "label": "GitHub PR repo access",
-            "ok": True,
-            "required": False,
-            "detail": "no jira cache yet — run fetch_jira_story first",
-        }
-    try:
-        data = json.loads(cache.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {
-            "id": "gh_pr_repos",
-            "label": "GitHub PR repo access",
-            "ok": True,
-            "required": False,
-            "detail": "jira cache unreadable",
-        }
-    repos: set[tuple[str, str]] = set()
-    import re
-
-    pat = re.compile(r"github\.com/([^/]+)/([^/]+)/pull/", re.I)
-    for url in data.get("prUrls") or []:
-        m = pat.search(str(url))
-        if m:
-            repos.add((m.group(1), m.group(2)))
-    if not repos:
-        return {
-            "id": "gh_pr_repos",
-            "label": "GitHub PR repo access",
-            "ok": True,
-            "required": False,
-            "detail": "no GitHub PR URLs in jira cache",
-        }
-    blocked = []
-    for org, repo in sorted(repos):
-        probe = probe_github_repo(org, repo)
-        if not probe.get("ok"):
-            blocked.append(f"{org}/{repo}")
-    if blocked:
-        return {
-            "id": "gh_pr_repos",
-            "label": "GitHub PR repo access",
-            "ok": False,
-            "required": False,
-            "detail": (
-                f"inaccessible: {', '.join(blocked)} — run "
-                f"gh auth refresh -h github.com -s read:org,repo and approve org SSO"
-            ),
-        }
-    return {
-        "id": "gh_pr_repos",
-        "label": "GitHub PR repo access",
-        "ok": True,
-        "required": False,
-        "detail": f"{len(repos)} repo(s) reachable",
-    }
-
-
 def run_preflight(issue_key: str | None = None, *, verify_jira: bool = False) -> dict[str, Any]:
     env_bootstrap = ensure_env_from_example(ROOT)
     checks = [
@@ -246,7 +182,6 @@ def run_preflight(issue_key: str | None = None, *, verify_jira: bool = False) ->
     ]
     if verify_jira and issue_key:
         checks.append(_check_jira_verify(issue_key.upper()))
-        checks.append(_check_gh_pr_repos(issue_key.upper()))
 
     required_fail = [c for c in checks if c.get("required") is not False and not c["ok"]]
     optional_fail = [c for c in checks if c.get("required") is False and not c["ok"]]

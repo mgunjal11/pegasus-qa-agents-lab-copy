@@ -62,7 +62,6 @@ SCRIPTS = [
     "cache_freshness.py",
     "test_mapping_evidence.py",
     "test_cache_freshness.py",
-    "test_prefetch_multi_org.py",
     "test_verdict_mode.py",
     "test_preflight_coverage_validator.py",
     "test_coverage_pipeline_golden.py",

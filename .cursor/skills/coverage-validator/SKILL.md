@@ -168,10 +168,7 @@ Prefetch cache stores `branchCompare` (`files`, `commits`, `ahead_by`). `map_req
 
 ```bash
 python scripts/prefetch_coverage_inputs.py {ISSUE-KEY} --pr {URL} --mode fetch-only
-python scripts/prefetch_coverage_inputs.py {ISSUE-KEY} --from-jira-cache --skip-if-fresh
 ```
-
-**Multi-org / partial prefetch:** When Jira links PRs across orgs, prefetch fetches every accessible URL and records failures in `prefetchErrors`; the pipeline continues when ≥1 PR succeeds. Report §2 lists inaccessible repos with SSO hints. See [github-coverage.md](references/github-coverage.md#multi-org-pr-access-option-c).
 
 Or manually:
 

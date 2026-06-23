@@ -86,26 +86,3 @@ Then parse `coverage.xml`, `lcov.info`, or HTML summary if present.
 | Codecov / Sonar / CI log | CI line coverage % |
 
 Never substitute CI line coverage for requirement coverage—they measure different things.
-
-## Multi-org PR access (Option C)
-
-Stories may link PRs across orgs (e.g. `wbd-msc/cde-media-manager` + `discoveryinc-cs/distribute-configuration`).
-
-1. **Authorize every org** your token needs:
-   ```bash
-   gh auth refresh -h github.com -s read:org,repo
-   ```
-   Then open `https://github.com/orgs/{org}` and **Authorize SSO** for each enterprise org.
-
-2. **Preflight** (with issue key) probes each repo in `reports/.cache/{KEY}-jira.json` `prUrls`:
-   ```bash
-   python scripts/preflight_coverage_validator.py MSC-208859 --verify-jira
-   ```
-
-3. **Partial prefetch** — `prefetch_coverage_inputs.py` fetches accessible PRs and records failures in `prefetchErrors` (report §2 shows **Inaccessible** rows). Pipeline continues when ≥1 PR succeeds.
-
-4. **Jira Development panel count** — Jira may show 5 merged PRs while only 3 URLs appear in comments. The validator stores `jiraDevPanel.githubPrCount` and warns in §2 when counts differ. Paste missing PR URLs in Jira comments or manifest `prUrls`.
-
-```bash
-python scripts/prefetch_coverage_inputs.py MSC-208859 --from-jira-cache --write-manifest
-```
