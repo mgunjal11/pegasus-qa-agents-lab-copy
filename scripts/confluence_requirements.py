@@ -879,10 +879,10 @@ def format_testplan_coverage_detail(coverage: dict[str, Any], source_hint: str =
     gap_n = coverage.get("gapSupplementCaseCount") or 0
     parts.append(f"{tc_count} attached test case{'s' if tc_count != 1 else ''}")
     if gap_n:
-        parts.append(f"{gap_n} gap-fill supplement")
+        parts.append(f"{gap_n} gap-filled supplement")
         eff_pct = coverage.get("testplanCoveragePctEffective")
         if eff_pct is not None and eff_pct != coverage.get("testplanCoveragePct"):
-            parts.append(f"effective {eff_pct}% incl. gap fill")
+            parts.append(f"effective {eff_pct}% incl. gap filled")
     parts.append(f"{gwt_complete}/{tc_count} full Given When Then" if tc_count else "0 Given When Then")
     ladr_total = coverage.get("ladrRequirementCount", 0)
     ladr_covered = coverage.get("ladrRequirementsCovered", 0)
@@ -894,7 +894,7 @@ def format_testplan_coverage_detail(coverage: dict[str, Any], source_hint: str =
         parts.append(f"{jira_covered}/{jira_total} Jira acceptance criteria in attached plan")
     gap_only = coverage.get("gapSupplementOnlyRequirements") or []
     if gap_only:
-        parts.append(f"gap fill only: {', '.join(gap_only)}")
+        parts.append(f"gap filled only: {', '.join(gap_only)}")
     elif coverage.get("requirementCount"):
         parts.append(
             f"{coverage.get('requirementsCovered', 0)}/{coverage.get('requirementCount', 0)} acceptance criteria covered"

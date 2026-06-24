@@ -192,7 +192,7 @@ def build_report(
     if not analysis or not analysis.get("verdictRationale"):
         tp_label = f"attached test plan {tp_pct}%"
         if gap_n and eff_tp is not None and eff_tp != tp_pct:
-            tp_label += f" ({gap_n} gap-fill → effective {eff_tp}%)"
+            tp_label += f" ({gap_n} gap filled → effective {eff_tp}%)"
         rationale = (
             f"{verdict} — {ac_label}; "
             f"{tp_label} ({tc_n} attached scenarios, {gwt_n}/{tc_n} full Given When Then); "

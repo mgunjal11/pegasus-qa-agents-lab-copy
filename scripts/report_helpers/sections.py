@@ -96,7 +96,7 @@ def ladr_coverage_badge(mapped: bool) -> str:
 def gap_fill_tc_badge(*, title: str | None = None) -> str:
     tip = title or "Added to cover uncovered Jira acceptance criteria or LADR scenarios (gap supplement)"
     return (
-        f'<span class="badge badge-gap-fill" title="{esc(tip)}">Gap fill</span>'
+        f'<span class="badge badge-gap-fill" title="{esc(tip)}">Gap filled</span>'
     )
 
 
@@ -108,13 +108,13 @@ def render_testplan_tc_id_cell(tc: dict[str, Any]) -> str:
 
 
 def format_tc_ids_plain(tc_ids: list[str], test_cases: list[dict[str, Any]]) -> str:
-    """Comma-separated TC ids with (Gap fill) suffix for supplement cases."""
+    """Comma-separated TC ids with (Gap filled) suffix for supplement cases."""
     by_id = {str(tc.get("id") or ""): tc for tc in test_cases}
     parts: list[str] = []
     for tid in sorted(set(tc_ids), key=lambda x: (len(x), x)):
         tc = by_id.get(tid, {"id": tid})
         if is_gap_supplement_tc(tc):
-            parts.append(f"{tid} (Gap fill)")
+            parts.append(f"{tid} (Gap filled)")
         else:
             parts.append(tid)
     return ", ".join(parts)
@@ -361,7 +361,7 @@ def render_testplan_split_metrics(cov: dict[str, Any]) -> str:
         )
     if gap_n:
         parts.append(
-            f'<span class="split-metric">Gap-fill supplement: '
+            f'<span class="split-metric">Gap-filled supplement: '
             f"<strong>{gap_n} case(s)</strong></span>"
         )
         if eff_pct is not None and eff_pct != cov.get("testplanCoveragePct"):

@@ -1,4 +1,4 @@
-"""Tests for Gap fill marker on gap-supplement test cases in reports."""
+"""Tests for Gap filled marker on gap-supplement test cases in reports."""
 
 from report_helpers.sections import (
     format_tc_ids_plain,
@@ -13,7 +13,7 @@ def test_render_testplan_tc_id_cell_shows_gap_fill_badge():
     assert render_testplan_tc_id_cell(primary) == "TC1"
     assert "TC6" in render_testplan_tc_id_cell(gap)
     assert "badge-gap-fill" in render_testplan_tc_id_cell(gap)
-    assert "Gap fill" in render_testplan_tc_id_cell(gap)
+    assert "Gap filled" in render_testplan_tc_id_cell(gap)
 
 
 def test_format_tc_ids_plain_marks_gap_supplement():
@@ -21,7 +21,7 @@ def test_format_tc_ids_plain_marks_gap_supplement():
         {"id": "TC5", "source_file": "Domino Test Plan.xlsx"},
         {"id": "TC6", "gap_supplement": True, "source_file": "MSC-205625-gap-supplement.xlsx"},
     ]
-    assert format_tc_ids_plain(["TC5", "TC6"], cases) == "TC5, TC6 (Gap fill)"
+    assert format_tc_ids_plain(["TC5", "TC6"], cases) == "TC5, TC6 (Gap filled)"
 
 
 def test_render_testplan_rows_includes_gap_badge_in_tc_column():
