@@ -44,9 +44,10 @@ SUMMARY_METRIC_INFO: dict[str, str] = {
         "in CI, from Codecov, SonarQube, or pytest-cov on the linked PR."
     ),
     "Release readiness score": (
-        "Weighted composite score (0–100%) combining dev code coverage, "
-        "dev unit/integration test coverage, test plan acceptance criteria coverage, "
-        "and open-gap severity from the review (higher is better)."
+        "Weighted composite (0–100%): dev code 30%, dev tests 25%, attached test plan "
+        "25%, open-gap penalty 10% (15 pts per High, 7 per Med), CI line coverage 10% "
+        "when reported. Drives the final verdict: ≥85% Pass (no High/Med gaps), "
+        "50–84% Pass with gaps, below 50% Fail. Also Fail on any High gap or dev code below 50%."
     ),
 }
 

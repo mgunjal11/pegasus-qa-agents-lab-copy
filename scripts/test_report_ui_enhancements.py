@@ -109,7 +109,8 @@ def test_release_readiness_tooltip_full_box_left_of_icon():
     assert "z-index: 1200" in rel
     assert "section-summary:has(.release-score-card .metric-info-tip:hover) .section-body" in out
     assert 'aria-label="About Release readiness score"' in out
-    assert "open-gap severity from the review" in out
+    assert "Drives the final verdict" in out
+    assert "50–84% Pass with gaps" in out
 
 
 def test_cache_meta_tooltip_anchors_left():
