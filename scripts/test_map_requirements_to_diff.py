@@ -92,4 +92,4 @@ def test_map_requirements_includes_ladr_rows(tmp_path):
     rows = render_requirement_rows_from_mapping(key, root=tmp_path)
     assert "L1" in rows
     assert "LADR" in rows
-    assert build_req_coverage_detail(payload) == "1 Jira + 1 LADR scored from PR diff mapping"
+    assert build_req_coverage_detail(payload).startswith("1 Jira + 1 LADR ·")

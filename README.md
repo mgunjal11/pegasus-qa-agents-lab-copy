@@ -14,7 +14,7 @@ AI-driven QA agents for the WBD Media Supply Chain (MSC) on Jira and GitHub. Clo
 | Agent | Purpose | Invoke |
 |-------|---------|--------|
 | **Spec2Test** | Jira (+ LADR when linked) → QMetry FF2.0 Excel (Given/When/Then) | `@Spec2Test MSC-204417` or `/Spec2Test MSC-204417` |
-| **Req2Release** | Jira AC + LADR + test plan vs PR; §5 FR/NFR; NFR SIT capped at medium; optional `--execute-tests` | `@Req2Release MSC-204417` or `/Req2Release MSC-204417` |
+| **Req2Release** | Jira AC + LADR + **attached** test plan vs **PR diff**; §5 Code/Dev tests PR-gated; attached vs effective test plan %; optional `--execute-tests` | `@Req2Release MSC-204417` or `/Req2Release MSC-204417` |
 | **msc-jira-bug** | Draft MSC Bug tickets (creates only after approval) | `@msc-jira-bug` + defect description |
 
 Workflow skills live under `.cursor/skills/` — they are **not** duplicate slash commands. Agent definitions: `.cursor/agents/`.
@@ -282,7 +282,9 @@ cp .cursor/skills/coverage-validator/validator.defaults.example.json .coverage-v
 | `testPlanFilename` | string | Display name when Jira references SharePoint |
 | `testRepoRoot` | string | Absolute or workspace-relative path to a **local clone** of the service repo — enables `build_coverage_report.py {KEY} --execute-tests` |
 | `verdictMode` | string | `pragmatic` (default) \| `strict` — **strict** requires 100% dev + test plan coverage and zero Medium gaps for **Pass** |
-| `semanticMappingBoost` | boolean | `true` (default) — second-pass semantic evidence for §5/§6 mapping (comments, Confluence ESS, test-plan steps) |
+| `semanticMappingBoost` | boolean | `false` (default) — optional second pass: raise **Code** from **PR diff comment lines** only (not LADR/Confluence/test-plan) |
+| `generateTestPlanIfMissing` | boolean | `true` — run `generate_testcases_from_requirements.py` when Jira has no test plan |
+| `fillTestPlanGaps` | boolean | `true` — gap supplement Excel for uncovered R/L on attached plans |
 
 Example:
 
@@ -332,7 +334,7 @@ When Jira **references** SharePoint/Domino Excel but does not attach the file, c
 
 ## Agent setup comparison
 
-| Requirement | testcase-writer | jira-bug | coverage-validator |
+| Requirement | Spec2Test | jira-bug | Req2Release |
 |-------------|-----------------|----------|-------------------|
 | Atlassian MCP | Yes | Yes | Yes |
 | `.env` Jira token (`ATLASSIAN_EMAIL` + `ATLASSIAN_API_TOKEN`) | No | No | **Yes when test plan is Jira attachment** |

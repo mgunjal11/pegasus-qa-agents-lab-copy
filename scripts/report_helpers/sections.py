@@ -341,22 +341,34 @@ def build_jira_readiness_block(issue_key: str, root: Path | None = None) -> str:
 
 
 def render_testplan_split_metrics(cov: dict[str, Any]) -> str:
-    """Sub-metrics: Jira AC % and LADR % separately."""
+    """Sub-metrics: Jira AC % and LADR % separately (attached plan only)."""
     jira_total = cov.get("jiraRequirementCount") or 0
     jira_cov = cov.get("jiraRequirementsCovered") or 0
     ladr_total = cov.get("ladrRequirementCount") or 0
     ladr_cov = cov.get("ladrRequirementsCovered") or 0
+    gap_n = cov.get("gapSupplementCaseCount") or 0
+    eff_pct = cov.get("testplanCoveragePctEffective")
     parts = []
     if jira_total:
         parts.append(
             f'<span class="split-metric">Jira acceptance criteria: '
-            f"<strong>{jira_cov}/{jira_total}</strong></span>"
+            f"<strong>{jira_cov}/{jira_total}</strong> (attached plan)</span>"
         )
     if ladr_total:
         parts.append(
             f'<span class="split-metric">LADR scenarios: '
-            f"<strong>{ladr_cov}/{ladr_total}</strong></span>"
+            f"<strong>{ladr_cov}/{ladr_total}</strong> (attached plan)</span>"
         )
+    if gap_n:
+        parts.append(
+            f'<span class="split-metric">Gap-fill supplement: '
+            f"<strong>{gap_n} case(s)</strong></span>"
+        )
+        if eff_pct is not None and eff_pct != cov.get("testplanCoveragePct"):
+            parts.append(
+                f'<span class="split-metric">Effective coverage: '
+                f"<strong>{eff_pct}%</strong></span>"
+            )
     if not parts:
         return ""
     return '<div class="testplan-split-metrics">' + " · ".join(parts) + "</div>"
@@ -1233,10 +1245,13 @@ def _render_trace_evidence_cell(
     confidence: str,
     evidence_note: str = "",
     matched_tests: list[str] | None = None,
+    design_context_note: str = "",
 ) -> str:
     """Evidence column: compact list + expandable +N more (details/summary) + confidence."""
     conf = confidence or "low"
     note = (evidence_note or "").strip()
+    if design_context_note:
+        note = f"{note}; {design_context_note}".strip("; ") if note else design_context_note
     items, extra = _summarize_trace_evidence(matched_files, matched_tests)
     if not items and not extra:
         body = (
@@ -1270,15 +1285,17 @@ def _render_trace_evidence_cell(
 
 
 def build_req_coverage_detail(mapping: dict[str, Any]) -> str:
-    """Human-readable scored-requirement count for Dev code coverage detail line."""
-    j_n = int(mapping.get("jiraRequirementCount") or 0)
-    l_n = int(mapping.get("ladrRequirementCount") or 0)
-    total = int(mapping.get("requirementCount") or 0)
-    if l_n and j_n:
-        return f"{j_n} Jira + {l_n} LADR scored from PR diff mapping"
-    if total:
-        return f"{total} scored from PR diff mapping"
-    return "0 scored from PR diff mapping"
+    """Human-readable Dev code coverage detail — mirrors §5 codeStatus badges."""
+    if mapping.get("reqCoverageDetail"):
+        return str(mapping["reqCoverageDetail"])
+    from map_requirements_to_diff import compute_coverage_pcts
+
+    metrics = compute_coverage_pcts(
+        mapping.get("requirements") or [],
+        jira_requirement_count=mapping.get("jiraRequirementCount"),
+        ladr_requirement_count=mapping.get("ladrRequirementCount"),
+    )
+    return str(metrics.get("reqCoverageDetail") or "0 requirements")
 
 
 def _render_requirement_type_badge(req: dict[str, Any]) -> str:
@@ -1307,6 +1324,7 @@ def render_requirement_rows_from_mapping(issue_key: str, root: Path | None = Non
             conf,
             str(req.get("evidenceNote") or ""),
             list(req.get("matchedTests") or []),
+            str(req.get("designContextNote") or ""),
         )
         id_cell = esc(rid)
         if str(req.get("source") or "") == "ladr" or str(rid).startswith("L"):
@@ -1330,27 +1348,47 @@ def compute_release_score(
     req_pct: float | None,
     dev_pct: float | None,
     tp_pct: float | None,
-    gap_count: int,
+    *,
+    high_gaps: int = 0,
+    med_gaps: int = 0,
+    ci_pct: float | None = None,
 ) -> tuple[int, str]:
     """Weighted 0–100 release readiness score."""
-    scores: list[tuple[float, float]] = []
+    gap_penalty = max(0.0, 100.0 - high_gaps * 15.0 - med_gaps * 7.0)
+    components: list[tuple[float, float]] = []
     if req_pct is not None:
-        scores.append((req_pct, 0.3))
+        components.append((req_pct, 0.30))
     if dev_pct is not None:
-        scores.append((dev_pct, 0.25))
+        components.append((dev_pct, 0.25))
     if tp_pct is not None:
-        scores.append((tp_pct, 0.25))
-    ci_placeholder = 70.0
-    scores.append((ci_placeholder, 0.1))
-    gap_penalty = max(0, 100 - gap_count * 15)
-    scores.append((gap_penalty, 0.1))
-    if not scores:
+        components.append((tp_pct, 0.25))
+    if ci_pct is not None:
+        components.append((ci_pct, 0.10))
+    components.append((gap_penalty, 0.10))
+    if not components:
         return 0, "metric-na"
-    total_w = sum(w for _, w in scores)
-    val = sum(s * w for s, w in scores) / total_w if total_w else 0
+    total_w = sum(w for _, w in components)
+    val = sum(s * w for s, w in components) / total_w if total_w else 0
     score = int(round(val))
     cls = "metric-good" if score >= 85 else "metric-warn" if score >= 70 else "metric-fail"
     return score, cls
+
+
+def aggregate_ci_line_pct(issue_key: str, root: Path | None = None) -> float | None:
+    """Average CI line coverage % from prefetched PR entries, when reported."""
+    cache = load_prefetch_cache(issue_key, root)
+    from ci_coverage import finalize_ci_coverage, merge_coverage
+
+    merged: dict[str, Any] = {}
+    for pr in cache.get("prs") or []:
+        merged = merge_coverage(merged, _ci_coverage_from_pr_entry(pr))
+    line = finalize_ci_coverage(merged).get("linePct")
+    if line is None:
+        return None
+    try:
+        return float(line)
+    except (TypeError, ValueError):
+        return None
 
 
 def build_release_score_block(
@@ -1358,8 +1396,12 @@ def build_release_score_block(
     dev_pct: Any,
     tp_pct: Any,
     gap_summary: str,
+    *,
+    issue_key: str | None = None,
+    root: Path | None = None,
+    ci_pct: float | None = None,
 ) -> str:
-    gap_n = gap_summary.count("High") + gap_summary.count("Med") if gap_summary else 0
+    high_n, med_n = _parse_open_gaps_summary_counts(gap_summary)
     try:
         r = float(req_pct) if req_pct is not None else None
     except (TypeError, ValueError):
@@ -1372,15 +1414,23 @@ def build_release_score_block(
         t = float(tp_pct) if tp_pct is not None else None
     except (TypeError, ValueError):
         t = None
-    score, cls = compute_release_score(r, d, t, gap_n)
+    if ci_pct is None and issue_key:
+        ci_pct = aggregate_ci_line_pct(issue_key, root)
+    score, cls = compute_release_score(r, d, t, high_gaps=high_n, med_gaps=med_n, ci_pct=ci_pct)
     from report_helpers.ui import metric_info_icon_html
 
+    note_bits = ["dev code", "dev tests", "attached test plan", "gaps"]
+    if ci_pct is not None:
+        note_bits.insert(3, "CI")
+    note = "Weighted: " + ", ".join(note_bits)
+    if high_n or med_n:
+        note += f" ({high_n} High · {med_n} Med)"
     return (
         f'<div class="metric-card {cls} release-score-card">'
         f'<div class="label-row"><div class="label">Release readiness score</div>'
         f'{metric_info_icon_html("Release readiness score")}</div>'
         f'<div class="metric-value">{score}%</div>'
-        f'<div class="note">Weighted: dev code, dev tests, test plan, gaps</div>'
+        f'<div class="note">{esc(note)}</div>'
         f"</div>"
     )
 

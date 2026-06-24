@@ -62,7 +62,22 @@ python scripts/run_coverage_validator.py {KEY} --auto --write --skip-if-fresh --
 
 
 
-Runs preflight → **fetch_jira_story** → confluence → test plan → **auto-generate QMetry cases when needed** → prefetch → map → build.
+Runs preflight → **fetch_jira_story** → confluence → test plan → **auto-generate QMetry cases when needed** → prefetch → **map (PR-gated code + dev test evidence)** → build.
+
+## Evidence sources (mandatory)
+
+| Report area | Primary evidence | Not scored from |
+|-------------|------------------|-----------------|
+| **§5 Code** | `gh pr diff` — production `src/` paths | LADR, Confluence, test-plan text |
+| **§5 Dev tests** | `gh pr diff` — `def test_*` in diff | Test module name alone; design docs |
+| **§3 Test plan** | Jira attachment (REST download) → local `testplans/` → workspace Excel | PR diff |
+| **§1 Dev code / dev test %** | Same badges as §5 (Implemented/Partial/Missing; Covered/Partial/Missing weights) | Semantic boost on design context |
+| **§1 Attached test plan %** | Jira-attached cases only | Gap-supplement Excel (see effective % in §3 split) |
+| **Release readiness** | Weighted: dev code 30%, dev tests 25%, attached test plan 25%, gaps 10%, CI 10% | — |
+
+**§5 traceability:** Code and Dev tests columns come from `gh pr diff` only — production `src/` paths for **Implemented**; `def test_*` in diff for **Covered**. LADR/Confluence/test-plan overlap is advisory in Evidence (`designContextOverlap`), not scored.
+
+**Semantic boost (`semanticMappingBoost`, default `false`):** when enabled, may raise **Code** scores from **PR diff comment lines** only — never from LADR, Confluence, or test-plan steps.
 
 
 
@@ -70,11 +85,13 @@ Runs preflight → **fetch_jira_story** → confluence → test plan → **auto-
 
 |-----------|----------------------------------|
 
-| `no_testplan` | `generate_testcases_from_requirements.py` → `testcases/{KEY}-testcases.xlsx` → re-fetch |
+| Jira attachment present | `fetch_jira_testplan.py` downloads Excel from issue (`.env` creds) — primary path |
 
-| Attached plan with uncovered R/L | Gap supplement → `testcases/{KEY}-gap-supplement.xlsx` merged at fetch → re-fetch |
+| `no_testplan` | Script first: `generate_testcases_from_requirements.py` → `testcases/{KEY}-testcases.xlsx` → re-fetch (**not** auto `@Spec2Test`) |
 
-| Auto-generate disabled / failed | Exit **2** + `needs_testcase_writer` → invoke `@Spec2Test {KEY}` → re-run |
+| Attached plan with uncovered R/L | Gap supplement → `testcases/{KEY}-gap-supplement.xlsx` merged at fetch → re-fetch; attached % excludes supplement; effective % in §3 when merged |
+
+| Auto-generate disabled / zero cases | Exit **2** + `needs_testcase_writer` → invoke `@Spec2Test {KEY}` manually → re-run orchestrator |
 
 
 

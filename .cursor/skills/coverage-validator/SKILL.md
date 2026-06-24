@@ -25,8 +25,8 @@ Validate that GitHub PR(s) linked to an MSC Jira story implement the described r
 | Metric | Meaning |
 |--------|---------|
 | **Dev code coverage %** | Share of Jira AC/requirements with matching production code (display label; was “Requirement coverage”) |
-| **Dev unit/integration test coverage %** | Share of **dev-owned** AC/requirements covered by unit and/or integration tests in the PR (shown in Coverage summary) |
-| **Test plan acceptance criteria coverage %** | Share of Jira acceptance criteria plus linked LADR/Confluence ESS scenarios with ≥1 mapped test case in the attached test plan |
+| **Dev unit/integration test coverage %** | Weighted share of dev/shared-owned §5 requirements with PR diff pytest evidence (**Covered** = 1.0, **Partial** = 0.5, **Missing** = 0) |
+| **Test plan acceptance criteria coverage %** | Share of Jira acceptance criteria plus linked LADR/Confluence ESS scenarios mapped in the **Jira-attached** test plan only (excludes auto-generated gap-fill supplement). **Effective %** (incl. gap fill) shown in §3 when supplement cases exist. |
 | **Test requirement coverage %** | *(internal)* Share of AC with any automated test evidence — computed for traceability but **not shown** in Coverage summary |
 | **CI line coverage %** | Line/branch coverage from PR checks (Codecov, SonarQube, pytest-cov, etc.) when reported |
 
@@ -70,7 +70,18 @@ python scripts/prefetch_coverage_inputs.py {ISSUE-KEY} --repo {org}/{repo} --sea
 python scripts/run_coverage_validator.py {ISSUE-KEY} --auto --write --skip-if-fresh --verify-jira
 ```
 
-`fetch_jira_story.py` writes `reports/.cache/{KEY}-jira.json` (requirements R1…Rn, attachments, PR URLs, test plan refs). Use `--from-mcp-json` when REST is unavailable. Mapping uses `--semantic-boost` (default on via `semanticMappingBoost` in defaults).
+`fetch_jira_story.py` writes `reports/.cache/{KEY}-jira.json` (requirements R1…Rn, attachments, PR URLs, test plan refs). Use `--from-mcp-json` when REST is unavailable.
+
+**Evidence sources (do not mix):**
+
+| Area | Source |
+|------|--------|
+| §5 Code / Dev tests | `gh pr diff` via `prefetch_coverage_inputs.py` + `pr_gated_*` in `mapping_evidence.py` |
+| §3 Test plan | Jira attachment download → comment/SharePoint refs → `testplans/` → workspace Excel |
+| §1 Attached test plan % | Attached cases only; gap supplement tracked separately (`testplanCoveragePctEffective`) |
+| Design context | LADR/Confluence/test-plan text → advisory Evidence only |
+
+Optional `--semantic-boost` (`semanticMappingBoost`, default **false**): may raise **Code** from **PR diff comment lines** only — never LADR/Confluence/test-plan text (`designContextOverlap` in Evidence).
 
 Reuse: `@Req2Release {ISSUE-KEY} --from-cache --auto`
 
@@ -256,7 +267,13 @@ Writes `reports/.cache/{ISSUE-KEY}-mapping.json` with per-requirement `codeStatu
 
 When **`prs` is empty** but **`branchCompare.files`** exists, mapping uses branch file paths, commit messages, and domain hints (caption/passport/status codes) for scoring.
 
-Use mapping scores as the baseline for **Dev code coverage %** and **Dev unit/integration test coverage %** in the report. Agent may override with narrative when diff evidence is clearer than token overlap, or via **`--analysis` JSON** (`reqCoveragePct`, `devCoveragePct`, `reqCoverageDetail`, `devCoverageDetail`).
+Use mapping scores as the baseline for **Dev code coverage %** and **Dev unit/integration test coverage %** in the report (`compute_coverage_pcts()` after NFR caps). **§5 Code / Dev tests** use **PR diff evidence only** via `mapping_evidence.pr_gated_code_status()` and `pr_gated_dev_test_status()`:
+
+- **Implemented** requires a matched **production** file (`src/…`) in the PR, not test/fixture/json paths alone.
+- **Covered** (dev tests) requires a matching **`def test_*`** added/changed in the PR diff — changed test module names alone → **Partial** at best.
+- Negative AC (e.g. “passport **not** attached”) ignore generic positive passport tests unless test name indicates negation/skip.
+
+LADR/Confluence/test-plan text never upgrades Code or Dev test badges (`semantic_mapping_boost` is advisory only). Agent may override via **`--analysis` JSON** only when citing specific PR paths/tests.
 
 ### Step 6: Map requirements to code, tests, test plan, and dev/QA ownership
 
@@ -268,19 +285,19 @@ For each requirement `R{n}`:
 
 | Status | Meaning |
 |--------|---------|
-| **Implemented** | Clear evidence in PR diff |
-| **Partial** | Related change but incomplete or missing edge cases |
-| **Missing** | No relevant change found |
+| **Implemented** | Production file in PR diff + score threshold (`pr_gated_code_status`) |
+| **Partial** | PR overlap only, or test/fixture paths without `src/` production hit |
+| **Missing** | No relevant PR production evidence |
 | **N/A** | Explicitly out of scope in Jira |
 
-**Automated tests (any tier)**
+**Automated tests (dev unit/integration in PR)**
 
 | Status | Meaning |
 |--------|---------|
-| **Covered** | Test file/assertion clearly exercises this requirement |
-| **Partial** | Indirect or weak test evidence |
-| **Missing** | No test change for this requirement |
-| **N/A** | Requirement is non-code (docs-only, process) |
+| **Covered** | Matching `test_*` function in PR diff (`pr_gated_dev_test_status`) |
+| **Partial** | Test module in PR but no matching pytest in diff, or weak overlap |
+| **Missing** | No dev test evidence in PR diff |
+| **N/A** | QA-only / SIT validation AC |
 
 **Dev vs QA columns** (required for every scored requirement)
 
@@ -317,16 +334,25 @@ For each requirement `R{n}` with mapped test case(s) `TC{x}`:
 
 ### Step 7: Compute coverage percentages
 
-**Dev code coverage %** (same formula as requirement → code mapping)
+**Dev code coverage %** (aligned with §5 Code column)
+
+Computed in `compute_coverage_pcts()` **after** NFR validation caps (`finalize_mapping_evidence`). Includes **all** mapped requirements (Jira **and** LADR), not Jira-only.
 
 ```
-score(R) = 1.0 if Implemented
-         = 0.5 if Partial
-         = 0.0 if Missing
-         = excluded if N/A
+score(R/L) = 1.0 if Implemented
+           = 0.5 if Partial
+           = 0.0 if Missing
 
-requirement_coverage_pct = round(100 * sum(score) / count(scored items), 1)
+dev_code_coverage_pct = round(100 * sum(score) / count(all mapped requirements), 1)
 ```
+
+`{{REQ_COVERAGE_DETAIL}}` e.g. `4 Jira + 5 LADR · 8 Implemented · 1 Partial`.
+
+**Dev unit / integration test coverage %** (aligned with §5 Dev tests column)
+
+Same weights: **Covered** = 1.0, **Partial** = 0.5, **Missing** = 0.0 on **dev/shared-owned** requirements only (QA-only SIT AC excluded). Badges from `pr_gated_dev_test_status()` — pytest functions in PR diff required for **Covered**.
+
+`{{DEV_COVERAGE_DETAIL}}` e.g. `3 Jira + 4 LADR dev-owned (7 scored) · 5 Covered · 2 Partial`.
 
 **Requirements mapped**
 
@@ -335,6 +361,14 @@ Count of Jira acceptance criteria extracted and scored: `{{REQ_MAPPED_SUMMARY}}`
 **Open gaps**
 
 From Implementation review gap list: `{{OPEN_GAPS_SUMMARY}}` e.g. `2 High · 2 Med`. `{{OPEN_GAPS_DETAIL}}` one-line card note from `build_open_gaps_detail(gap_summary=…)` — when total gaps **&lt; 5** (High+Med), names uncovered Jira/LADR ids, missing PR code/dev tests, and CI failures; when **≥ 5**, shows gap **themes** plus **see §6 for full list** (full bullets in §6 `{{GAPS_LIST}}`). Not tooltip copy. Class `{{OPEN_GAPS_CLASS}}`: `metric-fail` if any High/Critical, `metric-warn` if Medium only, `metric-good` if none.
+
+**Release readiness score** (composite — not an average of the 100% cards)
+
+Weighted blend via `compute_release_score()`: dev code 30%, dev tests 25%, **attached** test plan 25%, open-gap penalty 10% (15 pts per High, 7 per Med), CI line coverage 10% when reported on linked PRs. Gap counts are parsed from `{{OPEN_GAPS_SUMMARY}}` (not substring matching). CI uses prefetched PR `linePct` when available — no hardcoded 70% placeholder.
+
+**Test plan acceptance criteria coverage %**
+
+Computed from **Jira-attached** cases only (`compute_testplan_coverage()` excludes `gap-supplement` Excel). When gap-fill supplement cases exist, cache also stores `testplanCoveragePctEffective`, `gapSupplementCaseCount`, and `gapSupplementOnlyRequirements`. §1 shows attached %; §3 split metrics show effective % when different.
 
 **Test requirement coverage %** *(internal only — not shown in summary)*
 
@@ -385,7 +419,7 @@ Apply `{{REQ_COVERAGE_CLASS}}` to **Dev code coverage** (required). Set `{{DEV_C
 
 | Placeholder | Value |
 |-------------|-------|
-| `{{TESTPLAN_COVERAGE_PCT}}` | e.g. `100.0%` or `NA` |
+| `{{TESTPLAN_COVERAGE_PCT}}` | Attached-plan % only (excludes gap-fill supplement); see `testplanCoveragePctEffective` in cache when supplement merged |
 | `{{TESTPLAN_COVERAGE_CLASS}}` | metric-* tier class |
 | `{{TESTPLAN_COVERAGE_DETAIL}}` | completeness summary |
 | `{{TESTPLAN_NOTE}}` | note-box when no attachment/auth error; empty otherwise |

@@ -129,7 +129,7 @@ Follow [testcase-template.md](testcase-template.md) exactly (11 columns).
 
 ### Step 6: Review gate (required)
 
-**Exception:** When invoked from **`/Req2Release`** in **`--auto --write`** mode and Jira has **no test plan** (`no_testplan`), skip this gate and write files immediately (see `.cursor/skills/coverage-validator/references/testplan-missing-fallback.md`).
+**Req2Release relationship:** The orchestrator auto-runs `generate_testcases_from_requirements.py` for `no_testplan` — that script does **not** use this skill. Invoke **`/Spec2Test`** only when Req2Release returns exit **2** (`needs_testcase_writer`) or the user asks for LLM-authored scenarios. In those cases use the normal review gate (Step 6) unless the user explicitly says skip approval.
 
 Show the user a complete draft before writing any file. The draft must include:
 

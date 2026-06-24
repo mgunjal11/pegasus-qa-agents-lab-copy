@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-Optional semantic evidence boost for requirement-to-diff mapping.
+Optional second-pass evidence for requirement-to-diff mapping.
 
-Re-scores requirements using comment/docstring lines in the diff, Confluence ESS
-scenario text, and test-plan step overlap — beyond token/symbol heuristics.
+**Scoring rule:** Code and Dev test statuses/scores may only rise from PR diff
+comment/docstring lines — never from Confluence/LADR or QMetry test-plan text.
+
+LADR and test-plan overlap is recorded as advisory `designContextOverlap` only.
 
   python scripts/semantic_mapping_boost.py MSC-205625
 """
@@ -99,20 +101,16 @@ def _testplan_haystack(testplan: dict[str, Any], req_id: str) -> str:
     return " ".join(parts)
 
 
-def _status_from_score(score: float) -> str:
-    if score >= 0.55:
-        return "implemented"
-    if score >= 0.25:
-        return "partial"
-    return "missing"
+def _recalc_coverage_pcts(reqs: list[dict[str, Any]], out: dict[str, Any]) -> None:
+    from map_requirements_to_diff import compute_coverage_pcts
 
-
-def _test_status(score: float, has_test: bool) -> str:
-    if score >= 0.5 and has_test:
-        return "covered"
-    if score >= 0.2 and has_test:
-        return "partial"
-    return "missing"
+    out.update(
+        compute_coverage_pcts(
+            reqs,
+            jira_requirement_count=out.get("jiraRequirementCount"),
+            ladr_requirement_count=out.get("ladrRequirementCount"),
+        )
+    )
 
 
 def apply_semantic_boost(
@@ -123,13 +121,21 @@ def apply_semantic_boost(
     testplan: dict[str, Any] | None = None,
     min_boost: float = 0.08,
 ) -> dict[str, Any]:
-    """Boost code/test scores when semantic haystacks exceed token-only scores."""
+    """
+    Second pass on mapping cache.
+
+    - **Code / Dev test:** PR diff comment lines only (same thresholds as primary mapper).
+    - **Confluence / test plan:** advisory overlap only — does not change scores or §5 badges.
+    """
+    from map_requirements_to_diff import _status_from_score
+
     confluence = confluence or {}
     testplan = testplan or {}
-    comments = _comment_lines(diff_blob)
+    pr_comments = _comment_lines(diff_blob)
     out = dict(mapping)
     reqs: list[dict[str, Any]] = []
-    boosted = 0
+    pr_boosted = 0
+    design_context_count = 0
 
     for req in mapping.get("requirements") or []:
         r = dict(req)
@@ -138,63 +144,51 @@ def apply_semantic_boost(
         phrases = _phrases(text)
         req_tokens = _tokens(text)
 
-        haystacks = [
-            ("diff_comments", comments),
-            ("confluence", _confluence_haystack(confluence, rid)),
-            ("testplan", _testplan_haystack(testplan, rid)),
-        ]
-        semantic_code = max(
-            _overlap_phrases(phrases, h) * 0.9 + _overlap_phrases(req_tokens, h) * 0.4
-            for _, h in haystacks
-            if h.strip()
-        ) if any(h.strip() for _, h in haystacks) else 0.0
-
         old_code = float(r.get("codeScore") or 0)
         old_test = float(r.get("devTestScore") or 0)
-        new_code = max(old_code, min(1.0, semantic_code))
+        new_code = old_code
         new_test = old_test
-        if _overlap_phrases(phrases, haystacks[2][1]) >= 0.15:
-            new_test = max(old_test, min(1.0, _overlap_phrases(phrases, haystacks[2][1]) * 0.85))
 
-        notes: list[str] = []
+        if pr_comments.strip():
+            semantic_code = (
+                _overlap_phrases(phrases, pr_comments) * 0.9
+                + _overlap_phrases(req_tokens, pr_comments) * 0.4
+            )
+            new_code = max(old_code, min(1.0, semantic_code))
+
+        pr_notes: list[str] = []
         if new_code - old_code >= min_boost:
-            boosted += 1
-            for label, hay in haystacks:
-                if _overlap_phrases(phrases, hay) >= 0.12:
-                    notes.append(f"semantic:{label}")
+            pr_boosted += 1
+            pr_notes.append("semantic:diff_comments")
             r["codeScore"] = round(new_code, 3)
             r["codeStatus"] = _status_from_score(new_code)
-            if notes:
-                prev = str(r.get("evidenceNote") or "")
-                extra = "Semantic boost (" + ", ".join(notes) + ")"
-                r["evidenceNote"] = f"{prev}; {extra}".strip("; ") if prev else extra
-
-        if new_test - old_test >= min_boost:
-            r["devTestScore"] = round(new_test, 3)
-            has_test = bool(r.get("matchedTests")) or new_test > 0.2
-            r["devTestStatus"] = _test_status(new_test, has_test)
-
-        if new_code > old_code or new_test > old_test:
+            prev = str(r.get("evidenceNote") or "")
+            extra = "PR comment overlap (" + ", ".join(pr_notes) + ")"
+            r["evidenceNote"] = f"{prev}; {extra}".strip("; ") if prev else extra
             r["semanticBoost"] = True
+
+        design_overlap: list[str] = []
+        conf_hay = _confluence_haystack(confluence, rid)
+        tp_hay = _testplan_haystack(testplan, rid)
+        if conf_hay.strip() and _overlap_phrases(phrases, conf_hay) >= 0.12:
+            design_overlap.append("confluence")
+        if tp_hay.strip() and _overlap_phrases(phrases, tp_hay) >= 0.12:
+            design_overlap.append("testplan")
+        if design_overlap:
+            design_context_count += 1
+            r["designContextOverlap"] = design_overlap
+            r["designContextNote"] = (
+                "LADR or test-plan text aligns with requirement "
+                "(not PR implementation proof — Code/Dev tests use PR diff only)."
+            )
+
         reqs.append(r)
 
-    jira_scores = [
-        1.0 if r.get("codeStatus") == "implemented" else 0.5 if r.get("codeStatus") == "partial" else 0.0
-        for r in reqs
-        if str(r.get("source") or "") == "jira"
-    ]
-    dev_scores = [
-        1.0 if r.get("devTestStatus") == "covered" else 0.5 if r.get("devTestStatus") == "partial" else 0.0
-        for r in reqs
-        if r.get("owner") != "qa"
-    ]
     out["requirements"] = reqs
-    out["semanticBoostApplied"] = boosted > 0
-    out["semanticBoostCount"] = boosted
-    if jira_scores:
-        out["reqCoveragePct"] = round(100 * sum(jira_scores) / len(jira_scores), 1)
-    if dev_scores:
-        out["devTestCoveragePct"] = round(100 * sum(dev_scores) / len(dev_scores), 1)
+    out["semanticBoostApplied"] = pr_boosted > 0
+    out["semanticBoostCount"] = pr_boosted
+    out["designContextOverlapCount"] = design_context_count
+    _recalc_coverage_pcts(reqs, out)
     return out
 
 
@@ -232,7 +226,15 @@ def main() -> int:
     payload = boost_mapping_for_issue(key)
     if args.write:
         out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({"output": str(out_path.resolve()), "semanticBoostCount": payload.get("semanticBoostCount")}))
+    print(
+        json.dumps(
+            {
+                "output": str(out_path.resolve()),
+                "semanticBoostCount": payload.get("semanticBoostCount"),
+                "designContextOverlapCount": payload.get("designContextOverlapCount"),
+            }
+        )
+    )
     return 0
 
 

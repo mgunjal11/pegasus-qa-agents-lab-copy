@@ -116,6 +116,34 @@ def test_compute_testplan_coverage_dedupes_duplicate_ladr_ids():
     assert len(trace) == 12
 
 
+def test_compute_testplan_coverage_excludes_gap_supplement_from_primary_pct():
+    """Attached plan metrics must not count auto-generated gap-fill cases as 100%."""
+    jira = [{"id": f"R{i}", "text": f"ac{i}"} for i in range(1, 5)]
+    ladr = [{"id": f"L{i}", "text": f"ladr{i}"} for i in range(1, 6)]
+    attached = FakeTC(
+        "passport incremental",
+        mapped_requirements=["R1", "R2", "R3", "L1", "L2", "L3", "L4"],
+    )
+    gap = FakeTC(
+        "gap fill R4 L5",
+        mapped_requirements=["R4", "L5"],
+    )
+    gap.source_file = "MSC-205625-gap-supplement.xlsx"  # type: ignore[attr-defined]
+    cov = compute_testplan_coverage(
+        [attached, gap],
+        merge_requirement_sets(jira, ladr),
+        jira_requirements=jira,
+        ladr_requirements=ladr,
+    )
+    assert cov["testplanCoveragePct"] == round(100 * 7 / 9, 1)
+    assert cov["testplanCoveragePctEffective"] == 100.0
+    assert cov["gapSupplementCaseCount"] == 1
+    assert cov["attachedTestCaseCount"] == 1
+    assert "R4" in cov["uncoveredJiraRequirements"]
+    assert "L5" in cov["uncoveredLadrRequirements"]
+    assert set(cov["gapSupplementOnlyRequirements"]) == {"R4", "L5"}
+
+
 def test_collect_confluence_page_links_from_issue_caches(fixture_repo_root):
     """MSC-204417 analysis cache embeds LADR wiki URL even when confluence.json has no pages."""
     links = collect_confluence_page_links("MSC-204417", fixture_repo_root)

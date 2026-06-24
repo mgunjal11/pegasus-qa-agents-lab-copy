@@ -16,4 +16,6 @@ If the Excel is on the issue, set `.env` from `.env.example` so `fetch_jira_test
 
 ## No test plan on Jira
 
-Coverage validator can auto-generate QMetry cases via `@Spec2Test` and `write_testcase_excel.py`.
+1. Req2Release auto-runs `generate_testcases_from_requirements.py` (deterministic script).
+2. If that fails or is disabled (exit **2**), invoke `@Spec2Test {KEY}`, then re-run Req2Release.
+3. Optional: upload generated Excel to Jira or keep under `testcases/`.

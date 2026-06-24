@@ -2,7 +2,7 @@
 
 When Jira has **no test plan attachment**, the orchestrator **auto-generates** QMetry cases via `generate_testcases_from_requirements.py` (deterministic). When an attached plan has **uncovered R/L**, it writes **`testcases/{KEY}-gap-supplement.xlsx`** and merges at fetch.
 
-**LLM fallback:** `/Spec2Test` when auto-generate is disabled or exit **2** / `needs_testcase_writer`.
+**LLM fallback:** `/Spec2Test` when auto-generate is disabled or exit **2** / `needs_testcase_writer`. The orchestrator does **not** subprocess or auto-invoke Spec2Test — exit **2** tells the agent/user to run `/Spec2Test {KEY}` and re-run Req2Release.
 
 **Do not change** `apply_report_ui_enhancements()`, `SUMMARY_METRIC_INFO`, or report-template tooltip markup when adding this flow — only workflow, caches, and §3 narrative/notes.
 

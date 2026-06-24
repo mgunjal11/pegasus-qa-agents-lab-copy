@@ -180,6 +180,8 @@ def build_report(
 
     tc_n = cov.get("testCaseCount", 0)
     gwt_n = cov.get("completeGwtCount", 0)
+    gap_n = cov.get("gapSupplementCaseCount") or 0
+    eff_tp = cov.get("testplanCoveragePctEffective")
     qa_fields = build_qa_ownership_fields(key, base)
     jira_n = mapping.get("jiraRequirementCount") or len(mapping.get("requirements") or [])
     ladr_n = mapping.get("ladrRequirementCount") or 0
@@ -188,13 +190,17 @@ def build_report(
     else:
         ac_label = f"{len(mapping.get('requirements') or [])} acceptance criteria"
     if not analysis or not analysis.get("verdictRationale"):
+        tp_label = f"attached test plan {tp_pct}%"
+        if gap_n and eff_tp is not None and eff_tp != tp_pct:
+            tp_label += f" ({gap_n} gap-fill → effective {eff_tp}%)"
         rationale = (
             f"{verdict} — {ac_label}; "
-            f"test plan {tp_pct}% ({tc_n} scenarios, {gwt_n}/{tc_n} full Given When Then); "
+            f"{tp_label} ({tc_n} attached scenarios, {gwt_n}/{tc_n} full Given When Then); "
             f"dev code {req_pct}%; dev tests {dev_pct}%."
         )
 
-    req_detail_default = build_req_coverage_detail(mapping)
+    req_detail_default = mapping.get("reqCoverageDetail") or build_req_coverage_detail(mapping)
+    dev_detail_default = mapping.get("devCoverageDetail") or "auto-mapped from PR test files"
     replacements: dict[str, str] = {
         "{{ISSUE_KEY}}": key,
         "{{STORY_TITLE}}": (analysis or {}).get("storyTitle") or jira.get("summary") or key,
@@ -214,9 +220,9 @@ def build_report(
         "{{DEV_COVERAGE_PCT}}": f"{dev_pct}%" if dev_pct is not None else "NA",
         "{{DEV_COVERAGE_CLASS}}": _metric_class(dev_pct),
         "{{DEV_COVERAGE_DETAIL}}": (
-            analysis.get("devCoverageDetail", "auto-mapped from PR test files")
+            analysis.get("devCoverageDetail", dev_detail_default)
             if analysis
-            else "auto-mapped from PR test files"
+            else dev_detail_default
         ),
         "{{REQ_MAPPED_SUMMARY}}": f"{cov.get('requirementsCovered', 0)}/{cov.get('requirementCount', 0)} AC in test plan",
         "{{REQ_MAPPED_CLASS}}": testplan_coverage_class(tp_pct),
@@ -285,7 +291,9 @@ def build_report(
         "{{CACHE_META}}": build_cache_meta_line(key, base),
         "{{QUICK_LINKS}}": build_quick_links(key, base),
         "{{JIRA_READINESS_BLOCK}}": build_jira_readiness_block(key, base),
-        "{{RELEASE_SCORE_BLOCK}}": build_release_score_block(req_pct, dev_pct, tp_pct, gap_summary),
+        "{{RELEASE_SCORE_BLOCK}}": build_release_score_block(
+            req_pct, dev_pct, tp_pct, gap_summary, issue_key=key, root=base
+        ),
     }
     replacements.update(build_testplan_report_fields(key, base))
     replacements.update(ci_coverage_report_fields(key, base))

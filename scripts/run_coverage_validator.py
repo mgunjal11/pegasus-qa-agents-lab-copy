@@ -206,7 +206,7 @@ def run_pipeline(key: str, args: argparse.Namespace) -> dict[str, Any]:
     defaults = load_coverage_defaults(ROOT)
     semantic = args.semantic_boost
     if semantic is None:
-        semantic = bool(defaults.get("semanticMappingBoost", True))
+        semantic = bool(defaults.get("semanticMappingBoost", False))
 
     preflight = run_preflight(key, verify_jira=args.verify_jira)
     if not preflight["ok"]:

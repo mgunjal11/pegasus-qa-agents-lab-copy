@@ -751,21 +751,30 @@ def build_ladr_traceability(
     return rows
 
 
-def compute_testplan_coverage(
+def _is_gap_supplement_case(tc: Any) -> bool:
+    """True when a test case was auto-generated in gap-supplement Excel (not the Jira attachment)."""
+    if isinstance(tc, dict):
+        if tc.get("gap_supplement") or tc.get("gapSupplement"):
+            return True
+        return "gap-supplement" in str(tc.get("source_file") or "").lower()
+    if bool(getattr(tc, "gap_supplement", False)):
+        return True
+    return "gap-supplement" in str(getattr(tc, "source_file", "") or "").lower()
+
+
+def _testplan_coverage_stats(
     cases: list[Any],
-    requirements: list[dict[str, str]],
-    *,
-    jira_requirements: list[dict[str, str]] | None = None,
-    ladr_requirements: list[dict[str, str]] | None = None,
+    jira_reqs: list[dict[str, str]],
+    ladr_reqs: list[dict[str, str]],
 ) -> dict[str, Any]:
     from testplan_gwt import has_complete_gwt
 
-    jira_reqs = jira_requirements or [r for r in requirements if r["id"].startswith("R")]
-    ladr_reqs = ladr_requirements or [r for r in requirements if r["id"].startswith("L")]
-
     covered: set[str] = set()
     for tc in cases:
-        covered.update(getattr(tc, "mapped_requirements", []) or [])
+        mapped = getattr(tc, "mapped_requirements", None)
+        if mapped is None and isinstance(tc, dict):
+            mapped = tc.get("mapped_requirements")
+        covered.update(mapped or [])
 
     jira_ids = _unique_requirement_ids([r["id"] for r in jira_reqs if r.get("id")])
     ladr_ids = _unique_requirement_ids([r["id"] for r in dedupe_ladr_requirements(ladr_reqs) if r.get("id")])
@@ -776,25 +785,25 @@ def compute_testplan_coverage(
     ladr_covered = len(covered & set(ladr_ids))
 
     if all_ids:
-        pct = round(100 * len(covered & all_id_set) / len(all_ids), 1)
+        pct: float | str = round(100 * len(covered & all_id_set) / len(all_ids), 1)
     elif jira_ids:
         pct = round(100 * jira_covered / len(jira_ids), 1)
     else:
         pct = "NA"
 
-    complete_gwt = sum(1 for tc in cases if has_complete_gwt(getattr(tc, "steps", {}) or {}))
-
-    detail_parts = [f"{len(cases)} test cases", f"{complete_gwt}/{len(cases)} full Given When Then" if cases else "0 Given When Then"]
-    if ladr_ids:
-        detail_parts.append(f"{ladr_covered}/{len(ladr_ids)} LADR scenarios covered")
-    if jira_ids:
-        detail_parts.append(f"{jira_covered}/{len(jira_ids)} Jira acceptance criteria covered")
+    complete_gwt = sum(
+        1
+        for tc in cases
+        if has_complete_gwt(
+            (getattr(tc, "steps", None) if not isinstance(tc, dict) else tc.get("steps")) or {}
+        )
+    )
 
     uncovered_jira = [r for r in jira_ids if r not in covered]
     uncovered_ladr = [r for r in ladr_ids if r not in covered]
 
     return {
-        "testplanCoveragePct": pct,
+        "pct": pct,
         "requirementCount": len(all_ids) or len(jira_ids),
         "requirementsCovered": len(covered & all_id_set) if all_ids else jira_covered,
         "jiraRequirementCount": len(jira_ids),
@@ -806,23 +815,86 @@ def compute_testplan_coverage(
         "uncoveredRequirements": uncovered_jira + uncovered_ladr,
         "uncoveredJiraRequirements": uncovered_jira,
         "uncoveredLadrRequirements": uncovered_ladr,
+        "gapSupplementOnlyRequirements": [],
+    }
+
+
+def compute_testplan_coverage(
+    cases: list[Any],
+    requirements: list[dict[str, str]],
+    *,
+    jira_requirements: list[dict[str, str]] | None = None,
+    ladr_requirements: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    jira_reqs = jira_requirements or [r for r in requirements if r["id"].startswith("R")]
+    ladr_reqs = ladr_requirements or [r for r in requirements if r["id"].startswith("L")]
+
+    attached_cases = [tc for tc in cases if not _is_gap_supplement_case(tc)]
+    gap_cases = [tc for tc in cases if _is_gap_supplement_case(tc)]
+
+    attached = _testplan_coverage_stats(attached_cases, jira_reqs, ladr_reqs)
+    effective = _testplan_coverage_stats(cases, jira_reqs, ladr_reqs)
+
+    attached_covered: set[str] = set()
+    for tc in attached_cases:
+        mapped = getattr(tc, "mapped_requirements", None)
+        if mapped is None and isinstance(tc, dict):
+            mapped = tc.get("mapped_requirements")
+        attached_covered.update(mapped or [])
+    effective_covered: set[str] = set()
+    for tc in cases:
+        mapped = getattr(tc, "mapped_requirements", None)
+        if mapped is None and isinstance(tc, dict):
+            mapped = tc.get("mapped_requirements")
+        effective_covered.update(mapped or [])
+    gap_only_reqs = sorted(effective_covered - attached_covered, key=lambda x: (len(x), x))
+
+    return {
+        "testplanCoveragePct": attached["pct"],
+        "testplanCoveragePctEffective": effective["pct"],
+        "requirementCount": attached["requirementCount"],
+        "requirementsCovered": attached["requirementsCovered"],
+        "requirementsCoveredEffective": effective["requirementsCovered"],
+        "jiraRequirementCount": attached["jiraRequirementCount"],
+        "jiraRequirementsCovered": attached["jiraRequirementsCovered"],
+        "ladrRequirementCount": attached["ladrRequirementCount"],
+        "ladrRequirementsCovered": attached["ladrRequirementsCovered"],
+        "testCaseCount": attached["testCaseCount"],
+        "attachedTestCaseCount": attached["testCaseCount"],
+        "totalTestCaseCount": len(cases),
+        "gapSupplementCaseCount": len(gap_cases),
+        "gapSupplementOnlyRequirements": gap_only_reqs,
+        "completeGwtCount": attached["completeGwtCount"],
+        "completeGwtCountEffective": effective["completeGwtCount"],
+        "uncoveredRequirements": attached["uncoveredRequirements"],
+        "uncoveredJiraRequirements": attached["uncoveredJiraRequirements"],
+        "uncoveredLadrRequirements": attached["uncoveredLadrRequirements"],
     }
 
 
 def format_testplan_coverage_detail(coverage: dict[str, Any], source_hint: str = "") -> str:
     parts: list[str] = []
-    tc_count = coverage.get("testCaseCount", 0)
+    tc_count = coverage.get("attachedTestCaseCount", coverage.get("testCaseCount", 0))
     gwt_complete = coverage.get("completeGwtCount", 0)
-    parts.append(f"{tc_count} test cases")
+    gap_n = coverage.get("gapSupplementCaseCount") or 0
+    parts.append(f"{tc_count} attached test case{'s' if tc_count != 1 else ''}")
+    if gap_n:
+        parts.append(f"{gap_n} gap-fill supplement")
+        eff_pct = coverage.get("testplanCoveragePctEffective")
+        if eff_pct is not None and eff_pct != coverage.get("testplanCoveragePct"):
+            parts.append(f"effective {eff_pct}% incl. gap fill")
     parts.append(f"{gwt_complete}/{tc_count} full Given When Then" if tc_count else "0 Given When Then")
     ladr_total = coverage.get("ladrRequirementCount", 0)
     ladr_covered = coverage.get("ladrRequirementsCovered", 0)
     jira_total = coverage.get("jiraRequirementCount", 0)
     jira_covered = coverage.get("jiraRequirementsCovered", 0)
     if ladr_total:
-        parts.append(f"{ladr_covered}/{ladr_total} LADR scenarios covered")
+        parts.append(f"{ladr_covered}/{ladr_total} LADR scenarios in attached plan")
     if jira_total:
-        parts.append(f"{jira_covered}/{jira_total} Jira acceptance criteria covered")
+        parts.append(f"{jira_covered}/{jira_total} Jira acceptance criteria in attached plan")
+    gap_only = coverage.get("gapSupplementOnlyRequirements") or []
+    if gap_only:
+        parts.append(f"gap fill only: {', '.join(gap_only)}")
     elif coverage.get("requirementCount"):
         parts.append(
             f"{coverage.get('requirementsCovered', 0)}/{coverage.get('requirementCount', 0)} acceptance criteria covered"

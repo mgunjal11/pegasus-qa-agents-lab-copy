@@ -112,6 +112,117 @@ def _test_status(score: float, has_test_file: bool) -> str:
     return "missing"
 
 
+def _status_to_weight(status: str | None) -> float:
+    """Map §5 badge status to coverage score weight (matches Step 7 formula)."""
+    key = (status or "").lower().replace("_", " ")
+    if key in ("implemented", "covered"):
+        return 1.0
+    if key == "partial":
+        return 0.5
+    return 0.0
+
+
+def _count_statuses(requirements: list[dict[str, Any]], field: str) -> dict[str, int]:
+    counts = {"implemented": 0, "partial": 0, "missing": 0}
+    alias = {"covered": "implemented", "missing": "missing", "partial": "partial", "implemented": "implemented"}
+    for req in requirements:
+        raw = str(req.get(field) or "missing").lower()
+        bucket = alias.get(raw, "missing")
+        counts[bucket] = counts.get(bucket, 0) + 1
+    counts["total"] = len(requirements)
+    return counts
+
+
+def compute_coverage_pcts(
+    requirements: list[dict[str, Any]],
+    *,
+    jira_requirement_count: int | None = None,
+    ladr_requirement_count: int | None = None,
+) -> dict[str, Any]:
+    """
+    Derive summary percentages from final §5 codeStatus / devTestStatus badges.
+
+    - Dev code %: all mapped requirements (Jira R* + LADR L*), weighted 1 / 0.5 / 0.
+    - Dev test %: dev/shared-owned requirements only (excludes QA-only rows).
+    """
+    code_weights = [_status_to_weight(r.get("codeStatus")) for r in requirements]
+    dev_reqs = [r for r in requirements if str(r.get("owner") or "").lower() != "qa"]
+    dev_weights = [_status_to_weight(r.get("devTestStatus")) for r in dev_reqs]
+
+    code_counts = _count_statuses(requirements, "codeStatus")
+    dev_counts = _count_statuses(dev_reqs, "devTestStatus")
+
+    jira_n = jira_requirement_count
+    ladr_n = ladr_requirement_count
+    if jira_n is None:
+        jira_n = sum(1 for r in requirements if str(r.get("id", "")).startswith("R"))
+    if ladr_n is None:
+        ladr_n = sum(1 for r in requirements if str(r.get("id", "")).startswith("L"))
+
+    out: dict[str, Any] = {
+        "codeCoverageCounts": code_counts,
+        "devTestCoverageCounts": dev_counts,
+    }
+    if code_weights:
+        out["reqCoveragePct"] = round(100 * sum(code_weights) / len(code_weights), 1)
+    else:
+        out["reqCoveragePct"] = None
+    if dev_weights:
+        out["devTestCoveragePct"] = round(100 * sum(dev_weights) / len(dev_weights), 1)
+    else:
+        out["devTestCoveragePct"] = None
+    out["reqCoverageDetail"] = format_code_coverage_detail(code_counts, jira_n=jira_n, ladr_n=ladr_n)
+    out["devCoverageDetail"] = format_dev_test_coverage_detail(
+        dev_counts, dev_owned=len(dev_reqs), jira_n=jira_n, ladr_n=ladr_n
+    )
+    return out
+
+
+def format_code_coverage_detail(
+    counts: dict[str, int],
+    *,
+    jira_n: int = 0,
+    ladr_n: int = 0,
+) -> str:
+    """Human-readable Dev code coverage detail for §1 (matches §5 status badges)."""
+    parts: list[str] = []
+    if counts.get("implemented"):
+        parts.append(f"{counts['implemented']} Implemented")
+    if counts.get("partial"):
+        parts.append(f"{counts['partial']} Partial")
+    if counts.get("missing"):
+        parts.append(f"{counts['missing']} Missing")
+    status_bit = " · ".join(parts) if parts else "0 requirements"
+    if jira_n and ladr_n:
+        scope = f"{jira_n} Jira + {ladr_n} LADR"
+    else:
+        scope = f"{counts.get('total', 0)} requirements"
+    return f"{scope} · {status_bit}"
+
+
+def format_dev_test_coverage_detail(
+    counts: dict[str, int],
+    *,
+    dev_owned: int,
+    jira_n: int = 0,
+    ladr_n: int = 0,
+) -> str:
+    """Human-readable Dev test coverage detail for §1 (aligned with §5 Dev tests column)."""
+    parts: list[str] = []
+    if counts.get("implemented"):
+        parts.append(f"{counts['implemented']} Covered")
+    if counts.get("partial"):
+        parts.append(f"{counts['partial']} Partial")
+    if counts.get("missing"):
+        parts.append(f"{counts['missing']} Missing")
+    status_bit = " · ".join(parts) if parts else "0 dev-owned requirements"
+    if jira_n and ladr_n:
+        scope = f"{jira_n} Jira + {ladr_n} LADR dev-owned ({dev_owned} scored)"
+    else:
+        scope = f"{dev_owned} dev-owned"
+    return f"{scope} · {status_bit}"
+
+
 NFR_HEADING_RE = re.compile(
     r"^#{1,4}\s*(non[-\s]?functional(?:\s+requirements?)?|\bnfr\b|quality\s+attributes?)\s*$",
     re.I,
@@ -424,33 +535,49 @@ def _map_one_requirement(
     matched_files = list(evidence["matchedFiles"])
     matched_tests = list(evidence["matchedTests"])
     matched_symbols = list(evidence["matchedSymbols"])
+    prod_hits = list(evidence.get("prodFileHits") or [])
+    test_hits = list(evidence.get("testModuleHits") or [])
+
+    from mapping_evidence import pr_gated_code_status, pr_gated_dev_test_status
+
+    code_status = pr_gated_code_status(code_score, prod_hits)
+    dev_status = pr_gated_dev_test_status(
+        test_score,
+        matched_tests=matched_tests,
+        test_module_hits=test_hits,
+        test_files_in_pr=bool(evidence.get("testFilesInPr")),
+    )
     combined = min(1.0, code_score * 0.75 + test_score * 0.35)
-    has_test = (test_score > 0.1 and bool(test_files)) or bool(matched_tests)
-
-    code_status = _status_from_score(code_score)
-    dev_status = _test_status(test_score, has_test)
-    code_weight = 1.0 if code_status == "implemented" else 0.5 if code_status == "partial" else 0.0
-
     owner, qa_scope = derive_owner_and_qa_scope(text, dev_status, code_status)
-    dev_weight: float | None = None
-    if owner != "qa":
-        dev_weight = 1.0 if dev_status == "covered" else 0.5 if dev_status == "partial" else 0.0
 
     evidence_note = ""
     if matched_tests:
-        evidence_note = "Matched tests: " + ", ".join(matched_tests)
+        evidence_note = "PR diff tests: " + ", ".join(matched_tests)
+    elif test_hits and dev_status == "partial":
+        evidence_note = (
+            "Test module(s) changed in PR but no matching pytest function in diff — "
+            + ", ".join(Path(f).name for f in test_hits[:3])
+        )
     elif matched_symbols and not matched_files:
         evidence_note = "Matched symbols: " + ", ".join(matched_symbols)
-    if not matched_files and code_score >= 0.2 and not evidence_note:
+    if not prod_hits and code_status in ("implemented", "partial") and not evidence_note:
         bc_commits = (prefetch.get("branchCompare") or {}).get("commits") or []
         evidence_note = _commit_evidence_note(req_tokens, bc_commits)
         if not evidence_note:
             evidence_note = (
                 "Keyword/symbol overlap in branch diff/commits only — "
-                "no changed file path matched requirement terms"
+                "no production file path matched requirement terms"
             )
 
-    conf_files = matched_files or ([f"symbol:{s}" for s in matched_symbols[:2]] if matched_symbols else [])
+    conf_files = prod_hits or test_hits or matched_files or (
+        [f"symbol:{s}" for s in matched_symbols[:2]] if matched_symbols else []
+    )
+    conf = _evidence_confidence(combined, code_score, conf_files)
+    if dev_status == "covered" and matched_tests and prod_hits:
+        conf = "high"
+    elif dev_status == "partial" or (dev_status == "covered" and not matched_tests):
+        conf = "medium" if conf == "high" else conf
+
     mapped = {
         "id": rid,
         "text": text,
@@ -461,7 +588,7 @@ def _map_one_requirement(
         "devTestScore": round(test_score, 3),
         "owner": owner,
         "qaScope": qa_scope,
-        "confidence": _evidence_confidence(combined, code_score, conf_files),
+        "confidence": conf,
         "matchedFiles": matched_files,
         "matchedTests": matched_tests,
         "evidenceNote": evidence_note,
@@ -488,6 +615,8 @@ def _map_one_requirement(
     if section_hint:
         mapped["sectionHint"] = section_hint
 
+    code_weight = _status_to_weight(code_status)
+    dev_weight = _status_to_weight(dev_status) if owner != "qa" else None
     return mapped, code_weight, dev_weight
 
 
@@ -582,6 +711,12 @@ def finalize_mapping_evidence(
     for req in out.get("requirements") or []:
         reqs.append(adjust_nfr_validation_evidence(dict(req), str(req.get("text") or "")))
     out["requirements"] = reqs
+    metrics = compute_coverage_pcts(
+        reqs,
+        jira_requirement_count=out.get("jiraRequirementCount"),
+        ladr_requirement_count=out.get("ladrRequirementCount"),
+    )
+    out.update(metrics)
     return out
 
 
@@ -692,15 +827,13 @@ def map_requirements(
 
     diff_context = extract_diff_context(diff_blob, prod_files, test_files)
     mapped_reqs: list[dict[str, Any]] = []
-    jira_scores: list[float] = []
-    dev_scores: list[float] = []
 
     for req in requirements:
         rid = req.get("id") or ""
         if not rid:
             continue
         source = "ladr" if str(rid).startswith("L") else "jira"
-        mapped, code_weight, dev_weight = _map_one_requirement(
+        mapped, _code_weight, _dev_weight = _map_one_requirement(
             req,
             diff_blob=diff_blob,
             diff_context=diff_context,
@@ -711,10 +844,6 @@ def map_requirements(
             section_hints=section_hints,
         )
         mapped_reqs.append(mapped)
-        if source == "jira":
-            jira_scores.append(code_weight)
-        if dev_weight is not None:
-            dev_scores.append(dev_weight)
 
     # Link test plan TCs with partial keyword overlap (suggestions)
     cov = tp.get("coverage") or {}
@@ -742,17 +871,12 @@ def map_requirements(
                     {"id": tc.get("id"), "summary": tc.get("summary"), "overlap": round(overlap, 2)}
                 )
 
-    req_pct = round(100 * sum(jira_scores) / len(jira_scores), 1) if jira_scores else None
-    dev_pct = round(100 * sum(dev_scores) / len(dev_scores), 1) if dev_scores else None
-
     payload = {
         "issueKey": key,
         "fetchedAt": datetime.now(timezone.utc).isoformat(),
         "requirementCount": len(mapped_reqs),
         "jiraRequirementCount": len(jira_requirements),
         "ladrRequirementCount": len(ladr_requirements),
-        "reqCoveragePct": req_pct,
-        "devTestCoveragePct": dev_pct,
         "requirements": mapped_reqs,
         "prs": pr_summaries,
         "diffStats": {
@@ -766,7 +890,7 @@ def map_requirements(
     if semantic_boost is None:
         from coverage_validator_config import load_coverage_defaults
 
-        semantic_boost = bool(load_coverage_defaults(base).get("semanticMappingBoost", True))
+        semantic_boost = bool(load_coverage_defaults(base).get("semanticMappingBoost", False))
     if semantic_boost:
         from semantic_mapping_boost import apply_semantic_boost
 

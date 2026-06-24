@@ -12,7 +12,7 @@
   "generateTestPlanIfMissing": true,
   "fillTestPlanGaps": true,
   "skipTestcaseGeneration": false,
-  "semanticMappingBoost": true,
+  "semanticMappingBoost": false,
   "testPlanPath": "testplans/Domino Test Plan.xlsx",
   "testPlanSheet": "Inc as full",
   "testPlanFilename": "Domino Test Plan.xlsx",

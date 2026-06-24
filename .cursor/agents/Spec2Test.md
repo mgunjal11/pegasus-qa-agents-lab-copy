@@ -18,9 +18,17 @@ Follow **`.cursor/skills/jira-story-testcases/SKILL.md`** for the full workflow 
 | **2** | `pip install -r requirements.txt` |
 | **3** | `/Spec2Test MSC-1234` — draft → approval → Excel |
 
-## Coverage validator fallback
+## Req2Release fallback (when orchestrator exits **2**)
 
-When invoked from **`/Req2Release`** with `no_testplan`, follow [testplan-missing-fallback.md](.cursor/skills/coverage-validator/references/testplan-missing-fallback.md): **`--auto --write`**, skip approval gate, write `testcases/{KEY}-testcases.xlsx` only.
+`/Req2Release` does **not** invoke Spec2Test automatically. Flow:
+
+1. **Jira attachment** — Req2Release downloads attached QMetry Excel when present.
+2. **`no_testplan`** — orchestrator runs `generate_testcases_from_requirements.py` (deterministic) first.
+3. **Exit 2** — only when auto-generate is off or produced zero cases → invoke **`/Spec2Test {KEY}`** here.
+
+When Spec2Test is invoked for that fallback, follow [testplan-missing-fallback.md](.cursor/skills/coverage-validator/references/testplan-missing-fallback.md): show draft → approval → write `testcases/{KEY}-testcases.xlsx`, then re-run Req2Release.
+
+**Standalone invoke** (normal path): draft → explicit user approval → Excel — always use the review gate in Step 6 of the skill.
 
 ## Do not
 
