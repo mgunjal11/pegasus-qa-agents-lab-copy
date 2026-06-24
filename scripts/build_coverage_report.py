@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -32,7 +31,9 @@ from coverage_report_helpers import (  # noqa: E402
     build_open_gaps_detail,
     build_qa_ownership_fields,
     build_quick_links,
+    aggregate_ci_line_pct,
     build_release_score_block,
+    derive_release_verdict,
     build_req_coverage_detail,
     build_testplan_report_fields,
     build_cache_meta_line,
@@ -73,32 +74,18 @@ def _verdict(
     gap_summary: str,
     *,
     mode: str = "pragmatic",
+    dev_pct: float | None = None,
+    ci_pct: float | None = None,
 ) -> tuple[str, str, str]:
-    has_high = bool(re.search(r"[1-9]\d*\s+High", gap_summary or ""))
-    has_med = bool(re.search(r"[1-9]\d*\s+Med", gap_summary or ""))
-    gap_none = not gap_summary or gap_summary.strip().lower() == "none"
-
-    if has_high or (req_pct is not None and req_pct < 50):
-        return "Fail", "fail", "Critical gaps in code or test plan mapping"
-
-    if mode == "strict":
-        if (req_pct is not None and req_pct < 100) or (tp_pct is not None and tp_pct < 100) or has_med:
-            return (
-                "Pass with gaps",
-                "pass-gaps",
-                "Strict mode: 100% dev/test plan coverage and zero medium gaps required for Pass",
-            )
-        if gap_none and (req_pct is None or req_pct >= 100) and (tp_pct is None or tp_pct >= 100):
-            return "Pass", "pass", "Requirements, dev tests, and test plan alignment are satisfactory"
-        return (
-            "Pass with gaps",
-            "pass-gaps",
-            "Strict mode: remaining gaps — see sections below",
-        )
-
-    if (tp_pct is not None and tp_pct < 85) or (req_pct is not None and req_pct < 100):
-        return "Pass with gaps", "pass-gaps", "Implementation or test plan has remaining gaps — see sections below"
-    return "Pass", "pass", "Requirements, dev tests, and test plan alignment are satisfactory"
+    verdict, verdict_class, rationale, _, _ = derive_release_verdict(
+        req_pct,
+        dev_pct,
+        tp_pct,
+        gap_summary,
+        mode=mode,
+        ci_pct=ci_pct,
+    )
+    return verdict, verdict_class, rationale
 
 
 def build_report(
@@ -171,12 +158,23 @@ def build_report(
         except (OSError, json.JSONDecodeError):
             manifest = {}
     verdict_mode = get_verdict_mode(base, manifest)
+    ci_pct = aggregate_ci_line_pct(key, base)
 
-    verdict, verdict_class, rationale = _verdict(req_pct, tp_pct, gap_summary, mode=verdict_mode)
-    if analysis:
-        verdict = analysis.get("verdict", verdict)
-        verdict_class = analysis.get("verdictClass", verdict_class)
-        rationale = analysis.get("verdictRationale", rationale)
+    release_score: int | None = None
+    release_cls: str | None = None
+    if analysis and analysis.get("verdict") is not None:
+        verdict = analysis.get("verdict", "Pass with gaps")
+        verdict_class = analysis.get("verdictClass", "pass-gaps")
+        rationale = analysis.get("verdictRationale", "")
+    else:
+        verdict, verdict_class, rationale, release_score, release_cls = derive_release_verdict(
+            req_pct,
+            dev_pct,
+            tp_pct,
+            gap_summary,
+            mode=verdict_mode,
+            ci_pct=ci_pct,
+        )
 
     tc_n = cov.get("testCaseCount", 0)
     gwt_n = cov.get("completeGwtCount", 0)
@@ -292,7 +290,15 @@ def build_report(
         "{{QUICK_LINKS}}": build_quick_links(key, base),
         "{{JIRA_READINESS_BLOCK}}": build_jira_readiness_block(key, base),
         "{{RELEASE_SCORE_BLOCK}}": build_release_score_block(
-            req_pct, dev_pct, tp_pct, gap_summary, issue_key=key, root=base
+            req_pct,
+            dev_pct,
+            tp_pct,
+            gap_summary,
+            issue_key=key,
+            root=base,
+            ci_pct=ci_pct,
+            release_score=release_score,
+            release_cls=release_cls,
         ),
     }
     replacements.update(build_testplan_report_fields(key, base))

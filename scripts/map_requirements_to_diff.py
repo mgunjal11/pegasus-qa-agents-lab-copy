@@ -834,16 +834,16 @@ def map_requirements(
                 else:
                     prod_files.append(name)
             repo = str(bc.get("repo") or prefetch.get("repo") or "")
-            base = bc.get("base") or "main"
-            head = bc.get("head") or "develop"
+            compare_base = bc.get("base") or "main"
+            compare_head = bc.get("head") or "develop"
             primary = next(
                 (c for c in (bc.get("commits") or []) if "caption" in str(c.get("message", "")).lower()),
                 (bc.get("commits") or [{}])[0],
             )
             pr_summaries.append(
                 {
-                    "url": f"https://github.com/{repo}/compare/{base}...{head}" if repo else "",
-                    "number": f"{head} vs {base}",
+                    "url": f"https://github.com/{repo}/compare/{compare_base}...{compare_head}" if repo else "",
+                    "number": f"{compare_head} vs {compare_base}",
                     "repo": repo,
                     "state": f"{bc.get('ahead_by', '?')} ahead",
                     "title": f"{len(bc_files)} files including caption workflow",

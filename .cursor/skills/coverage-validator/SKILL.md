@@ -362,9 +362,19 @@ Count of Jira acceptance criteria extracted and scored: `{{REQ_MAPPED_SUMMARY}}`
 
 From Implementation review gap list: `{{OPEN_GAPS_SUMMARY}}` e.g. `2 High · 2 Med`. `{{OPEN_GAPS_DETAIL}}` one-line card note from `build_open_gaps_detail(gap_summary=…)` — when total gaps **&lt; 5** (High+Med), names uncovered Jira/LADR ids, missing PR code/dev tests, and CI failures; when **≥ 5**, shows gap **themes** plus **see §6 for full list** (full bullets in §6 `{{GAPS_LIST}}`). Not tooltip copy. Class `{{OPEN_GAPS_CLASS}}`: `metric-fail` if any High/Critical, `metric-warn` if Medium only, `metric-good` if none.
 
-**Release readiness score** (composite — not an average of the 100% cards)
+**Release readiness score** (composite — drives final verdict bands)
 
 Weighted blend via `compute_release_score()`: dev code 30%, dev tests 25%, **attached** test plan 25%, open-gap penalty 10% (15 pts per High, 7 per Med), CI line coverage 10% when reported on linked PRs. Gap counts are parsed from `{{OPEN_GAPS_SUMMARY}}` (not substring matching). CI uses prefetched PR `linePct` when available — no hardcoded 70% placeholder.
+
+**Verdict alignment** — `derive_release_verdict()` uses the same score bands as the release readiness card CSS (do not edit tooltip copy):
+
+| Release score | CSS class | Verdict (pragmatic) |
+|---------------|-----------|---------------------|
+| ≥ 85% | `metric-good` | **Pass** (when no High gaps and no Med gaps) |
+| 50–84% | `metric-warn` | **Pass with gaps** |
+| &lt; 50% | `metric-fail` | **Fail** |
+
+Hard **Fail** also when any **High** gap or dev code &lt; 50%. Override via **`verdictMode`** in manifest/defaults (`pragmatic` default | `strict` = Pass only at 100% + zero Med gaps + score ≥ 85%).
 
 **Test plan acceptance criteria coverage %**
 
@@ -446,11 +456,11 @@ Use **`NA`** when no attachment and no local fallback. Populate `{{TESTPLAN_COVE
 
 Apply `{{TESTPLAN_COVERAGE_CLASS}}` using the same tiers as dev coverage.
 
-**Verdict** — `build_coverage_report.py` `_verdict()`; override via **`verdictMode`** in manifest/defaults (`pragmatic` default | `strict` = Pass only at 100% + zero Med gaps):
+**Verdict** — `build_coverage_report.py` `derive_release_verdict()` (aligned with release readiness score); override via **`verdictMode`** in manifest/defaults:
 
-- **Fail** when `gap_summary` has **≥1 High** (`[1-9]\d* High`, not `0 High · N Med`) or dev code &lt; 50%.
-- **Pass with gaps** — pragmatic: test plan &lt; 85% or dev code &lt; 100%, or Medium gaps only; strict: any Med gap or &lt; 100% dev/test plan.
-- **Pass** when alignment is satisfactory (strict requires no Med gaps and 100%).
+- **Fail** when release readiness **&lt; 50%**, **≥1 High** gap, or dev code **&lt; 50%**.
+- **Pass with gaps** — release score **50–84%**, or any **Med** gaps (pragmatic), or strict mode short of 100%.
+- **Pass** — release score **≥ 85%**, no High/Med gaps (pragmatic); strict requires 100% metrics + score ≥ 85%.
 
 ### Step 8: Build HTML report
 

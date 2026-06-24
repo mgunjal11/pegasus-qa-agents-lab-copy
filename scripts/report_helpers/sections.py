@@ -1370,8 +1370,88 @@ def compute_release_score(
     total_w = sum(w for _, w in components)
     val = sum(s * w for s, w in components) / total_w if total_w else 0
     score = int(round(val))
-    cls = "metric-good" if score >= 85 else "metric-warn" if score >= 70 else "metric-fail"
+    cls = "metric-good" if score >= 85 else "metric-warn" if score >= 50 else "metric-fail"
     return score, cls
+
+
+def derive_release_verdict(
+    req_pct: float | None,
+    dev_pct: float | None,
+    tp_pct: float | None,
+    gap_summary: str,
+    *,
+    mode: str = "pragmatic",
+    ci_pct: float | None = None,
+) -> tuple[str, str, str, int, str]:
+    """
+    Derive Pass / Pass with gaps / Fail from release readiness score and hard rules.
+
+    Bands align with release score CSS: >=85 Pass, >=50 Pass with gaps, <50 Fail.
+    """
+    high_n, med_n = _parse_open_gaps_summary_counts(gap_summary)
+    score, score_cls = compute_release_score(
+        req_pct, dev_pct, tp_pct, high_gaps=high_n, med_gaps=med_n, ci_pct=ci_pct
+    )
+    has_high = high_n > 0
+    has_med = med_n > 0
+
+    if has_high or (req_pct is not None and req_pct < 50):
+        return (
+            "Fail",
+            "fail",
+            "Critical gaps in code or test plan mapping",
+            score,
+            score_cls,
+        )
+
+    if score_cls == "metric-fail":
+        return (
+            "Fail",
+            "fail",
+            f"Release readiness {score}% — dev code, dev tests, test plan, or open gaps below threshold",
+            score,
+            score_cls,
+        )
+
+    if mode == "strict":
+        if (
+            score_cls != "metric-good"
+            or has_med
+            or (req_pct is not None and req_pct < 100)
+            or (dev_pct is not None and dev_pct < 100)
+            or (tp_pct is not None and tp_pct < 100)
+        ):
+            return (
+                "Pass with gaps",
+                "pass-gaps",
+                "Strict mode: 100% dev/test plan coverage and zero medium gaps required for Pass",
+                score,
+                score_cls,
+            )
+        return (
+            "Pass",
+            "pass",
+            "Requirements, dev tests, and test plan alignment are satisfactory",
+            score,
+            score_cls,
+        )
+
+    if score_cls == "metric-good" and not has_med:
+        return (
+            "Pass",
+            "pass",
+            "Release readiness and coverage metrics are satisfactory",
+            score,
+            score_cls,
+        )
+
+    return (
+        "Pass with gaps",
+        "pass-gaps",
+        "Implementation or test plan has remaining gaps — see sections below",
+        score,
+        score_cls,
+    )
 
 
 def aggregate_ci_line_pct(issue_key: str, root: Path | None = None) -> float | None:
@@ -1400,6 +1480,8 @@ def build_release_score_block(
     issue_key: str | None = None,
     root: Path | None = None,
     ci_pct: float | None = None,
+    release_score: int | None = None,
+    release_cls: str | None = None,
 ) -> str:
     high_n, med_n = _parse_open_gaps_summary_counts(gap_summary)
     try:
@@ -1416,7 +1498,10 @@ def build_release_score_block(
         t = None
     if ci_pct is None and issue_key:
         ci_pct = aggregate_ci_line_pct(issue_key, root)
-    score, cls = compute_release_score(r, d, t, high_gaps=high_n, med_gaps=med_n, ci_pct=ci_pct)
+    if release_score is None or release_cls is None:
+        score, cls = compute_release_score(r, d, t, high_gaps=high_n, med_gaps=med_n, ci_pct=ci_pct)
+    else:
+        score, cls = release_score, release_cls
     from report_helpers.ui import metric_info_icon_html
 
     note_bits = ["dev code", "dev tests", "attached test plan", "gaps"]

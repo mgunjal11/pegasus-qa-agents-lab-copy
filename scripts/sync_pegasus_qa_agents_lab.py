@@ -69,6 +69,8 @@ SCRIPTS = [
     "test_semantic_and_run_validator.py",
     "patch_trace_section_template.py",
     "test_summary_metric_info.py",
+    "test_release_score.py",
+    "test_release_verdict_alignment.py",
     "patch_report_footer.py",
     "patch_report_template.py",
     "map_requirements_to_diff.py",

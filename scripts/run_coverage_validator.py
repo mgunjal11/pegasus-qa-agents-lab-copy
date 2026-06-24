@@ -196,6 +196,9 @@ def _prefetch_args(key: str, args: argparse.Namespace, defaults: dict[str, Any])
         cmd.extend(["--repo", str(repo)])
         if defaults.get("searchPrIfMissing", True) and not args.no_search_pr:
             cmd.append("--search-pr")
+        compare = manifest.get("compareBranch") or defaults.get("compareBranch")
+        if compare:
+            cmd.extend(["--compare", str(compare)])
     if args.skip_if_fresh:
         cmd.append("--skip-if-fresh")
     return cmd

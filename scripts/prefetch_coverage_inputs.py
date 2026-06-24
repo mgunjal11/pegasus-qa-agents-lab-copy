@@ -86,23 +86,33 @@ def parse_pr_url(url: str) -> tuple[str, str, int]:
 
 
 def search_prs(issue_key: str, repo: str, limit: int = 10) -> list[str]:
-    out = gh_text(
-        [
-            "search",
-            "prs",
-            issue_key,
-            "--repo",
-            repo,
-            "--state",
-            "open,closed",
-            "--limit",
-            str(limit),
-            "--json",
-            "url",
-        ]
-    )
-    rows = json.loads(out)
-    return [row["url"] for row in rows if row.get("url")]
+    """Search open and closed PRs; gh only accepts one --state value per call."""
+    urls: list[str] = []
+    per_state = max(1, (limit + 1) // 2)
+    for state in ("open", "closed"):
+        out = gh_text(
+            [
+                "search",
+                "prs",
+                issue_key,
+                "--repo",
+                repo,
+                "--state",
+                state,
+                "--limit",
+                str(per_state),
+                "--json",
+                "url",
+            ]
+        )
+        rows = json.loads(out)
+        for row in rows:
+            url = row.get("url")
+            if url and url not in urls:
+                urls.append(url)
+        if len(urls) >= limit:
+            break
+    return urls[:limit]
 
 
 def fetch_codecov_comment(org: str, repo: str, number: int) -> str | None:
@@ -173,6 +183,43 @@ def fetch_pr(org: str, repo: str, number: int, url: str) -> dict[str, Any]:
     }
 
 
+def compare_branches(repo: str, base: str, head: str) -> dict[str, Any]:
+    return gh_json(["api", f"repos/{repo}/compare/{base}...{head}", "--jq", "."])
+
+
+def build_branch_compare_payload(
+    repo: str, base: str, head: str, cmp: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "repo": repo,
+        "base": base,
+        "head": head,
+        "ahead_by": cmp.get("ahead_by"),
+        "total_commits": cmp.get("total_commits"),
+        "files": [f.get("filename") for f in cmp.get("files", [])],
+        "commits": [
+            {
+                "sha": c.get("sha", "")[:7],
+                "message": (c.get("commit") or {}).get("message", "").split("\n")[0],
+                "author": ((c.get("commit") or {}).get("author") or {}).get("name"),
+            }
+            for c in cmp.get("commits", [])[:20]
+        ],
+    }
+
+
+def load_manifest_compare_branch(issue_key: str) -> str | None:
+    path = Path("reports/.cache") / f"{issue_key.upper()}-manifest.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    branch = data.get("compareBranch")
+    return str(branch).strip() if branch else None
+
+
 def write_manifest(
     cache_dir: Path,
     issue_key: str,
@@ -180,6 +227,13 @@ def write_manifest(
     repo: str | None,
     mode: str,
 ) -> Path:
+    path = cache_dir / f"{issue_key}-manifest.json"
+    existing: dict[str, Any] = {}
+    if path.exists():
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            existing = {}
     manifest = {
         "issueKey": issue_key,
         "prUrls": pr_urls,
@@ -190,7 +244,8 @@ def write_manifest(
         "useCache": True,
         "cacheMaxAgeHours": 24,
     }
-    path = cache_dir / f"{issue_key}-manifest.json"
+    if existing.get("compareBranch"):
+        manifest["compareBranch"] = existing["compareBranch"]
     path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return path
 
@@ -210,6 +265,16 @@ def main() -> int:
     parser.add_argument(
         "--repo",
         help="org/repo for PR search when --pr not given",
+    )
+    parser.add_argument(
+        "--compare",
+        metavar="BRANCH",
+        help="When no PR URL: compare head branch to --compare-base (e.g. develop)",
+    )
+    parser.add_argument(
+        "--compare-base",
+        default="main",
+        help="Base branch for --compare (default: main)",
     )
     parser.add_argument(
         "--search-pr",
@@ -249,24 +314,25 @@ def main() -> int:
 
     issue_key = args.issue_key.strip().upper()
     pr_urls = list(args.pr_urls or [])
+    compare_head = (args.compare or "").strip() or None
+    compare_base = (args.compare_base or "main").strip() or "main"
 
     if not pr_urls:
         if args.search_pr and args.repo:
             found = search_prs(issue_key, args.repo)
-            if not found:
-                print(
-                    f"No PRs found for {issue_key} in {args.repo}",
-                    file=sys.stderr,
-                )
-                return 1
-            pr_urls = found
-            print(f"Found PR(s): {', '.join(pr_urls)}", file=sys.stderr)
-        else:
-            print(
-                "Provide --pr URL or --repo with --search-pr",
-                file=sys.stderr,
-            )
-            return 1
+            if found:
+                pr_urls = found
+                print(f"Found PR(s): {', '.join(pr_urls)}", file=sys.stderr)
+            elif not compare_head:
+                compare_head = load_manifest_compare_branch(issue_key)
+                if compare_head:
+                    print(
+                        f"No PRs for {issue_key} in {args.repo}; "
+                        f"using branch compare {compare_base}...{compare_head}",
+                        file=sys.stderr,
+                    )
+        elif not compare_head:
+            compare_head = load_manifest_compare_branch(issue_key)
 
     from cache_freshness import is_prefetch_fresh, load_manifest_max_age
 
@@ -274,13 +340,47 @@ def main() -> int:
     cache_dir.mkdir(parents=True, exist_ok=True)
     max_age = args.cache_max_age if args.cache_max_age is not None else load_manifest_max_age(issue_key)
 
-    if args.skip_if_fresh and pr_urls:
+    if args.skip_if_fresh and (pr_urls or compare_head):
         fresh, reason = is_prefetch_fresh(issue_key, pr_urls, max_age_hours=max_age)
         if fresh:
             out_path = cache_dir / f"{issue_key}-prefetch.json"
             print(out_path.resolve())
             print(f"Skipped prefetch ({reason})", file=sys.stderr)
             return 0
+
+    if not pr_urls and compare_head and args.repo:
+        cmp = compare_branches(args.repo, compare_base, compare_head)
+        payload = {
+            "issueKey": issue_key,
+            "fetchedAt": datetime.now(timezone.utc).isoformat(),
+            "repo": args.repo,
+            "prUrls": [],
+            "prs": [],
+            "branchCompare": build_branch_compare_payload(
+                args.repo, compare_base, compare_head, cmp
+            ),
+        }
+        out_path = cache_dir / f"{issue_key}-prefetch.json"
+        out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        print(out_path.resolve())
+        if args.write_manifest:
+            manifest_path = write_manifest(
+                cache_dir, issue_key, [], args.repo, args.mode
+            )
+            print(f"Manifest: {manifest_path.resolve()}", file=sys.stderr)
+        print(
+            f"Prefetched branch compare {compare_base}...{compare_head}. "
+            f"Run: @Req2Release {issue_key} --from-cache --auto",
+            file=sys.stderr,
+        )
+        return 0
+
+    if not pr_urls:
+        print(
+            "Provide --pr URL, --repo with --search-pr, or --repo with --compare / manifest compareBranch",
+            file=sys.stderr,
+        )
+        return 1
 
     prs: list[dict[str, Any]] = []
     inferred_repo = args.repo
