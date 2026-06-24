@@ -54,3 +54,26 @@ def test_finalize_recomputes_pct_after_nfr_validation_cap():
     assert out["requirements"][0]["codeStatus"] == "partial"
     assert out["requirements"][0]["devTestStatus"] == "missing"
     assert out["reqCoveragePct"] == 50.0
+
+
+def test_dev_coverage_detail_shows_qa_excluded_and_scored_split():
+    """MSC-205625-style: 9 total, R4 QA excluded → 8 dev-scored, 7 covered + 1 missing."""
+    reqs = [
+        {"id": "R1", "owner": "shared", "devTestStatus": "missing", "codeStatus": "implemented"},
+        {"id": "R2", "owner": "dev", "devTestStatus": "covered", "codeStatus": "implemented"},
+        {"id": "R3", "owner": "dev", "devTestStatus": "covered", "codeStatus": "implemented"},
+        {"id": "R4", "owner": "qa", "devTestStatus": "missing", "codeStatus": "partial"},
+        {"id": "L1", "owner": "dev", "devTestStatus": "covered", "codeStatus": "implemented"},
+        {"id": "L2", "owner": "dev", "devTestStatus": "covered", "codeStatus": "implemented"},
+        {"id": "L3", "owner": "dev", "devTestStatus": "covered", "codeStatus": "implemented"},
+        {"id": "L4", "owner": "dev", "devTestStatus": "covered", "codeStatus": "implemented"},
+        {"id": "L5", "owner": "dev", "devTestStatus": "covered", "codeStatus": "implemented"},
+    ]
+    metrics = compute_coverage_pcts(reqs, jira_requirement_count=4, ladr_requirement_count=5)
+    assert metrics["devTestCoveragePct"] == 87.5
+    detail = metrics["devCoverageDetail"]
+    assert "3/4 Jira + 5/5 LADR" in detail
+    assert "8 dev-scored" in detail
+    assert "1 QA excluded" in detail
+    assert "7 Covered" in detail
+    assert "1 Missing" in detail

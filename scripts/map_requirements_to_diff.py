@@ -148,6 +148,13 @@ def compute_coverage_pcts(
     code_weights = [_status_to_weight(r.get("codeStatus")) for r in requirements]
     dev_reqs = [r for r in requirements if str(r.get("owner") or "").lower() != "qa"]
     dev_weights = [_status_to_weight(r.get("devTestStatus")) for r in dev_reqs]
+    qa_excluded = len(requirements) - len(dev_reqs)
+    jira_dev_scored = sum(
+        1 for r in dev_reqs if str(r.get("id", "")).upper().startswith("R")
+    )
+    ladr_dev_scored = sum(
+        1 for r in dev_reqs if str(r.get("id", "")).upper().startswith("L")
+    )
 
     code_counts = _count_statuses(requirements, "codeStatus")
     dev_counts = _count_statuses(dev_reqs, "devTestStatus")
@@ -173,7 +180,13 @@ def compute_coverage_pcts(
         out["devTestCoveragePct"] = None
     out["reqCoverageDetail"] = format_code_coverage_detail(code_counts, jira_n=jira_n, ladr_n=ladr_n)
     out["devCoverageDetail"] = format_dev_test_coverage_detail(
-        dev_counts, dev_owned=len(dev_reqs), jira_n=jira_n, ladr_n=ladr_n
+        dev_counts,
+        dev_owned=len(dev_reqs),
+        jira_total=jira_n,
+        ladr_total=ladr_n,
+        jira_dev_scored=jira_dev_scored,
+        ladr_dev_scored=ladr_dev_scored,
+        qa_excluded=qa_excluded,
     )
     return out
 
@@ -204,10 +217,20 @@ def format_dev_test_coverage_detail(
     counts: dict[str, int],
     *,
     dev_owned: int,
-    jira_n: int = 0,
-    ladr_n: int = 0,
+    jira_total: int = 0,
+    ladr_total: int = 0,
+    jira_dev_scored: int | None = None,
+    ladr_dev_scored: int | None = None,
+    qa_excluded: int = 0,
+    # Legacy kwargs (ignored) — kept so cached callers do not break
+    jira_n: int | None = None,
+    ladr_n: int | None = None,
 ) -> str:
     """Human-readable Dev test coverage detail for §1 (aligned with §5 Dev tests column)."""
+    if jira_n is not None and not jira_total:
+        jira_total = jira_n
+    if ladr_n is not None and not ladr_total:
+        ladr_total = ladr_n
     parts: list[str] = []
     if counts.get("implemented"):
         parts.append(f"{counts['implemented']} Covered")
@@ -215,11 +238,21 @@ def format_dev_test_coverage_detail(
         parts.append(f"{counts['partial']} Partial")
     if counts.get("missing"):
         parts.append(f"{counts['missing']} Missing")
-    status_bit = " · ".join(parts) if parts else "0 dev-owned requirements"
-    if jira_n and ladr_n:
-        scope = f"{jira_n} Jira + {ladr_n} LADR dev-owned ({dev_owned} scored)"
-    else:
-        scope = f"{dev_owned} dev-owned"
+    status_bit = " · ".join(parts) if parts else "0 dev-scored"
+
+    scope_parts: list[str] = []
+    jd = jira_dev_scored if jira_dev_scored is not None else jira_total
+    ld = ladr_dev_scored if ladr_dev_scored is not None else ladr_total
+    if jira_total and ladr_total:
+        scope_parts.append(f"{jd}/{jira_total} Jira + {ld}/{ladr_total} LADR")
+    elif jira_total:
+        scope_parts.append(f"{jd}/{jira_total} Jira")
+    elif ladr_total:
+        scope_parts.append(f"{ld}/{ladr_total} LADR")
+    scope_parts.append(f"{dev_owned} dev-scored")
+    if qa_excluded:
+        scope_parts.append(f"{qa_excluded} QA excluded")
+    scope = " · ".join(scope_parts)
     return f"{scope} · {status_bit}"
 
 

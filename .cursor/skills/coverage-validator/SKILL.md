@@ -352,7 +352,7 @@ dev_code_coverage_pct = round(100 * sum(score) / count(all mapped requirements),
 
 Same weights: **Covered** = 1.0, **Partial** = 0.5, **Missing** = 0.0 on **dev/shared-owned** requirements only (QA-only SIT AC excluded). Badges from `pr_gated_dev_test_status()` — pytest functions in PR diff required for **Covered**.
 
-`{{DEV_COVERAGE_DETAIL}}` e.g. `3 Jira + 4 LADR dev-owned (7 scored) · 5 Covered · 2 Partial`.
+`{{DEV_COVERAGE_DETAIL}}` e.g. `3/4 Jira + 5/5 LADR · 8 dev-scored · 1 QA excluded · 7 Covered · 1 Missing` (denominator excludes QA-only rows; status counts sum to dev-scored total).
 
 **Requirements mapped**
 
