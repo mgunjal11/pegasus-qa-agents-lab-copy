@@ -868,6 +868,13 @@ TRACE_SECTION_CSS = """
     .section-trace .evidence-list-extra code {
       opacity: 0.92;
     }
+    .section-testplan td:nth-child(2) {
+      min-width: 220px;
+      white-space: normal;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      line-height: 1.45;
+    }
 """
 
 PR_TABLE_INFO_CSS = """

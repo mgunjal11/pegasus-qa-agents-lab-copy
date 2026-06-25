@@ -65,6 +65,19 @@ def _slug(text: str, max_len: int = 55) -> str:
     return slug[:max_len].rstrip("_")
 
 
+def _qmetry_summary(issue_key: str, text: str, rid: str, max_total: int = 255) -> str:
+    """QMetry Summary: {KEY}_{descriptive scenario} (maps R#)."""
+    clean = re.sub(r"\s+", " ", (text or "").strip())
+    prefix = f"{issue_key}_"
+    suffix = f" (maps {rid})"
+    body_budget = max(40, max_total - len(prefix) - len(suffix))
+    body = re.sub(r"[^\w\s-]", "", clean)
+    body = "_".join(body.split())
+    if len(body) > body_budget:
+        body = body[: body_budget - 3].rstrip("_") + "..."
+    return f"{prefix}{body}{suffix}"
+
+
 def _truncate(text: str, max_len: int = 220) -> str:
     text = re.sub(r"\s+", " ", (text or "").strip())
     if len(text) <= max_len:
@@ -161,8 +174,7 @@ def _jira_cases(issue_key: str, req: dict[str, str]) -> list[list[list[str]]]:
             blocks.append(_case_rows(issue_key, summary=summary, given=given, when=when, then=then))
         return blocks
 
-    slug = _slug(text)
-    summary = f"{issue_key}_{slug} (maps {rid})"
+    summary = _qmetry_summary(issue_key, text, rid)
     given = f"Given: {_truncate(text, 240)}"
     when = f"When: Acceptance criterion {rid} is exercised per Jira story {issue_key}"
     then = f"Then: Observable outcome matches {rid} in Jira acceptance criteria"

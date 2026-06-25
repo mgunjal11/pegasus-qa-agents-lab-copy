@@ -60,3 +60,50 @@ def test_prefetch_fresh_when_urls_match(tmp_path):
     fresh, reason = is_prefetch_fresh(key, urls, tmp_path, max_age_hours=24)
     assert fresh
     assert "fresh" in reason
+
+
+def test_prefetch_fresh_when_inaccessible_pr_skipped(tmp_path):
+    key = "MSC-TEST"
+    cache = tmp_path / "reports" / ".cache"
+    cache.mkdir(parents=True)
+    requested = [
+        "https://github.com/wbd-msc/a/pull/1",
+        "https://github.com/other/repo/pull/2",
+    ]
+    fetched = ["https://github.com/wbd-msc/a/pull/1"]
+    now = datetime.now(timezone.utc)
+    (cache / f"{key}-prefetch.json").write_text(
+        json.dumps(
+            {
+                "fetchedAt": now.isoformat(),
+                "requestedPrUrls": requested,
+                "prUrls": fetched,
+            }
+        ),
+        encoding="utf-8",
+    )
+    fresh, reason = is_prefetch_fresh(key, requested, tmp_path, max_age_hours=24)
+    assert fresh
+    assert "fresh" in reason
+
+
+def test_prefetch_fresh_when_all_prs_inaccessible(tmp_path):
+    key = "MSC-TEST"
+    cache = tmp_path / "reports" / ".cache"
+    cache.mkdir(parents=True)
+    requested = ["https://github.com/other/repo/pull/2"]
+    now = datetime.now(timezone.utc)
+    (cache / f"{key}-prefetch.json").write_text(
+        json.dumps(
+            {
+                "fetchedAt": now.isoformat(),
+                "requestedPrUrls": requested,
+                "prUrls": [],
+                "skippedPrs": [{"url": requested[0], "reason": "Could not resolve repository"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    fresh, reason = is_prefetch_fresh(key, requested, tmp_path, max_age_hours=24)
+    assert fresh
+    assert "inaccessible" in reason

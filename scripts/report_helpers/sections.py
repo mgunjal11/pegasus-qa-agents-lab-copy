@@ -12,7 +12,13 @@ from testplan_gwt import steps_for_display
 from testplan_evidence import extract_testcase_evidence_ids, has_mascot_links
 
 from fetch_jira_testplan import is_gap_supplement_tc
-from report_helpers.common import REPORT_AGENT_NAME, REPORT_DEVELOPER, esc
+from report_helpers.common import (
+    REPORT_AGENT_NAME,
+    REPORT_DEVELOPER,
+    esc,
+    format_testplan_scenario,
+)
+
 
 
 def render_mascot_links(links: list[dict[str, str]]) -> str:
@@ -258,6 +264,7 @@ def build_testplan_report_fields(issue_key: str, root: Path | None = None) -> di
         "{{TESTPLAN_ROWS}}": render_testplan_rows(
             tp.get("testCases") or [],
             jira_reqs,
+            ladr_requirements=tp.get("ladrRequirements") or [],
             generated_local=is_generated_testplan(tp),
         ),
         "{{LADR_TRACEABILITY_BLOCK}}": render_ladr_traceability_block(tp),
@@ -1523,15 +1530,14 @@ def build_release_score_block(
 def render_testplan_rows(
     test_cases: list[dict[str, Any]],
     jira_requirements: list[dict[str, str]] | None = None,
+    ladr_requirements: list[dict[str, Any]] | None = None,
     *,
     generated_local: bool = False,
 ) -> str:
     rows = []
     for tc in test_cases:
         steps = tc.get("steps") or {}
-        section = tc.get("section") or ""
-        summary = tc.get("summary") or ""
-        scenario = f"{section} · {summary}" if section and summary else (section or summary or tc.get("id", ""))
+        scenario = format_testplan_scenario(tc, jira_requirements, ladr_requirements)
         ev = evidence_type_badges(tc) + render_testplan_evidence(
             tc,
             jira_requirements,

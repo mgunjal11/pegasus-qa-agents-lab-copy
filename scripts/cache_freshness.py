@@ -130,10 +130,28 @@ def is_prefetch_fresh(
     except (OSError, json.JSONDecodeError):
         return False, "prefetch cache unreadable"
 
-    cached_urls = sorted(str(u).strip() for u in (data.get("prUrls") or []) if u)
     wanted = sorted(str(u).strip() for u in pr_urls if u)
-    if cached_urls != wanted:
+    cached_urls = sorted(str(u).strip() for u in (data.get("prUrls") or []) if u)
+    requested_urls = sorted(
+        str(u).strip() for u in (data.get("requestedPrUrls") or data.get("prUrls") or []) if u
+    )
+    if cached_urls != wanted and requested_urls != wanted:
         return False, "prefetch PR URL list changed"
+
+    skipped = data.get("skippedPrs") or data.get("prefetchErrors") or []
+    skipped_urls = sorted(
+        str((s.get("url") or "")).strip() for s in skipped if isinstance(s, dict) and s.get("url")
+    )
+    if requested_urls == wanted and not cached_urls:
+        if skipped_urls and skipped_urls == wanted:
+            fetched = cache_timestamp(path)
+            if not fetched:
+                return False, "prefetch timestamp missing"
+            age_h = (datetime.now(timezone.utc) - fetched).total_seconds() / 3600
+            if age_h > max_age_hours:
+                return False, f"prefetch older than {max_age_hours}h"
+            return True, "prefetch cache fresh (PRs inaccessible)"
+        return False, "prefetch has no accessible PRs"
 
     fetched = cache_timestamp(path)
     if not fetched:

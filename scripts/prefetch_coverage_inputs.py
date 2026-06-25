@@ -383,24 +383,39 @@ def main() -> int:
         return 1
 
     prs: list[dict[str, Any]] = []
+    skipped_prs: list[dict[str, str]] = []
+    fetched_urls: list[str] = []
     inferred_repo = args.repo
     for url in pr_urls:
         org, repo_name, number = parse_pr_url(url)
         if not inferred_repo:
             inferred_repo = f"{org}/{repo_name}"
-        prs.append(fetch_pr(org, repo_name, number, url))
+        try:
+            prs.append(fetch_pr(org, repo_name, number, url))
+            fetched_urls.append(url)
+        except (RuntimeError, ValueError) as exc:
+            skipped_prs.append({"url": url, "reason": str(exc).split("\n")[0]})
+            print(f"Skipped PR {url}: {skipped_prs[-1]['reason']}", file=sys.stderr)
 
     payload = {
         "issueKey": issue_key,
         "fetchedAt": datetime.now(timezone.utc).isoformat(),
         "repo": inferred_repo,
-        "prUrls": pr_urls,
+        "requestedPrUrls": pr_urls,
+        "prUrls": fetched_urls,
+        "skippedPrs": skipped_prs,
         "prs": prs,
     }
 
     out_path = cache_dir / f"{issue_key}-prefetch.json"
     out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(out_path.resolve())
+
+    if not prs and pr_urls:
+        print(
+            "No accessible PRs could be prefetched — report will use test plan / Jira only.",
+            file=sys.stderr,
+        )
 
     if args.write_manifest:
         manifest_path = write_manifest(
