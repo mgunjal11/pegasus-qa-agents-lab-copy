@@ -34,6 +34,30 @@ def _jira_cache_exists(key: str) -> bool:
     return (_cache_dir(key) / f"{key.upper()}-jira.json").exists()
 
 
+def _parse_subprocess_json(stdout: str) -> dict[str, Any]:
+    """Parse JSON from subprocess stdout (single-line, pretty-printed, or trailing line)."""
+    text = stdout.strip()
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+    for line in reversed(text.splitlines()):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            parsed = json.loads(line)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            continue
+    return {"stdout": text}
+
+
 def _run(cmd: list[str], *, label: str) -> dict[str, Any]:
     print(f"\n>> {label}: {' '.join(cmd)}", flush=True)
     result = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, encoding="utf-8")
@@ -51,10 +75,7 @@ def _run(cmd: list[str], *, label: str) -> dict[str, Any]:
                 "`python scripts/preflight_coverage_validator.py {key} --verify-jira`."
             )
         raise RuntimeError(f"{label} failed (exit {result.returncode}): {err}{hint}")
-    try:
-        return json.loads(result.stdout.strip().splitlines()[-1])
-    except (json.JSONDecodeError, IndexError):
-        return {"stdout": result.stdout.strip()}
+    return _parse_subprocess_json(result.stdout)
 
 
 def _load_manifest(key: str) -> dict[str, Any]:
@@ -90,6 +111,30 @@ def _load_testplan_cache(key: str) -> dict[str, Any]:
 
 def _testcase_xlsx_path(key: str) -> Path:
     return ROOT / "testcases" / f"{key.upper()}-testcases.xlsx"
+
+
+def _gap_supplement_xlsx_path(key: str) -> Path:
+    return ROOT / "testcases" / f"{key.upper()}-gap-supplement.xlsx"
+
+
+def _generated_case_count(result: dict[str, Any]) -> int:
+    """Cases written this run (`generatedCases` or legacy `generated` key)."""
+    for field in ("generatedCases", "generated"):
+        value = result.get(field)
+        if value is not None:
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return 0
+    return 0
+
+
+def _should_refetch_after_generate(key: str, gen_result: dict[str, Any], *, gap_only: bool) -> bool:
+    if _generated_case_count(gen_result) > 0:
+        return True
+    if gap_only:
+        return _gap_supplement_xlsx_path(key).exists()
+    return _testcase_xlsx_path(key).exists()
 
 
 def _auto_generate_enabled(
@@ -264,7 +309,7 @@ def run_pipeline(key: str, args: argparse.Namespace) -> dict[str, Any]:
             if _auto_generate_enabled(defaults, manifest, args):
                 gen_result = _run_generate_testcases(key, gap_only=None)
                 steps.append(gen_result)
-                if gen_result.get("generatedCases", 0) > 0 or _testcase_xlsx_path(key).exists():
+                if _should_refetch_after_generate(key, gen_result, gap_only=False):
                     testplan_result = _refetch_testplan(key)
                     steps.append(testplan_result)
                 else:
@@ -299,10 +344,10 @@ def run_pipeline(key: str, args: argparse.Namespace) -> dict[str, Any]:
             if uncovered:
                 gap_result = _run_generate_testcases(
                     key,
-                    gap_only=",".join(uncovered),
+                    gap_only="from-testplan",
                 )
                 steps.append(gap_result)
-                if gap_result.get("generatedCases", 0) > 0:
+                if _should_refetch_after_generate(key, gap_result, gap_only=True):
                     testplan_result = _refetch_testplan(key, label="testplan-gap-refetch")
                     steps.append(testplan_result)
 

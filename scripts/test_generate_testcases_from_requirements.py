@@ -122,3 +122,46 @@ def test_generate_cli_writes_tsv(tmp_path: Path, monkeypatch):
     tsv = cache / f"{key}-testcases-source.tsv"
     assert tsv.exists()
     assert "(maps R1)" in tsv.read_text(encoding="utf-8")
+
+
+def test_parse_subprocess_json_pretty_printed_multiline():
+    import run_coverage_validator as rcv
+
+    stdout = json.dumps(
+        {"issueKey": "MSC-TEST", "generatedCases": 13, "mode": "gap_only"},
+        indent=2,
+    )
+    parsed = rcv._parse_subprocess_json(stdout)
+    assert parsed["generatedCases"] == 13
+
+
+def test_parse_subprocess_json_trailing_single_line():
+    import run_coverage_validator as rcv
+
+    stdout = "Building cases...\n" + json.dumps({"generatedCases": 2})
+    parsed = rcv._parse_subprocess_json(stdout)
+    assert parsed["generatedCases"] == 2
+
+
+def test_generated_case_count_accepts_legacy_generated_key():
+    import run_coverage_validator as rcv
+
+    assert rcv._generated_case_count({"generated": 0, "reason": "already covered"}) == 0
+    assert rcv._generated_case_count({"generatedCases": 5}) == 5
+
+
+def test_should_refetch_after_gap_fill_when_supplement_exists(tmp_path: Path, monkeypatch):
+    import run_coverage_validator as rcv
+
+    key = "MSC-GAP"
+    gap_xlsx = tmp_path / "testcases" / f"{key}-gap-supplement.xlsx"
+    gap_xlsx.parent.mkdir(parents=True)
+    gap_xlsx.write_bytes(b"xlsx")
+
+    monkeypatch.setattr(rcv, "ROOT", tmp_path)
+    # Pretty-print JSON parse failed in old _run — generatedCases missing from fallback dict
+    gen_result = {"stdout": json.dumps({"generatedCases": 13}, indent=2)}
+    assert rcv._should_refetch_after_generate(key, gen_result, gap_only=True) is True
+
+    gen_result_empty = {"generated": 0, "reason": "gaps already covered in TSV"}
+    assert rcv._should_refetch_after_generate(key, gen_result_empty, gap_only=True) is True
