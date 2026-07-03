@@ -9,7 +9,7 @@
   "timezone": "Asia/Kolkata",
   "timezoneLabel": "IST",
   "validateTestPlan": true,
-  "generateTestPlanIfMissing": true,
+  "generateTestPlanIfMissing": false,
   "fillTestPlanGaps": true,
   "skipTestcaseGeneration": false,
   "semanticMappingBoost": false,

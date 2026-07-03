@@ -252,7 +252,17 @@ def build_testplan_summary_note(
     count_label = "test case" if case_count == 1 else "test cases"
     count_part = f"{case_count} {filter_note}".strip() if filter_note else str(case_count)
 
-    active_meta = next(
+    parsed_files = {str(fp.get("file") or "") for fp in (files_parsed or [])}
+    jira_meta = next(
+        (
+            m
+            for m in attachment_meta
+            if m.get("source") == "jira_attachment"
+            and str(m.get("filename") or "") in parsed_files
+        ),
+        None,
+    )
+    active_meta = jira_meta or next(
         (m for m in attachment_meta if m.get("source") == "jira_attachment"),
         None,
     )
@@ -263,7 +273,8 @@ def build_testplan_summary_note(
         )
 
     filename = (
-        (primary_ref or {}).get("filename")
+        (jira_meta or {}).get("filename")
+        or (primary_ref or {}).get("filename")
         or (active_meta or {}).get("filename")
         or (files_parsed[0].get("file") if files_parsed else None)
         or "test plan"
@@ -274,8 +285,20 @@ def build_testplan_summary_note(
 
     source = (active_meta or {}).get("source") or (primary_ref or {}).get("source")
     ref_type = (primary_ref or {}).get("type")
+    gap_only_parsed = (
+        parsed_files
+        and all("gap-supplement" in f.lower() for f in parsed_files if f)
+    )
 
-    if source == "jira_attachment":
+    if gap_only_parsed and active_meta and active_meta.get("source") == "gap_supplement":
+        return (
+            f"Gap-filled supplement {active_meta.get('filename')}{tab_part} · "
+            f"{count_part} {count_label} · Jira attachment "
+            f"{(primary_ref or {}).get('filename') or 'test plan'} not parsed — "
+            f"attach or place under testplans/ and re-run."
+        )
+
+    if source == "jira_attachment" and jira_meta:
         tab = excel_tab or comment_sheet or "default"
         return (
             f"Downloaded {filename} from Jira attachment → Excel tab {tab} · "
@@ -483,16 +506,44 @@ def extract_testplan_references(jira_data: dict[str, Any], issue_key: str) -> li
     return refs
 
 
-def is_testplan_attachment(filename: str) -> bool:
-    name = filename.lower()
-    ext = Path(name).suffix
+def referenced_testplan_filenames(
+    testplan_refs: list[dict[str, Any]],
+    attachments: list[dict[str, Any]] | None = None,
+) -> set[str]:
+    """Filenames cited in Jira comments/SharePoint refs or matching Jira attachments."""
+    names: set[str] = set()
+    for ref in testplan_refs or []:
+        fn = str(ref.get("filename") or "").strip()
+        if fn:
+            names.add(fn)
+    for att in attachments or []:
+        fn = str(att.get("filename") or "").strip()
+        if fn and fn.lower().endswith((".xlsx", ".xls", ".tsv")):
+            names.add(fn)
+    return names
+
+
+def is_testplan_attachment(
+    filename: str,
+    *,
+    referenced_filenames: set[str] | None = None,
+) -> bool:
+    name = (filename or "").strip()
+    if not name:
+        return False
+    lower = name.lower()
+    ext = Path(lower).suffix
     if ext not in TESTPLAN_EXT:
         return False
+    if referenced_filenames:
+        ref_lower = {n.lower() for n in referenced_filenames}
+        if lower in ref_lower:
+            return True
     if TESTPLAN_NAME_RE.search(name):
         return True
     if ext in {".xlsx", ".tsv"} and re.search(r"MSC-\d+", name, re.IGNORECASE):
         return True
-    return ext in {".xlsx", ".tsv"} and ("test" in name or "case" in name)
+    return ext in {".xlsx", ".tsv"} and ("test" in lower or "case" in lower)
 
 
 def attachments_from_jira_cache(path: Path) -> list[dict[str, Any]]:
@@ -1084,7 +1135,12 @@ def resolve_testplan_files(
         or run_opts.get("testPlanSheet")
         or (testplan_refs[0].get("sheet") if testplan_refs else None)
     )
-    candidates = [a for a in attachments if is_testplan_attachment(a.get("filename", ""))]
+    referenced_names = referenced_testplan_filenames(testplan_refs, attachments)
+    candidates = [
+        a
+        for a in attachments
+        if is_testplan_attachment(a.get("filename", ""), referenced_filenames=referenced_names)
+    ]
     for att in candidates:
         try:
             path = download_attachment(att, dest_dir)

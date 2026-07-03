@@ -1,8 +1,10 @@
 # Missing or partial Jira test plan — auto-generate + `/Spec2Test` fallback
 
-When Jira has **no test plan attachment**, the orchestrator **auto-generates** QMetry cases via `generate_testcases_from_requirements.py` (deterministic). When an attached plan has **uncovered R/L**, it writes **`testcases/{KEY}-gap-supplement.xlsx`** and merges at fetch.
+When Jira has **no test plan attachment**, the orchestrator exits **2** and the agent invokes **`/Spec2Test {KEY}`** (preferred). When an attached plan is parsed, cases are mapped to **Jira + LADR** requirements; **gap supplement** adds cases **only for uncovered R/L**.
 
-**LLM fallback:** `/Spec2Test` when auto-generate is disabled or exit **2** / `needs_testcase_writer`. The orchestrator does **not** subprocess or auto-invoke Spec2Test — exit **2** tells the agent/user to run `/Spec2Test {KEY}` and re-run Req2Release.
+**Deterministic fallback:** `generate_testcases_from_requirements.py` full plan when `generateTestPlanIfMissing: true` in manifest/defaults (opt-in, default **off**).
+
+**LLM path:** `/Spec2Test` on exit **2** / `needs_testcase_writer`. The orchestrator does **not** subprocess Spec2Test — exit **2** tells the agent/user to run `/Spec2Test {KEY}` and re-run Req2Release.
 
 **Do not change** `apply_report_ui_enhancements()`, `SUMMARY_METRIC_INFO`, or report-template tooltip markup when adding this flow — only workflow, caches, and §3 narrative/notes.
 
@@ -12,11 +14,12 @@ Read `reports/.cache/{KEY}-testplan.json` after `fetch_jira_testplan.py`:
 
 | status | Auto-generate (`generateTestPlanIfMissing` / `fillTestPlanGaps`) |
 |--------|---------------------------------------------------------------------|
-| `ok` with uncovered R/L | **Gap supplement** when `fillTestPlanGaps: true` |
+| `ok` with attached cases + uncovered R/L | **Gap supplement for uncovered R/L only** when `fillTestPlanGaps: true` |
 | `ok` fully covered | **No** |
+| `ok` with **0 attached** cases (parse miss) | **No gap fill** — fix attachment / add `testplans/{file}`; do not use supplement as primary |
 | `referenced_not_local` | **No** — add `testplans/{filename}` locally |
 | `parse_failed` | **No** (default) — fix file first |
-| `no_testplan` | **Full generate** when `generateTestPlanIfMissing: true` |
+| `no_testplan` | **`@Spec2Test {KEY}`** (exit 2); full generate only when `generateTestPlanIfMissing: true` |
 
 Also skip when:
 
@@ -36,7 +39,7 @@ Also skip when:
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `generateTestPlanIfMissing` | `true` | Full QMetry plan when `no_testplan` |
+| `generateTestPlanIfMissing` | `false` | Full QMetry plan when `no_testplan` (opt-in; default use `@Spec2Test`) |
 | `fillTestPlanGaps` | `true` | Supplement cases for uncovered R/L on attached plans |
 | `skipTestcaseGeneration` | `false` | Opt out of all auto-generation |
 

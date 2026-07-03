@@ -150,7 +150,7 @@ def _auto_generate_enabled(
         return False
     gen = manifest.get("generateTestPlanIfMissing")
     if gen is None:
-        gen = defaults.get("generateTestPlanIfMissing", True)
+        gen = defaults.get("generateTestPlanIfMissing", False)
     return bool(gen)
 
 
@@ -167,6 +167,31 @@ def _fill_gaps_enabled(
     if fill is None:
         fill = defaults.get("fillTestPlanGaps", True)
     return bool(fill)
+
+
+def _attached_testcase_count(testplan_result: dict[str, Any]) -> int:
+    cov = testplan_result.get("coverage") if isinstance(testplan_result.get("coverage"), dict) else {}
+    try:
+        return int(cov.get("attachedTestCaseCount") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _should_fill_testplan_gaps(
+    key: str,
+    testplan_result: dict[str, Any],
+    defaults: dict[str, Any],
+    manifest: dict[str, Any],
+    args: argparse.Namespace,
+) -> bool:
+    """Gap fill only after a Jira/local attached plan was parsed (not gap-supplement alone)."""
+    if testplan_result.get("status") != "ok":
+        return False
+    if not _fill_gaps_enabled(defaults, manifest, args):
+        return False
+    if _attached_testcase_count(testplan_result) <= 0:
+        return False
+    return bool(_uncovered_requirement_ids(key))
 
 
 def _uncovered_requirement_ids(key: str) -> list[str]:
@@ -212,11 +237,6 @@ def _should_invoke_testcase_writer(
     if args.skip_testplan:
         return False
     if manifest.get("skipTestcaseGeneration") or defaults.get("skipTestcaseGeneration"):
-        return False
-    gen = manifest.get("generateTestPlanIfMissing")
-    if gen is None:
-        gen = defaults.get("generateTestPlanIfMissing", True)
-    if not gen:
         return False
     tp = _load_testplan_cache(key)
     if tp.get("status") != "no_testplan":
@@ -336,20 +356,15 @@ def run_pipeline(key: str, args: argparse.Namespace) -> dict[str, Any]:
                     ),
                     "preflight": preflight,
                 }
-        elif (
-            testplan_result.get("status") == "ok"
-            and _fill_gaps_enabled(defaults, manifest, args)
-        ):
-            uncovered = _uncovered_requirement_ids(key)
-            if uncovered:
-                gap_result = _run_generate_testcases(
-                    key,
-                    gap_only="from-testplan",
-                )
-                steps.append(gap_result)
-                if _should_refetch_after_generate(key, gap_result, gap_only=True):
-                    testplan_result = _refetch_testplan(key, label="testplan-gap-refetch")
-                    steps.append(testplan_result)
+        elif _should_fill_testplan_gaps(key, testplan_result, defaults, manifest, args):
+            gap_result = _run_generate_testcases(
+                key,
+                gap_only="from-testplan",
+            )
+            steps.append(gap_result)
+            if _should_refetch_after_generate(key, gap_result, gap_only=True):
+                testplan_result = _refetch_testplan(key, label="testplan-gap-refetch")
+                steps.append(testplan_result)
 
     steps.append(_run(_prefetch_args(key, args, defaults), label="prefetch"))
 

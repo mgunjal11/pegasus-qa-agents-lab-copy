@@ -68,7 +68,7 @@ def test_parse_gap_ids_from_testplan_cache(tmp_path: Path):
 
 
 def test_run_coverage_validator_needs_testcase_writer_exit_when_auto_off(tmp_path: Path, monkeypatch):
-    """Exit 2 when no testplan, no xlsx, and auto-generate disabled."""
+    """Exit 2 when no testplan, no xlsx, and auto-generate disabled (default)."""
     key = "MSC-NOTP"
     import run_coverage_validator as rcv
     import argparse
@@ -80,9 +80,35 @@ def test_run_coverage_validator_needs_testcase_writer_exit_when_auto_off(tmp_pat
         lambda k: {"status": "no_testplan"},
     )
     args = argparse.Namespace(skip_testplan=False, no_auto_generate_testplan=True)
-    defaults = {"generateTestPlanIfMissing": True}
+    defaults = {"generateTestPlanIfMissing": False}
     assert rcv._should_invoke_testcase_writer(key, defaults, {}, args) is True
     assert rcv._auto_generate_enabled(defaults, {}, args) is False
+
+
+def test_should_fill_gaps_only_when_attached_cases_present(tmp_path: Path, monkeypatch):
+    import argparse
+    import json
+    import run_coverage_validator as rcv
+
+    key = "MSC-GAPFILL"
+    cache = tmp_path / "reports" / ".cache"
+    cache.mkdir(parents=True)
+    monkeypatch.setattr(rcv, "_cache_dir", lambda k: cache)
+
+    args = argparse.Namespace(skip_testplan=False, no_fill_testplan_gaps=False)
+    defaults: dict = {}
+    manifest: dict = {}
+    no_attached = {"status": "ok", "coverage": {"attachedTestCaseCount": 0, "uncoveredRequirements": ["R1"]}}
+    with_attached = {"status": "ok", "coverage": {"attachedTestCaseCount": 5, "uncoveredRequirements": ["R4"]}}
+
+    assert rcv._should_fill_testplan_gaps(key, no_attached, defaults, manifest, args) is False
+    assert rcv._should_fill_testplan_gaps(key, with_attached, defaults, manifest, args) is False
+
+    (cache / f"{key}-testplan.json").write_text(
+        json.dumps({"coverage": {"uncoveredRequirements": ["R4"], "attachedTestCaseCount": 5}}),
+        encoding="utf-8",
+    )
+    assert rcv._should_fill_testplan_gaps(key, with_attached, defaults, manifest, args) is True
 
 
 def test_msc213475_context_loads_when_cache_present():

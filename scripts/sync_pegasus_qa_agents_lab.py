@@ -89,6 +89,7 @@ SCRIPTS = [
     "test_fetch_jira_story.py",
     "test_jira_env_setup.py",
     "test_fetch_jira_testplan_summary.py",
+    "test_fetch_jira_testplan_attachment.py",
     "test_fetch_jira_testplan_merge.py",
     "test_gap_fill_tc_marker.py",
     "test_testplan_scenario_display.py",

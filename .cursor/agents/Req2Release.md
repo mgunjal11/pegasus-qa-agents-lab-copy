@@ -81,17 +81,27 @@ Runs preflight → **fetch_jira_story** → confluence → test plan → **auto-
 
 
 
+## Test plan workflow (mandatory order)
+
+1. **Jira attachment present** — download every referenced / cited `.xlsx` from the issue (including filenames like `FF Race Condition.xlsx` cited in comments), parse scenarios, map each case to **Jira R1…Rn + LADR L1…Ln**, and show Mascot / Edit ID evidence from the Excel when present.
+2. **Attached plan with uncovered R/L only** — run gap supplement (`--gap-only from-testplan`) for **missing requirements only**; merge supplement after attached cases; attached % excludes supplement; effective % in §3 when merged.
+3. **No Jira test plan** — orchestrator exit **2** → invoke **`@Spec2Test {KEY}`**, then re-run Req2Release. Deterministic full generate (`generateTestPlanIfMissing: true`) is opt-in only.
+
+Gap fill **never** replaces an attached plan. If attached cases parse to **0** rows, fix attachment recognition or add `testplans/{filename}` locally — do not treat gap supplement as the primary plan.
+
+
+
 | Situation | Orchestrator behavior (default) |
 
 |-----------|----------------------------------|
 
-| Jira attachment present | `fetch_jira_testplan.py` downloads Excel from issue (`.env` creds) — primary path |
+| Jira attachment present | `fetch_jira_testplan.py` downloads referenced Excel (`.env` creds) → map cases to R/L → Mascot evidence in §3 |
 
-| `no_testplan` | Script first: `generate_testcases_from_requirements.py` → `testcases/{KEY}-testcases.xlsx` → re-fetch (**not** auto `@Spec2Test`) |
+| Attached plan with uncovered R/L | Gap supplement **only for missing R/L** → `testcases/{KEY}-gap-supplement.xlsx` merged after attached TC ids |
 
-| Attached plan with uncovered R/L | Gap supplement → `testcases/{KEY}-gap-supplement.xlsx` merged at fetch → re-fetch; attached % excludes supplement; effective % in §3 when merged |
+| `no_testplan` | Exit **2** → **`@Spec2Test {KEY}`** → re-run (unless `generateTestPlanIfMissing: true`) |
 
-| Auto-generate disabled / zero cases | Exit **2** + `needs_testcase_writer` → invoke `@Spec2Test {KEY}` manually → re-run orchestrator |
+| Auto-generate disabled / zero cases | Exit **2** + `needs_testcase_writer` → `@Spec2Test {KEY}` |
 
 
 
