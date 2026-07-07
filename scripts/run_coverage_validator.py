@@ -169,10 +169,27 @@ def _fill_gaps_enabled(
     return bool(fill)
 
 
-def _attached_testcase_count(testplan_result: dict[str, Any]) -> int:
+def _attached_testcase_count(testplan_result: dict[str, Any], key: str | None = None) -> int:
+    """Count attached (non-gap-supplement) cases from subprocess JSON or full testplan cache."""
     cov = testplan_result.get("coverage") if isinstance(testplan_result.get("coverage"), dict) else {}
     try:
-        return int(cov.get("attachedTestCaseCount") or 0)
+        count = int(cov.get("attachedTestCaseCount") or 0)
+    except (TypeError, ValueError):
+        count = 0
+    if count > 0:
+        return count
+    # fetch_jira_testplan stdout summary omits coverage — read the cache it just wrote.
+    if key:
+        cache_cov = _load_testplan_cache(key).get("coverage")
+        if isinstance(cache_cov, dict):
+            try:
+                count = int(cache_cov.get("attachedTestCaseCount") or 0)
+            except (TypeError, ValueError):
+                count = 0
+            if count > 0:
+                return count
+    try:
+        return int(testplan_result.get("testCaseCount") or 0)
     except (TypeError, ValueError):
         return 0
 
@@ -189,7 +206,7 @@ def _should_fill_testplan_gaps(
         return False
     if not _fill_gaps_enabled(defaults, manifest, args):
         return False
-    if _attached_testcase_count(testplan_result) <= 0:
+    if _attached_testcase_count(testplan_result, key) <= 0:
         return False
     return bool(_uncovered_requirement_ids(key))
 

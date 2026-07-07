@@ -338,6 +338,22 @@ def main() -> int:
 
     new_rows = generate_blocks(key, jira_reqs, ladr_reqs, skip_ids=skip_ids)
     if not new_rows and gap_only:
+        if args.write_excel and not xlsx_path.exists() and existing:
+            rc = write_excel(key, tsv_path, xlsx_path, root)
+            if rc != 0:
+                return rc
+            print(
+                json.dumps(
+                    {
+                        "issueKey": key,
+                        "generated": 0,
+                        "reason": "gaps already covered in TSV",
+                        "totalCases": len(existing) // 3,
+                        "xlsx": str(xlsx_path.resolve()),
+                    }
+                )
+            )
+            return 0
         print(json.dumps({"issueKey": key, "generated": 0, "reason": "gaps already covered in TSV"}))
         return 0
 

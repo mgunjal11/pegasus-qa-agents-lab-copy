@@ -1461,6 +1461,9 @@ def main() -> int:
                 "output": str(out_path.resolve()),
                 "status": status,
                 "testCaseCount": len(all_cases),
+                "attachedTestCaseCount": coverage.get("attachedTestCaseCount", 0),
+                "gapSupplementCaseCount": coverage.get("gapSupplementCaseCount", 0),
+                "uncoveredRequirements": coverage.get("uncoveredRequirements") or [],
                 "references": len(testplan_refs),
                 "primarySheet": (primary_ref.get("sheet") if primary_ref else None)
                 or sheet

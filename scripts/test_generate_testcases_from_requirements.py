@@ -111,6 +111,34 @@ def test_should_fill_gaps_only_when_attached_cases_present(tmp_path: Path, monke
     assert rcv._should_fill_testplan_gaps(key, with_attached, defaults, manifest, args) is True
 
 
+def test_should_fill_gaps_reads_attached_count_from_cache_when_stdout_omits_coverage(
+    tmp_path: Path, monkeypatch
+):
+    """fetch_jira_testplan stdout summary lacks coverage — orchestrator must read cache."""
+    import argparse
+    import json
+    import run_coverage_validator as rcv
+
+    key = "MSC-STDOUT"
+    cache = tmp_path / "reports" / ".cache"
+    cache.mkdir(parents=True)
+    monkeypatch.setattr(rcv, "_cache_dir", lambda k: cache)
+    (cache / f"{key}-testplan.json").write_text(
+        json.dumps(
+            {
+                "coverage": {
+                    "attachedTestCaseCount": 5,
+                    "uncoveredRequirements": ["R4", "L5"],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    stdout_summary = {"status": "ok", "testCaseCount": 5}
+    args = argparse.Namespace(skip_testplan=False, no_fill_testplan_gaps=False)
+    assert rcv._should_fill_testplan_gaps(key, stdout_summary, {}, {}, args) is True
+
+
 def test_msc213475_context_loads_when_cache_present():
     cache_path = ROOT / "reports" / ".cache" / "MSC-213475-jira.json"
     if not cache_path.exists():
